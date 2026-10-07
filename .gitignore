@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+out/
+# ROM sets are copyrighted: never commit them.
+*.zip
+roms/

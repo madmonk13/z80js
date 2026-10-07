@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "z80js",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 -m http.server ${PORT:-1976}"],
+      "port": 1976,
+      "autoPort": false
+    }
+  ]
+}
