@@ -140,15 +140,20 @@ async function loadSet(bytes, name, id) {
   if (!screen2d || screen2d.canvas.width !== board.width || screen2d.canvas.height !== board.height) {
     screen2d = new Screen2D($('screen2d'), board.width, board.height);
   }
-  // Two-way games (left/right only) get the narrow pad; the rest a 4-way d-pad.
+  // Two-way games (left/right only) get the narrow pad; the rest a 4- or 8-way d-pad.
   const twoWay = board.controls === 'two-way';
   touch.twoWay = twoWay;
-  touch.eightWay = false;
+  touch.eightWay = board.controls === 'eight-way';
   touch.stickOnly = board.buttons === 0;
+  touch.twoButtons = board.buttons === 2;
+  touch.dial = !!board.dialControl;
   document.body.classList.toggle('two-way', twoWay);
   document.body.classList.toggle('stick-only', touch.stickOnly);
   $('joyHintText').textContent = twoWay ? 'Drag left or right on this side'
     : touch.stickOnly ? 'Touch & drag anywhere' : 'Touch & drag on this side';
+  $('fireHintTitle').textContent = touch.dial ? 'Fire & aim' : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
+  $('fireHintText').textContent = touch.dial ? 'Hold to fire, drag sideways to aim'
+    : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
   renderSwitches();
   layout2D();
   const res = library.add(name, bytes, Board.title);
@@ -161,7 +166,9 @@ async function loadSet(bytes, name, id) {
 
 function refreshLibrary() {
   renderLibrary($('library'), {
+    titles: SUPPORTED,
     currentId: state.romId,
+    onAdd: () => $('romFile').click(),
     onPlay: (entry) => playEntry(entry),
     onRemove: (entry) => {
       library.remove(entry.id);
@@ -173,7 +180,7 @@ function refreshLibrary() {
   const n = library.list().length;
   $('libraryInfo').textContent = n
     ? `${n} saved · ${Math.ceil(library.usage() / 1024)} KB on this device`
-    : `Add a ROM set (the zip used by MAME) for ${SUPPORTED.join(', ')}. It's kept on this device.`;
+    : 'Add a game\'s ROM set (the zip used by MAME) to enable it. Sets are kept on this device.';
 }
 
 async function playEntry(entry) {
@@ -405,7 +412,9 @@ function tick(now) {
     let ran = 0;
     const frameTime = 1 / board.refresh;
     while (acc >= frameTime && ran < 4) {
-      board.setInputs(input.read());
+      const s = input.read();
+      if (board.buttons < 2) s.fire ||= s.fire2;    // a second button is just fire here
+      board.setInputs(s);
       board.runFrame();
       acc -= frameTime;
       ran++;

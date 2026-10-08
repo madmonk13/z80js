@@ -52,3 +52,11 @@ export function rotate90(src, w, h, dst) {
 
 // Helper for x/y offset tables: n consecutive values from `start` in `step`s.
 export const run = (start, n, step = 1) => Array.from({ length: n }, (_, i) => start + i * step);
+
+// Rotate a w x h picture 90 degrees counter-clockwise into `dst` (h wide, w
+// tall), for vertical monitors mounted the other way round.
+export function rotate270(src, w, h, dst) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) dst[(w - 1 - x) * h + y] = src[y * w + x];
+  }
+}

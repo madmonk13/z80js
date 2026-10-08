@@ -6,10 +6,13 @@
 //
 // Fire half: every touch presses fire. Each press is held for at least
 // MIN_PRESS so a quick tap is never shorter than a frame the game polls.
+// Two-button games split it: the top half is the second button. Dial games
+// (Tron) also turn the dial by the finger's sideways movement while it's down.
 
 const UP = 0x10, DOWN = 0x20, LEFT = 0x40, RIGHT = 0x80;
 const MIN_PRESS = 70;     // ms
 const DEADZONE = 0.22;    // fraction of the d-pad radius
+const DIAL_PX = 4;        // finger movement (px) per dial count
 
 // Sector index (0 = right, counting clockwise in screen space) → SWCHA bits.
 const DIR8 = [RIGHT, RIGHT | DOWN, DOWN, DOWN | LEFT, LEFT, LEFT | UP, UP, UP | RIGHT];
@@ -25,6 +28,8 @@ export class TouchControls {
     this.eightWay = true;
     this.twoWay = false;      // left/right only (e.g. Galaga's fighter)
     this.stickOnly = false;   // no fire button (e.g. Pac-Man): the whole surface is the stick
+    this.twoButtons = false;  // top of the fire half is a second button (e.g. Satan's Hollow's shield)
+    this.dial = false;        // dragging on the fire half turns a dial (Tron)
     this.size = 140;
     this.haptics = true;
     this.onTouch = null;      // called on every touch start (audio unlock, hints)
@@ -33,6 +38,10 @@ export class TouchControls {
     this.joy = null;          // { id, ox, oy, dir }
     this.fireIds = new Set();
     this.fireUntil = 0;
+    this.fire2Ids = new Set();
+    this.fire2Until = 0;
+    this.dialX = new Map();   // pointerId → last x, for dial touches
+    this.spinAcc = 0;
     this.forwarded = new Map(); // pointerId → button it was handed to
 
     surface.addEventListener('pointerdown', (e) => this.down(e));
@@ -46,6 +55,12 @@ export class TouchControls {
   // Input source interface (see Input.sources).
   dir() { return this.joy ? this.joy.dir : 0; }
   fire() { return this.fireIds.size > 0 || performance.now() < this.fireUntil; }
+  fire2() { return this.fire2Ids.size > 0 || performance.now() < this.fire2Until; }
+  spin() {
+    const n = Math.trunc(this.spinAcc / DIAL_PX);
+    this.spinAcc -= n * DIAL_PX;
+    return n;
+  }
 
   setSize(px) {
     this.size = px;
@@ -87,15 +102,27 @@ export class TouchControls {
       this.dpad.style.top = `${e.clientY}px`;
       this.knob.style.transform = 'translate(-50%, -50%)';
       this.dpad.className = 'show';
+    } else if (this.twoButtons && e.clientY < this.surface.getBoundingClientRect().top + this.surface.clientHeight / 2) {
+      this.fire2Ids.add(e.pointerId);
+      this.fire2Until = performance.now() + MIN_PRESS;
+      this.ripple(e.clientX, e.clientY);
+      if (this.haptics && navigator.vibrate) navigator.vibrate(8);
     } else {
       this.fireIds.add(e.pointerId);
       this.fireUntil = performance.now() + MIN_PRESS;
+      if (this.dial) this.dialX.set(e.pointerId, e.clientX);
       this.ripple(e.clientX, e.clientY);
       if (this.haptics && navigator.vibrate) navigator.vibrate(8);
     }
   }
 
   move(e) {
+    if (this.dialX.has(e.pointerId)) {
+      e.preventDefault();
+      this.spinAcc += e.clientX - this.dialX.get(e.pointerId);
+      this.dialX.set(e.pointerId, e.clientX);
+      return;
+    }
     const j = this.joy;
     if (!j || e.pointerId !== j.id) return;
     e.preventDefault();
@@ -130,6 +157,8 @@ export class TouchControls {
       this.dpad.className = '';
     }
     this.fireIds.delete(e.pointerId);
+    this.fire2Ids.delete(e.pointerId);
+    this.dialX.delete(e.pointerId);
   }
 
   direction(dx, dy) {
@@ -162,6 +191,10 @@ export class TouchControls {
     this.forwarded.clear();
     this.fireIds.clear();
     this.fireUntil = 0;
+    this.fire2Ids.clear();
+    this.fire2Until = 0;
+    this.dialX.clear();
+    this.spinAcc = 0;
     this.dpad.className = '';
   }
 }

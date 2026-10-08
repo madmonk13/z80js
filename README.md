@@ -20,6 +20,19 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Ms. Pac-Man (1981) | Pac-Man board plus Midway's add-on board (its ROMs are stored scrambled; z80js unscrambles them) | `mspacman` | **Tested:** boots, attract mode, coin, start and play |
 | Frogger (1981) | Konami: Galaxian-style video, a second Z80 and an AY-3-8910 for sound | `frogger` | **Tested:** boots, attract mode, coin, start and play |
 | Donkey Kong Jr. (1982) | Donkey Kong board with a second tile bank and different sound wiring | `dkongjr` (US) | **Tested:** boots, attract mode, coin, start and play |
+| Dig Dug (1982) | Galaga board design plus a ROM-based background playfield, the 53xx switch reader and an EAROM | `digdug` (rev 2) | **Tested:** boots, attract mode, coin, start and play |
+| | | `digdugb`, `digdugat` | Recognized, not yet tested |
+| Time Pilot (1982) | Konami: 1 Z80, tiles and sprites re-used down the screen; a sound Z80 with two AY-3-8910s | `timeplt` | **Tested:** boots, attract mode, coin, start and play |
+| | | `timepltc`, `timeplta` | Recognized, not yet tested |
+| Bosconian (1981) | Galaga design plus two 06xx, two 50xx score chips, 52xx speech and a scrolling playfield with radar | `bosco` (new version) | **Tested:** boots, attract mode, coin, start and play, speech |
+| Berzerk (1980) | Stern: 1 Z80, one-bit bitmap with "magic RAM" shifter/ALU and collision detection, 6840 sound effects | `berzerk` (set 1) | **Tested:** boots, attract mode, coin, start and play (no speech: see below) |
+| | | `berzerk1` | Recognized, not yet tested |
+| Mr. Do! (1982) | Universal: 1 Z80, two tile layers (one scrolling), two SN76489s | `mrdo` | **Tested:** boots, attract mode, coin, start and play |
+| | | `mrdot` | Recognized, not yet tested |
+| Satan's Hollow (1981) | Bally Midway MCR (90010 CPU board): Z80 with a Z80 CTC, Super Sound I/O (Z80, two AY-3-8910s) | `shollow` | **Tested:** boots, attract mode, coin, start and play |
+| | | `shollow2` | Recognized, not yet tested |
+| Tron (1982) | MCR, as Satan's Hollow, plus the aiming dial | `tron` (set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Tapper (1983) | MCR (91490 CPU board): 5 MHz Z80, bigger sprites with their own palettes | `tapper` (Budweiser) | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -35,16 +48,29 @@ The touch layout follows the game:
 
 - **Galaga, Galaxian:** the left half is a left/right pad, the right half is fire.
 - **Donkey Kong, Donkey Kong Jr.:** the left half is a 4-way joystick, the right half is jump.
+- **Bosconian, Berzerk:** the left half is an 8-way joystick, the right half is fire.
+- **Dig Dug:** the left half is a 4-way joystick, the right half is the pump.
+- **Time Pilot:** the left half is an 8-way joystick, the right half is fire.
+- **Mr. Do!, Tapper:** the left half is a 4-way joystick, the right half is fire (Mr. Do!'s
+  power ball, Tapper's pour/serve).
+- **Satan's Hollow:** the left half is a left/right pad; on the right half, the bottom
+  fires and the top raises the shield.
+- **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
+  aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
+  cabinet's spinner).
 - **Pac-Man, Ms. Pac-Man, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
-- Keyboards and gamepads also work: arrows or WASD to move, Space/Z/X to fire, 5 or C for
-  a coin, 1 or Return to start (2 for two players).
+- Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
+  for a second button (fire in one-button games), Q/E or the mouse wheel (or the
+  gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
+  (2 for two players).
 - **Left-handed** mode in settings swaps the halves.
 
 ## Settings (⚙) and Games
 
-- **Games:** add ROM sets (.zip). They're kept whole in `localStorage`; the last game
-  played starts on launch.
+- **Games:** every supported game, in alphabetical order. Games you haven't added a ROM
+  set for are greyed out ("Upload ROM to enable"); tap one, or **Add ROM set…**, to add
+  its zip. Sets are kept whole in `localStorage`; the last game played starts on launch.
 - **Controls, Sound and volume**, as in 6502js.
 - **Resume where I left off** (on by default): the game in progress is saved when the
   page is hidden or closed, and every few seconds while playing, so a refresh or relaunch
@@ -88,10 +114,138 @@ right, up, down, fire) then holds a control.
 - `src/emu/i8035.js`: the Intel 8035/8039 (MCS-48) microcontroller, Donkey Kong's sound CPU.
 - `src/emu/frogger.js`: Frogger, built on the Galaxian board: its river background,
   rewired color and position lines, the 8255 PPI interface, and the sound board's Z80.
-- `src/emu/ay8910.js`: the General Instrument AY-3-8910 sound chip.
-- `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga).
+- `src/emu/digdug.js`: Dig Dug, built on the Galaga board: the background playfield
+  (four pictures in a map ROM), the 1-bit text layer, its sprites and the 53xx.
+- `src/emu/timeplt.js`: Time Pilot: tiles with priority, sprites latched line by line (the
+  game re-uses them down the screen for its clouds) and the two-AY sound board with its
+  switchable filters.
+- `src/emu/bosco.js`: Bosconian, built on the Galaga board: the second 06xx, stand-ins
+  for the 50xx score chips and the 54xx, the 52xx speech player, the playfield, radar
+  panel and dots, and the two-way starfield.
+- `src/emu/berzerk.js`: Berzerk: the bitmap, the magic-RAM shifter and ALU with collision
+  detection, scanline-timed interrupts, and the 6840 sound effects.
+- `src/emu/mrdo.js`: Mr. Do!: two tile layers, sprites, and its protection read.
+- `src/emu/mcr.js`: the Bally Midway MCR boards (Satan's Hollow, Tron, Tapper): tiles,
+  both sprite generators, palette RAM, and the Super Sound I/O board (its sound Z80, two
+  AYs gated by duty-cycle counters, and the game's input ports).
+- `src/emu/z80ctc.js`: the Zilog Z80 CTC counter/timer, with mode 2 interrupts and RETI.
+- `src/emu/ay8910.js`: the General Instrument AY-3-8910 sound chip (with optional
+  per-channel low-pass filters and volume gating).
+- `src/emu/sn76489.js`: the Texas Instruments SN76489 sound chip (Mr. Do!).
+- `src/emu/mixer.js`: mixes a board's sound chips into one output.
+- `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga, Dig Dug).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.
 - `src/main.js`, `src/touch.js`, `src/input.js`, `src/audio-out.js`: the app shell.
+
+## How the boards are simulated
+
+Every board is a JavaScript class with the same interface (see the top of
+`src/emu/boards.js`). The app shell knows nothing about any particular board:
+
+```mermaid
+flowchart LR
+  zip[ROM zip] --> unzip[src/unzip.js] --> identify["identify()<br/>src/emu/boards.js"]
+  identify -->|"Board class + assembled ROMs"| board[Board instance]
+  input["src/input.js<br/>src/touch.js"] -->|"setInputs({left, right, up, down,<br/>fire, fire2, spin, coin, start1, start2})"| board
+  loop["main.js frame loop"] -->|"runFrame() × refresh rate"| board
+  board -->|"frame (RGBA Uint32Array)"| screen[Screen2D canvas]
+  board -->|"sound (48 kHz ring buffer)"| audio["src/audio-out.js<br/>src/audio-worklet.js"]
+  board <-->|"saveState() / loadState()"| state["src/emu/state.js<br/>(resume)"]
+```
+
+Inside `runFrame()`, each board steps its CPUs a scanline (or a slice of one)
+at a time, fires interrupts at the lines the hardware does, calls its sound
+chips' `sample()` so they fill exactly 48,000 samples per emulated second, and
+renders the picture once per frame (rotated with `rotate90`/`rotate270` in
+`src/emu/video.js` for vertical monitors).
+
+### Namco Galaga family: Galaga, Dig Dug, Bosconian
+
+```mermaid
+flowchart TB
+  subgraph cpus["3 × Z80 @ 3.072 MHz (src/emu/z80.js)"]
+    main[Main CPU] --- sub[Sub CPU] --- snd[Sound CPU]
+  end
+  ram[("Shared RAM<br/>video, sprites, work")]
+  cpus <--> ram
+  main <-->|"7000/7100"| n06["06xx bus interface<br/>(NMI every 200 µs while a chip is selected)"]
+  n06 --> n51["51xx: coins, credits, joystick<br/>galaga.js read51/write51"]
+  n06 --> n53["53xx: DIP switches<br/>digdug.js read53"]
+  n06 --> n54["54xx: explosions (noise stand-in)<br/>galaga.js / bosco.js write54"]
+  n06 --> n50a["50xx #1: scores (stand-in)<br/>bosco.js Score50"]
+  sub <-->|"9000/9100 (Bosconian)"| n06b["second 06xx"]
+  n06b --> n50b["50xx #2 (stand-in)"]
+  n06b --> n52["52xx speech player<br/>bosco.js Speech52"]
+  snd -->|"6800-681F"| wsg["Waveform sound generator<br/>src/emu/wsg.js"]
+  n52 -->|"wsg.extra()"| wsg
+  ram --> video["Tiles + sprites + stars<br/>galaga.js / digdug.js / bosco.js render()"]
+```
+
+Files: `src/emu/galaga.js` (base class), `src/emu/digdug.js`, `src/emu/bosco.js`,
+`src/emu/galaga-stars.js`, `src/emu/wsg.js`.
+
+### Pac-Man / Galaxian / Frogger / Mr. Do! / Time Pilot: one main Z80
+
+```mermaid
+flowchart TB
+  z80["Z80 (src/emu/z80.js)"] <--> mem[("ROM / RAM / tile RAM / sprite RAM")]
+  z80 -->|"vblank IRQ or NMI"| z80
+  mem --> render["render(): tiles, sprites,<br/>stars / bullets / river"]
+  z80 -->|"sound regs"| s1["Pac-Man, Ms. Pac-Man: wsg.js"]
+  z80 -->|"sound latches"| s2["Galaxian: galaxian-sound.js (analog model)"]
+  z80 -->|"PPI 8255 latch + IRQ"| sz80["Sound Z80"] --> ay["AY-3-8910 (src/emu/ay8910.js)<br/>Frogger: 1 chip; Time Pilot: 2 chips + RC filters"]
+  z80 -->|"9801/9802"| sn["2 × SN76489 (src/emu/sn76489.js)<br/>Mr. Do!"]
+  ay --> mix["src/emu/mixer.js SoundMix"]
+  sn --> mix
+```
+
+Files: `src/emu/pacman.js` (Pac-Man, Ms. Pac-Man add-on decryption),
+`src/emu/galaxian.js` → `src/emu/frogger.js` (subclass), `src/emu/timeplt.js`
+(sprites latched per scanline for the cloud multiplexing), `src/emu/mrdo.js`.
+
+### Nintendo Donkey Kong / Donkey Kong Jr.
+
+```mermaid
+flowchart LR
+  z80["Z80 @ 3.072 MHz"] <--> vram[("Tile RAM, sprite RAM")]
+  z80 -->|"sound latch + trigger lines"| i8035["i8035 sound CPU<br/>src/emu/i8035.js"]
+  i8035 -->|"8-bit DAC"| dks["src/emu/dkong-sound.js"]
+  z80 -->|"walk / jump / stomp … lines"| fx["Modeled analog / sample effects<br/>dkong-sound.js EFFECTS"] --> dks
+  vram --> r["dkong.js render()"]
+```
+
+### Bally Midway MCR: Satan's Hollow, Tron, Tapper
+
+```mermaid
+flowchart TB
+  main["Main Z80<br/>2.5 MHz (90010) / 5 MHz (91490)"] <-->|"I/O F0-F3"| ctc["Z80 CTC<br/>src/emu/z80ctc.js"]
+  ctc -->|"mode 2 IRQ vector,<br/>RETI via z80.onReti"| main
+  vbl["vblank per field"] -->|"trigger 2 / 3"| ctc
+  main <--> mem[("Tile RAM + palette RAM,<br/>sprite RAM, NVRAM")]
+  main <-->|"I/O 00-07: inputs, 1C-1F: latches"| ssio
+  subgraph ssio["Super Sound I/O board (mcr.js)"]
+    sz80["Sound Z80 @ 2 MHz<br/>IRQ from 50 kHz counter"] --> ay2["2 × AY-3-8910"]
+    ay2 -->|"port writes"| duty["duty-cycle volume gating<br/>(timing PROM)"]
+  end
+  mem --> spr["spritesOred() (90010) /<br/>spritesFrontToBack() (91490)"]
+```
+
+Files: `src/emu/mcr.js` (base class `MCR`, subclasses `SatansHollow`, `Tron`,
+`Tapper`), `src/emu/z80ctc.js`, `src/emu/ay8910.js`, `src/emu/mixer.js`.
+
+### Stern Berzerk
+
+```mermaid
+flowchart LR
+  z80["Z80 @ 2.5 MHz"] -->|"writes to 6000-7FFF"| magic["Magic RAM: shift → mirror →<br/>collision check → 74181 ALU"]
+  magic --> bitmap[("1-bit bitmap 4000-5FFF")]
+  z80 --> bitmap
+  z80 --> cram[("Color RAM: 4×4-pixel cells")]
+  bitmap --> render["berzerk.js render()"]
+  cram --> render
+  z80 -->|"I/O 40-47"| ptm["6840 timer + noise LFSR<br/>berzerk.js PTM6840"]
+  lines["scanline counter"] -->|"2 IRQs + 8 NMIs per frame"| z80
+```
 
 ## Known gaps
 
@@ -102,6 +256,15 @@ right, up, down, fire) then holds a control.
   climb, jump, land, roar, snapjaw, death and drop** effects are models (of analog
   circuits, or of recorded samples on the original), so they're close but not exact. Donkey Kong's music is the real thing:
   its own sound CPU program, run by the 8035 core.
+- **Dig Dug** ignores coins for its first ~11 seconds, while its power-on self test
+  runs. Its high scores live in an EAROM that's kept only while running.
+- **Bosconian's 50xx and 54xx** are microcontrollers whose programs aren't in the ROM set:
+  the 50xx is reimplemented from its documented commands (scores, bonus and high-score
+  checks), and the 54xx's shots and explosions are bursts of noise. Like Dig Dug, it
+  ignores coins during its ~16-second power-on test.
+- **Berzerk's robot voice** lives on a separate speech board whose two ROMs (`1c`, `2c`)
+  many Berzerk sets don't include; the speech chip isn't emulated yet, so the robots are
+  silent. The 6840 sound effects play.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware
@@ -111,6 +274,4 @@ waveform sound) but each adds its own video and custom chips:
 
 | Game | Year | What it adds |
 |---|---|---|
-| Dig Dug | 1982 | A background playfield layer (the dirt) and the 53xx input chip. The closest to Galaga. |
-| Bosconian | 1981 | A scrolling playfield, the radar display, the 50xx score chip and 52xx speech. |
 | Xevious | 1982 | Two scrolling tile layers, a ROM-based terrain data chip, and the 50xx and 52xx. |

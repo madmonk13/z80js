@@ -14,7 +14,7 @@ import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
 const SCREEN_W = 224, SCREEN_H = 288;   // as displayed (rotated)
-const NATIVE_W = 288, NATIVE_H = 224;
+export const NATIVE_W = 288, NATIVE_H = 224;
 const LINES = 264, LINE_CYCLES = 192, VBLANK_LINE = 224;
 const NMI_06XX_CYCLES = 614;                     // 200 us at 3.072 MHz
 
@@ -43,7 +43,7 @@ export class Galaga {
     this.buttons = 1;
     this.roms = roms;
     this.ram = new Uint8Array(0x10000);     // video RAM and the three work RAMs, by address
-    this.applySwitches(defaultSwitches(Galaga.switches));
+    this.applySwitches(defaultSwitches(this.constructor.switches));
     // Inputs, active low as the hardware reads them.
     //   IN0: 0 fire, 2 start 1, 3 start 2, 4 coin 1, 5 coin 2, 6 service, 7 test
     //   IN1: 1 right, 3 left (player 1)
@@ -136,9 +136,13 @@ export class Galaga {
     if (!(this.cmd06 & 0x10)) return 0;
     switch (this.cmd06 & 0x0F) {
       case 0x1: return this.read51();
+      case 0x2: return this.read53();
       default: return 0xFF;
     }
   }
+
+  // Chip select 2 is empty on Galaga; Dig Dug puts its 53xx there.
+  read53() { return 0xFF; }
 
   write06(v) {
     if (this.cmd06 & 0x10) return;

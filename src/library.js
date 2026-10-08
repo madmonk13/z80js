@@ -101,41 +101,58 @@ function sizeLabel(bytes) {
   return bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)}K`;
 }
 
-// Render the collection into `el` (a <ul>). Removing takes two taps.
-export function renderLibrary(el, { currentId, onPlay, onRemove }) {
+// Render the games list into `el` (a <ul>): every supported game in
+// alphabetical order, each ROM set added for it as a playable row and games
+// without one greyed out (tapping those calls onAdd). Sets for games no longer
+// recognized are listed after them. Removing takes two taps.
+export function renderLibrary(el, { titles, currentId, onPlay, onRemove, onAdd }) {
   el.textContent = '';
-  const add = (entry, removable) => {
+  const row = (label, detail, { entry, missing } = {}) => {
     const li = document.createElement('li');
-    li.className = 'cart-item' + (entry.id === currentId ? ' playing' : '');
+    li.className = 'cart-item' + (entry && entry.id === currentId ? ' playing' : '') + (missing ? ' missing' : '');
     const play = document.createElement('button');
     play.className = 'cart-play';
     const name = document.createElement('b');
-    name.textContent = entry.name;
+    name.textContent = label;
     const meta = document.createElement('small');
-    meta.textContent = entry.id === currentId ? 'Playing'
-      : [entry.size ? sizeLabel(entry.size) : '', entry.mapper, ago(entry.lastPlayed)].filter(Boolean).join(' · ');
+    meta.textContent = detail;
     play.append(name, meta);
-    play.addEventListener('click', () => onPlay(entry));
+    play.addEventListener('click', () => (entry ? onPlay(entry) : onAdd()));
     li.append(play);
-    if (removable) {
-      const rm = document.createElement('button');
-      rm.className = 'cart-remove';
-      rm.setAttribute('aria-label', `Remove ${entry.name}`);
-      rm.textContent = '✕';
-      let timer = 0;
-      rm.addEventListener('click', () => {
-        if (!rm.classList.contains('confirm')) {
-          rm.classList.add('confirm');
-          rm.textContent = 'Remove';
-          timer = setTimeout(() => { rm.classList.remove('confirm'); rm.textContent = '✕'; }, 3000);
-          return;
-        }
-        clearTimeout(timer);
-        onRemove(entry);
-      });
-      li.append(rm);
-    }
+    if (entry) li.append(removeButton(entry, label, onRemove));
     el.append(li);
   };
-  for (const e of library.list()) add(e, true);
+  const detail = (e) => (e.id === currentId ? 'Playing'
+    : [e.size ? sizeLabel(e.size) : '', ago(e.lastPlayed)].filter(Boolean).join(' · '));
+
+  const entries = library.list();
+  const byTitle = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  for (const title of [...titles].sort(byTitle)) {
+    const sets = entries.filter((e) => e.mapper === title);
+    if (!sets.length) { row(title, 'Upload ROM to enable', { missing: true }); continue; }
+    // Two sets for one game (a clone, say) are told apart by file name.
+    for (const e of sets) row(title, sets.length > 1 ? `${e.name} · ${detail(e)}` : detail(e), { entry: e });
+  }
+  for (const e of entries.filter((x) => !titles.includes(x.mapper)).sort((a, b) => byTitle(a.name, b.name))) {
+    row(e.name, detail(e), { entry: e });
+  }
+}
+
+function removeButton(entry, label, onRemove) {
+  const rm = document.createElement('button');
+  rm.className = 'cart-remove';
+  rm.setAttribute('aria-label', `Remove ${label}`);
+  rm.textContent = '✕';
+  let timer = 0;
+  rm.addEventListener('click', () => {
+    if (!rm.classList.contains('confirm')) {
+      rm.classList.add('confirm');
+      rm.textContent = 'Remove';
+      timer = setTimeout(() => { rm.classList.remove('confirm'); rm.textContent = '✕'; }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    onRemove(entry);
+  });
+  return rm;
 }

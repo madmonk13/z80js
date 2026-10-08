@@ -41,7 +41,7 @@ export class DonkeyKong {
       test: (n) => this.t[n],
     });
     this.in0 = 0; this.in1 = 0; this.in2 = 0;
-    this.applySwitches(defaultSwitches(DonkeyKong.switches));
+    this.applySwitches(defaultSwitches(this.constructor.switches));
     this.frame = new Uint32Array(this.width * this.height);
     this.native = new Uint32Array(NATIVE_W * 256);
 

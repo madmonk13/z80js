@@ -35,7 +35,7 @@ export class PacMan {
     this.cpu.onIrqAck = () => { this.cpu.irq = false; };
     this.in0 = 0xFF;
     this.in1 = 0xFF;
-    this.applySwitches(defaultSwitches(PacMan.switches));
+    this.applySwitches(defaultSwitches(this.constructor.switches));
     this.frame = new Uint32Array(this.width * this.height);
     this.native = new Uint32Array(NATIVE_W * NATIVE_H);
 

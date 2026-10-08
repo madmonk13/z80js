@@ -23,7 +23,7 @@ export const RATE = 48000;
 // measurements of real chips (louder at the bottom than a pure 3 dB curve).
 const LEVEL = Float32Array.from([0, 0.0105, 0.0152, 0.0221, 0.0321, 0.0468, 0.0644, 0.1069,
   0.1316, 0.2167, 0.2950, 0.3770, 0.4900, 0.6062, 0.7714, 1]);
-const STATE = ['regs', 'addr', 'toneCount', 'toneOut', 'noiseCount', 'noise', 'envCount', 'envStep', 'envHold', 'envAttack', 'envAlt', 'envCont', 'envHoldBit', 'acc', 'enabled', 'dcIn', 'dcOut'];
+const STATE = ['regs', 'addr', 'toneCount', 'toneOut', 'noiseCount', 'noise', 'envCount', 'envStep', 'envHold', 'envAttack', 'envAlt', 'envCont', 'envHoldBit', 'acc', 'enabled', 'dcIn', 'dcOut', 'filterK', 'lp', 'volume'];
 
 export class AY8910 {
   // clock: input clock in Hz; portIn(n) -> byte for ports A (0) and B (1);
@@ -32,6 +32,7 @@ export class AY8910 {
     this.clock = clock;
     this.gain = gain;
     this.portIn = portIn;
+    this.portOut = null;          // portOut(n, value): writes to the I/O ports, if the board uses them
     this.buffer = new Float32Array(1 << 15);
     this.rate = RATE;
     this.reset();
@@ -52,6 +53,9 @@ export class AY8910 {
     this.dcIn = 0; this.dcOut = 0;
     this.acc = 0;                 // fraction of a clock/16 tick carried between samples
     this.enabled = true;          // board-level mute
+    this.filterK = [1, 1, 1];     // per-channel low-pass coefficient (1 = no filter)
+    this.lp = [0, 0, 0];
+    this.volume = [1, 1, 1];      // per-channel level set by the board (some boards gate the outputs)
     this.writePos = this.readPos = 0;
   }
 
@@ -66,6 +70,7 @@ export class AY8910 {
     const r = this.addr;
     const MASK = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF];
     this.regs[r] = v & MASK[r];
+    if (r >= 14 && this.portOut) this.portOut(r - 14, v);
     if (r === 13) {
       // New envelope shape: restart it. Bits: continue, attack, alternate, hold.
       const s = this.regs[13];
@@ -78,6 +83,10 @@ export class AY8910 {
       this.envCount = 0;
     }
   }
+
+  // Some boards put a switchable RC low-pass on each channel's output: set
+  // channel `ch`'s time constant in seconds (0 for none).
+  setFilter(ch, tau) { this.filterK[ch] = tau > 0 ? 1 - Math.exp(-1 / (tau * RATE)) : 1; }
 
   tonePeriod(ch) { return (this.regs[ch * 2] | (this.regs[ch * 2 + 1] << 8)) || 1; }
 
@@ -109,7 +118,7 @@ export class AY8910 {
 
   sample() {
     this.acc += this.clock / 16 / RATE;
-    let s = 0, n = 0;
+    let a = 0, b = 0, c = 0, n = 0;
     while (this.acc >= 1) {
       this.acc -= 1;
       this.tick();
@@ -118,17 +127,21 @@ export class AY8910 {
       const mix = this.regs[7], noise = this.noise & 1;
       for (let ch = 0; ch < 3; ch++) {
         const toneOn = !((mix >> ch) & 1), noiseOn = !((mix >> (ch + 3)) & 1);
-        const high = (toneOn ? this.toneOut[ch] : 1) & (noiseOn ? noise : 1);
+        if (!((toneOn ? this.toneOut[ch] : 1) & (noiseOn ? noise : 1))) continue;
         const amp = this.regs[8 + ch];
-        const vol = (amp & 0x10) ? this.envLevel() : amp & 0x0F;
-        if (high) s += LEVEL[vol];
+        const level = LEVEL[(amp & 0x10) ? this.envLevel() : amp & 0x0F];
+        if (ch === 0) a += level * this.volume[0]; else if (ch === 1) b += level * this.volume[1]; else c += level * this.volume[2];
       }
       n++;
     }
+    // Each channel through its filter (if any), then the three mixed.
+    const lp = this.lp, k = this.filterK;
+    if (n) { lp[0] += (a / n - lp[0]) * k[0]; lp[1] += (b / n - lp[1]) * k[1]; lp[2] += (c / n - lp[2]) * k[2]; }
     // The chip's output never goes below zero; a DC blocker centers it.
-    const raw = this.enabled && n ? (s / n / 3) * this.gain : 0;
+    const raw = this.enabled ? ((lp[0] + lp[1] + lp[2]) / 3) * this.gain : 0;
     const out = raw - this.dcIn + 0.995 * this.dcOut;
     this.dcIn = raw; this.dcOut = out;
+    this.out = out;
     const mask = this.buffer.length - 1;
     this.buffer[this.writePos] = out;
     this.writePos = (this.writePos + 1) & mask;
@@ -152,3 +165,4 @@ export class AY8910 {
     this.frac = pos; this.last = last;
   }
 }
+

@@ -8,11 +8,12 @@
 //   width, height        picture size as displayed (rotated for vertical monitors)
 //   frame                Uint32Array of RGBA pixels, updated each frame
 //   refresh              frames per second
-//   controls             'two-way' (left/right) or 'four-way'
-//   buttons              number of fire buttons (0 or 1)
+//   controls             'two-way' (left/right), 'four-way' or 'eight-way'
+//   buttons              number of fire buttons (0-2; button2 names the second)
+//   dialControl          true if the game has a spinner (read as `spin`)
 //   sound                sample source: buffer/readPos/writePos/available()/pull(), rate
 //   runFrame(), reset()
-//   setInputs({ left, right, up, down, fire, coin, start1, start2 })
+//   setInputs({ left, right, up, down, fire, fire2, spin, coin, start1, start2 })
 //   applySwitches({ id: value }) with the options listed in Board.switches
 
 import { Galaga } from './galaga.js';
@@ -20,6 +21,12 @@ import { PacMan, MsPacMan } from './pacman.js';
 import { Galaxian } from './galaxian.js';
 import { DonkeyKong, DonkeyKongJr } from './dkong.js';
 import { Frogger } from './frogger.js';
+import { DigDug } from './digdug.js';
+import { TimePilot } from './timeplt.js';
+import { MrDo } from './mrdo.js';
+import { SatansHollow, Tron, Tapper } from './mcr.js';
+import { Bosconian } from './bosco.js';
+import { Berzerk } from './berzerk.js';
 
 const BOARDS = [
   {
@@ -178,6 +185,171 @@ const BOARDS = [
       sound: cat(swap01(c.sound0), c.sound1, c.sound2),
       gfx: cat(c.gfx0, swap01(c.gfx1)),
       palette: c.palette,
+    }),
+  },
+  {
+    Board: DigDug,
+    chips: [
+      ['main0', 0x1000, [/^136007\.101/, /^dd1a\.1$/, /^136007\.201/]],
+      ['main1', 0x1000, [/^136007\.102/, /^dd1a\.2$/, /^136007\.202/]],
+      ['main2', 0x1000, [/^136007\.103/, /^dd1a\.3$/, /^136007\.203/]],
+      ['main3', 0x1000, [/^dd1\.4b/, /^dd1a\.4$/, /^136007\.104/, /^136007\.204/]],
+      ['sub0', 0x1000, [/^dd1\.5b/, /^dd1a\.5$/, /^136007\.105/, /^136007\.205/]],
+      ['sub1', 0x1000, [/^dd1\.6b/, /^dd1a\.6$/, /^136007\.106/, /^136007\.206/]],
+      ['sound', 0x1000, [/^136007\.107/]],
+      ['chars', 0x800, [/^dd1\.9$/, /^136007\.108/]],
+      ['sprites0', 0x1000, [/^136007\.116/]],
+      ['sprites1', 0x1000, [/^dd1\.14/, /^136007\.117/]],
+      ['sprites2', 0x1000, [/^136007\.118/]],
+      ['sprites3', 0x1000, [/^136007\.119/]],
+      ['bgTiles', 0x1000, [/^dd1\.11/, /^136007\.115/]],
+      ['bgMap', 0x1000, [/^dd1\.10b/, /^136007\.114/]],
+      ['palette', 0x20, [/^digdug\.5n/, /^136007\.113/]],
+      ['spriteLut', 0x100, [/^digdug\.1c/, /^136007\.111/]],
+      ['bgLut', 0x100, [/^digdug\.2n/, /^136007\.112/]],
+      ['wave', 0x100, [/^digdug\.spr/, /^136007\.110/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sub: cat(c.sub0, c.sub1), sound: c.sound,
+      chars: c.chars, sprites: cat(c.sprites0, c.sprites1, c.sprites2, c.sprites3),
+      bgTiles: c.bgTiles, bgMap: c.bgMap, palette: c.palette, spriteLut: c.spriteLut, bgLut: c.bgLut, wave: c.wave,
+    }),
+  },
+  {
+    Board: TimePilot,
+    chips: [
+      ['main0', 0x2000, [/^tm1$/, /^cd1y/, /^cd_e1/]],
+      ['main1', 0x2000, [/^tm2$/, /^cd2y/, /^cd_e2/]],
+      ['main2', 0x2000, [/^tm3$/, /^cd3y/, /^cd_e3/]],
+      ['sound', 0x1000, [/^tm7$/]],
+      ['chars', 0x2000, [/^tm6$/]],
+      ['sprites0', 0x2000, [/^tm4$/]],
+      ['sprites1', 0x2000, [/^tm5$/]],
+      ['palLo', 0x20, [/^timeplt\.b4/]],
+      ['palHi', 0x20, [/^timeplt\.b5/]],
+      ['spriteLut', 0x100, [/^timeplt\.e9/]],
+      ['charLut', 0x100, [/^timeplt\.e12/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2), sound: c.sound, chars: c.chars, sprites: cat(c.sprites0, c.sprites1),
+      palLo: c.palLo, palHi: c.palHi, spriteLut: c.spriteLut, charLut: c.charLut,
+    }),
+  },
+  {
+    Board: MrDo,
+    chips: [
+      ['main0', 0x2000, [/^a4-01/, /^d1$/]],
+      ['main1', 0x2000, [/^c4-02/, /^d2$/]],
+      ['main2', 0x2000, [/^e4-03/, /^d3$/]],
+      ['main3', 0x2000, [/^f4-04/, /^d4$/]],
+      ['fg0', 0x1000, [/^s8-09/, /^d9$/]],
+      ['fg1', 0x1000, [/^u8-10/, /^d10$/]],
+      ['bg0', 0x1000, [/^r8-08/]],
+      ['bg1', 0x1000, [/^n8-07/]],
+      ['sprites0', 0x1000, [/^h5-05/]],
+      ['sprites1', 0x1000, [/^k5-06/]],
+      ['palHi', 0x20, [/^u02--2/]],
+      ['palLo', 0x20, [/^t02--3/]],
+      ['spriteLut', 0x20, [/^f10--1/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), fg: cat(c.fg0, c.fg1), bg: cat(c.bg0, c.bg1),
+      sprites: cat(c.sprites0, c.sprites1), palHi: c.palHi, palLo: c.palLo, spriteLut: c.spriteLut,
+    }),
+  },
+  {
+    Board: Bosconian,
+    chips: [
+      ['main0', 0x1000, [/^bos3_1/, /^bos1_1/, /^bos2_1/]],
+      ['main1', 0x1000, [/^bos1_2/]],
+      ['main2', 0x1000, [/^bos1_3/]],
+      ['main3', 0x1000, [/^bos1_4/]],
+      ['sub0', 0x1000, [/^bos1_5/]],
+      ['sub1', 0x1000, [/^bos3_6/, /^bos1_6/]],
+      ['sound', 0x1000, [/^2900\.3e/]],
+      ['chars', 0x1000, [/^5300\.5d/]],
+      ['sprites', 0x1000, [/^5200\.5e/]],
+      ['dots', 0x100, [/^prom\.2d/]],
+      ['palette', 0x20, [/^bosco\.6b/]],
+      ['charLut', 0x100, [/^bosco\.4m/]],
+      ['wave', 0x100, [/^prom\.1d/, /^bosco\.spr/]],
+      ['speech0', 0x1000, [/^4900\.5n/]],
+      ['speech1', 0x1000, [/^5000\.5m/]],
+      ['speech2', 0x1000, [/^5100\.5l/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sub: cat(c.sub0, c.sub1), sound: c.sound,
+      chars: c.chars, sprites: c.sprites, dots: c.dots, palette: c.palette, charLut: c.charLut, spriteLut: c.charLut,
+      wave: c.wave, speech: cat(c.speech0, c.speech1, c.speech2),
+    }),
+  },
+  {
+    Board: Berzerk,
+    chips: [
+      ['r0', 0x800, [/^1c-0/, /^rom0\.1c/]],
+      ['r1', 0x800, [/^1d-1/, /^rom1\.1d/]],
+      ['r2', 0x800, [/^3d-2/, /^rom2\.3d/]],
+      ['r3', 0x800, [/^5d-3/, /^rom3\.5d/]],
+      ['r4', 0x800, [/^6d-4/, /^rom4\.6d/]],
+      ['r5', 0x800, [/^5c-5/, /^rom5\.5c/]],
+    ],
+    // 0800-0FFF is RAM; the program sits at 0000-07FF and 1000-37FF.
+    assemble: (c) => ({ main: cat(c.r0, new Uint8Array(0x800), c.r1, c.r2, c.r3, c.r4, c.r5, new Uint8Array(0x800).fill(0xFF)) }),
+  },
+  {
+    Board: SatansHollow,
+    chips: [
+      ...[0, 1, 2, 3, 4, 5].map((n) => [`main${n}`, 0x2000, [new RegExp(`^sh-pro\\.0${n}`)]]),
+      ['sound0', 0x1000, [/^sh-snd\.01/, /^snd-0\.a7/]],
+      ['sound1', 0x1000, [/^sh-snd\.02/, /^snd-1\.a8/]],
+      ['sound2', 0x1000, [/^sh-snd\.03/, /^snd-2\.a9/]],
+      ['bg0', 0x2000, [/^sh-bg\.00/]],
+      ['bg1', 0x2000, [/^sh-bg\.01/]],
+      ...[0, 1, 2, 3].map((n) => [`fg${n}`, 0x2000, [new RegExp(`^sh-fg\\.0${n}`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3, c.main4, c.main5), sound: cat(c.sound0, c.sound1, c.sound2),
+      bg: cat(c.bg0, c.bg1), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3), prom: c.prom,
+    }),
+  },
+  {
+    Board: Tron,
+    chips: [
+      ...['a', 'b', 'c', 'd', 'e', 'f'].map((n) => [`main_${n}`, 0x2000, [new RegExp(`^scpu_pg${n}`)]]),
+      ['sound0', 0x1000, [/^ssi_0a/]],
+      ['sound1', 0x1000, [/^ssi_0b/]],
+      ['sound2', 0x1000, [/^ssi_0c/]],
+      ['bg0', 0x2000, [/^scpu_bgg/]],
+      ['bg1', 0x2000, [/^scpu_bgh/]],
+      ...[3, 2, 1, 0].map((n) => [`fg${n}`, 0x2000, [new RegExp(`^vg_${n}\\.`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main_a, c.main_b, c.main_c, c.main_d, c.main_e, c.main_f), sound: cat(c.sound0, c.sound1, c.sound2),
+      bg: cat(c.bg0, c.bg1), fg: cat(c.fg3, c.fg2, c.fg1, c.fg0), prom: c.prom,
+    }),
+  },
+  {
+    Board: Tapper,
+    chips: [
+      ['main0', 0x4000, [/^tappg0/]],
+      ['main1', 0x4000, [/^tappg1/]],
+      ['main2', 0x4000, [/^tappg2/]],
+      ['main3', 0x2000, [/^tappg3/]],
+      ['sound0', 0x1000, [/^tapsnda7/]],
+      ['sound1', 0x1000, [/^tapsnda8/]],
+      ['sound2', 0x1000, [/^tapsnda9/]],
+      ['sound3', 0x1000, [/^tapsda10/]],
+      ['bg0', 0x4000, [/^tapbg0/]],
+      ['bg1', 0x4000, [/^tapbg1/]],
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => [`fg${n}`, 0x4000, [new RegExp(`^tapfg${n}`)]]),
+      ['prom', 0x20, [/^5784$/, /^82s123/]],
+    ],
+    // The graphics chips are wired in pairs, the odd-numbered one first.
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1, c.sound2, c.sound3),
+      bg: cat(c.bg1, c.bg0), fg: cat(c.fg1, c.fg0, c.fg3, c.fg2, c.fg5, c.fg4, c.fg7, c.fg6), prom: c.prom,
     }),
   },
 ];

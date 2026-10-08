@@ -53,6 +53,7 @@ export class Z80 {
     this.input = input;
     this.output = output;
     this.onIrqAck = null;     // called when an IRQ is taken (for 'hold until acknowledged' lines)
+    this.onReti = null;       // called on RETI (Z80 peripherals watch for it to end an interrupt)
     this.reset();
   }
 
@@ -405,7 +406,10 @@ export class Z80 {
           this.cycles += 20; return;
         }
         case 4: { const a = this.a; this.a = 0; this.sub8(a, 0); this.cycles += 8; return; }       // NEG
-        case 5: this.iff1 = this.iff2; this.pc = this.pop(); this.cycles += 14; return;           // RETN / RETI
+        case 5:                                                                                  // RETN / RETI
+          this.iff1 = this.iff2; this.pc = this.pop(); this.cycles += 14;
+          if (y === 1 && this.onReti) this.onReti();
+          return;
         case 6: this.im = [0, 0, 1, 2, 0, 0, 1, 2][y]; this.cycles += 8; return;
         case 7:
           switch (y) {

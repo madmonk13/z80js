@@ -76,6 +76,7 @@ export class WSG {
         out += ((this.noise & 1) ? 0.35 : -0.35) * this.noiseLevel;
         this.noiseLevel *= 0.99985;
       }
+      if (this.extra) out += this.extra();          // another source on the board (Bosconian's speech)
       buf[this.writePos] = out * 0.8;
       this.writePos = (this.writePos + 1) & mask;
       if (this.writePos === this.readPos) this.readPos = (this.readPos + 1) & mask;
