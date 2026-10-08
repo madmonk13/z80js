@@ -1,10 +1,10 @@
-// Donkey Kong's sound: the 8035's 8-bit DAC (music and most effects), plus
-// three analog circuits triggered by the main CPU. The DAC output fades while
-// the 8035 holds its "discharge" line (P2 bit 7) low. The analog circuits are
-// modeled by character, not component by component:
-//   walk  - a short blip each step: a 555 oscillator near 430 Hz, quickly gated off
-//   jump  - a rising "boing"
-//   stomp - a low boom (Donkey Kong landing, falling girders)
+// Sound for the Donkey Kong boards: the 8035's 8-bit DAC (music and most
+// effects), plus effects the main CPU triggers directly. The DAC output fades
+// while the 8035 holds its "discharge" line (P2 bit 7) low.
+//
+// The directly triggered effects come from analog circuits (Donkey Kong) or
+// recorded samples (Donkey Kong Jr.), so they're modeled by character here,
+// not reproduced exactly. Each is started on the rising edge of its line.
 // Output goes into a ring buffer at RATE, like the other sound sources.
 
 import { capture, apply } from './state.js';
@@ -12,70 +12,77 @@ import { capture, apply } from './state.js';
 export const RATE = 48000;
 const FADE = Math.exp(-1 / (0.25 * RATE));    // DAC envelope time constant: 0.25 s
 
+// name: length in seconds and a generator f(t, progress 0-1, voice) -> sample.
+// `voice` holds per-play state (phase, noise filter).
 const EFFECTS = {
-  walk: { length: 0.07 },
-  jump: { length: 0.32 },
-  stomp: { length: 0.45 },
+  // Donkey Kong
+  walk: { length: 0.07, gen: (t, p, v) => square(v, 430 - 60 * p) * 0.32 * Math.exp(-t / 0.022) },    // 555 near 430 Hz, gated
+  jump: { length: 0.32, gen: (t, p, v) => square(v, 250 + 700 * p) * 0.25 * (1 - p) },
+  stomp: { length: 0.45, gen: (t, p, v) => lowNoise(v, 0.02) * 1.6 * (1 - p) ** 2 },
+  // Donkey Kong Jr.
+  climb: { length: 0.06, gen: (t, p, v) => square(v, v.pitch) * 0.28 * Math.exp(-t / 0.02) },
+  land: { length: 0.18, gen: (t, p, v) => (lowNoise(v, 0.05) * 1.2 + square(v, 120) * 0.2) * (1 - p) ** 2 },
+  roar: { length: 0.9, gen: (t, p, v) => lowNoise(v, 0.03) * 1.4 * Math.sin(Math.PI * p) * (0.7 + 0.3 * Math.sin(t * 60)) },
+  snapjaw: { length: 0.12, gen: (t, p, v) => (noise(v) * 0.25 + square(v, 900 - 500 * p) * 0.2) * (1 - p) },
+  death: { length: 1.1, gen: (t, p, v) => square(v, 700 * (1 - p) + 120 + 60 * Math.sin(t * 40)) * 0.25 * (1 - p * 0.6) },
+  drop: { length: 0.7, gen: (t, p, v) => square(v, 1400 - 1100 * p) * 0.22 * (1 - p * 0.5) },
 };
 
-const DKONG_SOUND_STATE = ['dac', 'env', 'discharge', 'inputs', 'active', 'noise', 'phase', 'lp', 'walkPhase'];
+function square(v, freq) {
+  v.phase = (v.phase + freq / RATE) % 1;
+  return v.phase < 0.5 ? 1 : -1;
+}
+function noise(v) {
+  const bit = ((v.lfsr >> 16) ^ (v.lfsr >> 13)) & 1;
+  v.lfsr = ((v.lfsr << 1) | bit) & 0x1FFFF;
+  return bit ? 1 : -1;
+}
+function lowNoise(v, k) {
+  v.lp += (noise(v) - v.lp) * k;
+  return v.lp;
+}
+
+const STATE = ['dac', 'env', 'discharge', 'levels', 'active', 'climbs'];
 
 export class DKongSound {
-  // Save states: everything that changes while running (not ROM-derived data).
-  saveState() { return capture(this, DKONG_SOUND_STATE); }
-  loadState(s) { apply(this, DKONG_SOUND_STATE, s); }
-
   constructor() {
     this.buffer = new Float32Array(1 << 15);
     this.rate = RATE;
     this.reset();
   }
 
+  // Save states: everything that changes while running.
+  saveState() { return capture(this, STATE); }
+  loadState(s) { apply(this, STATE, s); }
+
   reset() {
     this.writePos = this.readPos = 0;
     this.dac = 0x80;
     this.env = 1;
     this.discharge = false;
-    this.inputs = [0, 0, 0];
-    this.active = {};             // effect -> samples played so far
-    this.noise = 0x1FFFF;
-    this.phase = 0;
-    this.lp = 0;
+    this.levels = {};             // effect line -> last level written
+    this.active = {};             // effect -> { n samples played, voice state }
+    this.climbs = 0;
   }
 
-  // The main CPU's sound lines (7D00 walk, 7D01 jump, 7D02 stomp) start an
-  // effect on a rising edge.
-  trigger(n, v) {
+  // Start effect `name` on a rising edge of its line.
+  trigger(name, v) {
     const bit = v & 1;
-    if (bit && !this.inputs[n]) this.active[['walk', 'jump', 'stomp'][n]] = 0;
-    this.inputs[n] = bit;
-  }
-
-  nextNoise() {
-    const bit = ((this.noise >> 16) ^ (this.noise >> 13)) & 1;
-    this.noise = ((this.noise << 1) | bit) & 0x1FFFF;
-    return bit ? 1 : -1;
+    if (bit && !this.levels[name]) {
+      const voice = { phase: 0, lfsr: 0x1ACE1 + this.climbs * 977, lp: 0 };
+      if (name === 'climb') voice.pitch = [520, 600, 520, 600, 460, 520, 460][this.climbs++ % 7];   // a climbing step pattern
+      this.active[name] = { n: 0, voice };
+    }
+    this.levels[name] = bit;
   }
 
   effects() {
     let s = 0;
     for (const name of Object.keys(this.active)) {
-      const n = this.active[name], len = EFFECTS[name].length * RATE;
-      if (n >= len) { delete this.active[name]; continue; }
-      const t = n / RATE, left = 1 - n / len;
-      if (name === 'walk') {
-        // Square wave with a slight downward bend, fast exponential decay.
-        this.walkPhase = ((this.walkPhase || 0) + (430 - 60 * (n / len)) / RATE) % 1;
-        s += (this.walkPhase < 0.5 ? 0.32 : -0.32) * Math.exp(-t / 0.022);
-      } else if (name === 'jump') {
-        this.phase += (250 + 700 * (n / len)) / RATE;
-        s += ((this.phase % 1) < 0.5 ? 0.25 : -0.25) * left;
-      } else {
-        // Low-passed noise for the boom.
-        this.lp += (this.nextNoise() - this.lp) * 0.02;
-        s += this.lp * 1.6 * left * left;
-      }
-      this.active[name] = n + 1;
+      const a = this.active[name], fx = EFFECTS[name], len = fx.length * RATE;
+      if (a.n >= len) { delete this.active[name]; continue; }
+      s += fx.gen(a.n / RATE, a.n / len, a.voice);
+      a.n++;
     }
     return s;
   }

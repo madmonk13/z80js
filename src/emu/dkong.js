@@ -14,7 +14,7 @@ const NATIVE_W = 256, NATIVE_H = 224, TOP = 16;
 const LINES = 264, LINE_CYCLES = 192, VBLANK_LINE = 240;
 const SOUND_CYCLES = [8, 8, 9];                 // the 8035's 25 cycles per line, in thirds
 
-const DKONG_STATE = ['ram', 'vram', 'nmiEnable', 'spriteBank', 'paletteBank', 'latch', 'page', 'mcuStatus', 'p1In', 'p2In', 't', 'in0', 'in1', 'in2', 'cpu', 'snd', 'sound'];
+const DKONG_STATE = ['ram', 'vram', 'nmiEnable', 'spriteBank', 'paletteBank', 'tileBank', 'latch', 'page', 'mcuStatus', 'p1In', 'p2In', 't', 'in0', 'in1', 'in2', 'cpu', 'snd', 'sound'];
 
 export class DonkeyKong {
   // Save states: everything that changes while running (not ROM-derived data).
@@ -48,7 +48,7 @@ export class DonkeyKong {
     // Tiles: 256 of 8x8, planes in the two 2K halves (second half = high bit).
     const tileHalf = roms.tiles.length * 4;
     this.tilePix = decodeTiles(roms.tiles, {
-      count: 256, width: 8, height: 8, planes: [tileHalf, 0], xs: run(0, 8), ys: run(0, 8, 8), size: 64,
+      count: roms.tiles.length / 16, width: 8, height: 8, planes: [tileHalf, 0], xs: run(0, 8), ys: run(0, 8, 8), size: 64,
     });
     // Sprites: 128 of 16x16; left and right halves in separate ROMs, planes in
     // the two halves of the set.
@@ -81,6 +81,7 @@ export class DonkeyKong {
     this.sound.reset();
     this.nmiEnable = false;
     this.spriteBank = 0;
+    this.tileBank = 0;            // Donkey Kong Jr. has a second set of 256 tiles
     this.paletteBank = 0;
     // Sound CPU interface.
     this.latch = 0x0F;            // tune select (written inverted)
@@ -125,7 +126,7 @@ export class DonkeyKong {
 
   // 7D00-7D07: analog sounds and lines into the 8035.
   soundSignal(n, v) {
-    if (n <= 2) this.sound.trigger(n, v);
+    if (n <= 2) this.sound.trigger(['walk', 'jump', 'stomp'][n], v);
     else if (n === 3) this.p2In = (this.p2In & ~0x20) | ((v & 1) ? 0 : 0x20);   // active low
     else if (n === 4) this.t[1] = ~v & 1;
     else if (n === 5) this.t[0] = ~v & 1;
@@ -183,7 +184,7 @@ export class DonkeyKong {
       for (let col = 0; col < 32; col++) {
         const idx = row * 32 + col;
         const color = ((this.colorCodes[col + 32 * (row >> 2)] & 0x0F) + bank) * 4;
-        const pix = this.vram[idx] * 64;
+        const pix = (this.vram[idx] + this.tileBank * 256) * 64;
         for (let y = 0; y < 8; y++) {
           let o = (row * 8 + y) * NATIVE_W + col * 8;
           for (let x = 0; x < 8; x++) out[o++] = pal[color + this.tilePix[pix + y * 8 + x]];
@@ -229,3 +230,37 @@ DonkeyKong.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x01], ['5', 0x02], ['6', 0x03]], default: 0x00 },
   { id: 'bonus', label: 'Bonus life', options: [['7K', 0x00], ['10K', 0x04], ['15K', 0x08], ['20K', 0x0C]], default: 0x00 },
 ];
+
+// Donkey Kong Jr. (1982): the same board with a 24K program, a second bank of
+// tiles, and different sound wiring. Its tune latch isn't inverted, the
+// directly triggered effects (recorded samples on MAME, modeled here) are
+// climb, jump, land, roar, snapjaw, death and drop, and nothing interrupts the
+// sound CPU.
+export class DonkeyKongJr extends DonkeyKong {
+  read(a) {
+    if (a < 0x6000) return this.roms.main[a];
+    return super.read(a);
+  }
+
+  write(a, v) {
+    switch (a) {
+      case 0x7C00: this.latch = v; return;                              // tune select
+      case 0x7C80: this.tileBank = v & 1; return;
+      case 0x7C81: this.p2In = (this.p2In & ~0x40) | ((v & 1) ? 0 : 0x40); return;   // active low
+      case 0x7D80: this.sound.trigger('death', v); return;
+      case 0x7D81: this.sound.trigger('drop', v); return;
+    }
+    super.write(a, v);
+  }
+
+  soundSignal(n, v) {
+    const effect = ['climb', 'jump', 'land', 'roar', null, null, 'snapjaw', null][n];
+    if (effect) this.sound.trigger(effect, v);
+    else if (n === 4) this.t[1] = ~v & 1;
+    else if (n === 5) this.t[0] = ~v & 1;
+  }
+}
+
+DonkeyKongJr.id = 'dkongjr';
+DonkeyKongJr.title = 'Donkey Kong Jr.';
+DonkeyKongJr.switches = DonkeyKong.switches;

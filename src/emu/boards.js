@@ -16,9 +16,9 @@
 //   applySwitches({ id: value }) with the options listed in Board.switches
 
 import { Galaga } from './galaga.js';
-import { PacMan } from './pacman.js';
+import { PacMan, MsPacMan } from './pacman.js';
 import { Galaxian } from './galaxian.js';
-import { DonkeyKong } from './dkong.js';
+import { DonkeyKong, DonkeyKongJr } from './dkong.js';
 
 const BOARDS = [
   {
@@ -101,6 +101,61 @@ const BOARDS = [
       tiles: cat(c.tiles0, c.tiles1), sprites: cat(c.sprites0, c.sprites1, c.sprites2, c.sprites3),
       palLow: c.palLow, palHigh: c.palHigh, colors: c.colors,
     }),
+  },
+  {
+    Board: MsPacMan,
+    chips: [
+      ['main0', 0x1000, [/^pacman\.6e/, /^boot1/]],
+      ['main1', 0x1000, [/^pacman\.6f/, /^boot2/]],
+      ['main2', 0x1000, [/^pacman\.6h/, /^boot3/]],
+      ['main3', 0x1000, [/^pacman\.6j/, /^boot4/]],
+      ['u5', 0x800, [/^u5(\.|$)/]],
+      ['u6', 0x1000, [/^u6(\.|$)/]],
+      ['u7', 0x1000, [/^u7(\.|$)/]],
+      ['tiles', 0x1000, [/^5e(\.|$)/]],
+      ['sprites', 0x1000, [/^5f(\.|$)/]],
+      ['palette', 0x20, [/^82s123\.7f/]],
+      ['lut', 0x100, [/^82s126\.4a/]],
+      ['wave', 0x100, [/^82s126\.1m/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), u5: c.u5, u6: c.u6, u7: c.u7,
+      tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    Board: DonkeyKongJr,
+    chips: [
+      ['p5b', 0x2000, [/^dkj\.5b/]],
+      ['p5c', 0x2000, [/^dkj\.5c/]],
+      ['p5e', 0x2000, [/^dkj\.5e/]],
+      ['sound', 0x1000, [/^c_3h/]],
+      ['tiles0', 0x1000, [/^dkj\.3n/]],
+      ['tiles1', 0x1000, [/^dkj\.3p/]],
+      ['sprites0', 0x800, [/^v_7c/]],
+      ['sprites1', 0x800, [/^v_7d/]],
+      ['sprites2', 0x800, [/^v_7e/]],
+      ['sprites3', 0x800, [/^v_7f/]],
+      ['palLow', 0x100, [/^c-2e/]],
+      ['palHigh', 0x100, [/^c-2f/]],
+      ['colors', 0x100, [/^v-2n/]],
+    ],
+    // The 8K program chips are wired in 2K and 4K pieces scattered across 0000-5FFF.
+    assemble: (c) => {
+      const main = new Uint8Array(0x6000);
+      const place = (rom, pieces) => pieces.forEach(([to, size], i) => {
+        const from = pieces.slice(0, i).reduce((n, [, s]) => n + s, 0);
+        main.set(rom.subarray(from, from + size), to);
+      });
+      place(c.p5b, [[0x0000, 0x1000], [0x3000, 0x1000]]);
+      place(c.p5c, [[0x2000, 0x800], [0x4800, 0x800], [0x1000, 0x800], [0x5800, 0x800]]);
+      place(c.p5e, [[0x4000, 0x800], [0x2800, 0x800], [0x5000, 0x800], [0x1800, 0x800]]);
+      return {
+        main, sound: c.sound, tiles: cat(c.tiles0, c.tiles1),
+        sprites: cat(c.sprites0, c.sprites1, c.sprites2, c.sprites3),
+        palLow: c.palLow, palHigh: c.palHigh, colors: c.colors,
+      };
+    },
   },
 ];
 

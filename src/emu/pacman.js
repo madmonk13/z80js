@@ -92,12 +92,15 @@ export class PacMan {
       switch (io & 7) {
         case 0: this.irqEnable = !!(v & 1); if (!this.irqEnable) this.cpu.irq = false; break;
         case 1: this.wsg.enabled = !!(v & 1); break;
-        // 2 unused, 3 flip screen (cocktail), 4-5 lamps, 6 coin lockout, 7 coin counter
+        case 6: this.coinLockout(v); break;
+        // 2 unused, 3 flip screen (cocktail), 4-5 lamps, 7 coin counter
       }
     } else if (io < 0x60) this.wsg.write(io & 0x1F, v);
     else if (io < 0x70) this.spritePos[io & 0x0F] = v;
     // 50C0: watchdog
   }
+
+  coinLockout() {}
 
   // OUT (0),A sets the interrupt vector (the CPU runs in IM 2).
   out(port, v) {
@@ -186,3 +189,75 @@ PacMan.switches = [
 export function defaultSwitches(list) {
   return Object.fromEntries(list.map((s) => [s.id, s.default]));
 }
+
+// ---------------------------------------------------------------- Ms. Pac-Man
+
+// Ms. Pac-Man (1981) is a Pac-Man board with an add-on board on top. The
+// add-on's ROMs (u5, u6, u7) are stored with their data and address lines
+// scrambled; once unscrambled they supply 3000-3FFF and 8000-9FFF, and
+// 8-byte patches from 8000-81EF replace pieces of the original Pac-Man code.
+// The board starts out as plain Pac-Man and switches over during start-up
+// (the start-up code's write to 5006 is a convenient trigger).
+
+// Data lines: which input bit feeds each output bit.
+function unscrambleData(e) {
+  return ((e & 0x80) >> 3) | ((e & 0x40) >> 3) | (e & 0x20) | ((e & 0x10) << 2) |
+    ((e & 0x08) >> 1) | ((e & 0x04) >> 1) | ((e & 0x02) >> 1) | ((e & 0x01) << 7);
+}
+// Address lines for the 4K ROMs (u6, u7) and the 2K ROM (u5).
+function unscrambleAddr4k(e) {
+  return (e & 0x807) | ((e & 0x400) >> 7) | ((e & 0x200) >> 2) | ((e & 0x100) << 1) | ((e & 0x80) << 3) |
+    ((e & 0x40) << 2) | ((e & 0x20) << 1) | ((e & 0x10) << 1) | ((e & 0x08) << 1);
+}
+function unscrambleAddr2k(e) {
+  return (e & 0x807) | ((e & 0x400) >> 2) | ((e & 0x200) >> 2) | ((e & 0x100) >> 3) | ((e & 0x80) << 2) |
+    ((e & 0x40) << 4) | ((e & 0x20) << 1) | ((e & 0x10) >> 1) | ((e & 0x08) << 1);
+}
+// Where each 8-byte patch from the add-on lands in the Pac-Man program:
+// [address in 0000-2FFF, source in 8000-81FF].
+const PATCHES = [
+  [0x0410, 0x8008], [0x08E0, 0x81D8], [0x0A30, 0x8118], [0x0BD0, 0x80D8], [0x0C20, 0x8120], [0x0E58, 0x8168],
+  [0x0EA8, 0x8198], [0x1000, 0x8020], [0x1008, 0x8010], [0x1288, 0x8098], [0x1348, 0x8048], [0x1688, 0x8088],
+  [0x16B0, 0x8188], [0x16D8, 0x80C8], [0x16F8, 0x81C8], [0x19A8, 0x80A8], [0x19B8, 0x81A8], [0x2060, 0x8148],
+  [0x2108, 0x8018], [0x21A0, 0x81A0], [0x2298, 0x80A0], [0x23E0, 0x80E8], [0x2418, 0x8000], [0x2448, 0x8058],
+  [0x2470, 0x8140], [0x2488, 0x8080], [0x24B0, 0x8180], [0x24D8, 0x80C0], [0x24F8, 0x81C0], [0x2748, 0x8050],
+  [0x2780, 0x8090], [0x27B8, 0x8190], [0x2800, 0x8028], [0x2B20, 0x8100], [0x2B30, 0x8110], [0x2BF0, 0x81D0],
+  [0x2CC0, 0x80D0], [0x2CD8, 0x80E0], [0x2CF0, 0x81E0], [0x2D60, 0x8160],
+];
+
+export class MsPacMan extends PacMan {
+  // roms: Pac-Man's plus u5 (2K), u6 and u7 (4K each), scrambled as dumped.
+  constructor(roms) {
+    super(roms);
+    const img = new Uint8Array(0xC000);
+    img.set(roms.main.subarray(0, 0x3000));                     // Pac-Man 0000-2FFF
+    for (let i = 0; i < 0x1000; i++) {
+      img[0x3000 + unscrambleAddr4k(i)] = unscrambleData(roms.u7[i]);
+      img[0x9000 + unscrambleAddr4k(i)] = unscrambleData(roms.u6[i]);
+    }
+    for (let i = 0; i < 0x800; i++) img[0x8000 + unscrambleAddr2k(i)] = unscrambleData(roms.u5[i]);
+    img.copyWithin(0x8800, 0x9800, 0xA000);                     // second half of u6 also appears at 8800
+    img.set(roms.main.subarray(0x2000, 0x4000), 0xA000);
+    for (const [to, from] of PATCHES) img.copyWithin(to, from, from + 8);
+    this.aux = img;
+  }
+
+  reset() {
+    super.reset();
+    this.auxOn = false;
+  }
+
+  saveState() { return { ...super.saveState(), auxOn: this.auxOn }; }
+  loadState(s) { super.loadState(s); this.auxOn = !!s.auxOn; }
+
+  read(a) {
+    if (this.auxOn && (a < 0x4000 || (a >= 0x8000 && a < 0xC000))) return this.aux[a];
+    return super.read(a);
+  }
+
+  coinLockout(v) { if (v === 1) this.auxOn = true; }
+}
+
+MsPacMan.id = 'mspacman';
+MsPacMan.title = 'Ms. Pac-Man';
+MsPacMan.switches = PacMan.switches;
