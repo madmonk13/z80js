@@ -1,5 +1,6 @@
 import { identify, SUPPORTED } from './emu/boards.js';
 import { extractAll } from './unzip.js';
+import { encode, decode } from './emu/state.js';
 import { Screen2D } from './render/screen2d.js';
 import { Input } from './input.js';
 import { AudioOut } from './audio-out.js';
@@ -19,6 +20,7 @@ const DEFAULTS = {
   sound: true,
   volume: 70,        // percent
   switches: {},      // board id -> { switch id -> value }
+  resume: true,      // pick games up where they were left
 };
 
 const input = new Input();
@@ -93,11 +95,44 @@ function renderSwitches() {
   }
 }
 
+// ---------------------------------------------------------------- resume
+
+// The game in progress is saved when the page is hidden or closed, and every
+// few seconds while playing, so a refresh or relaunch picks up where it was.
+const RESUME = 'resume:';
+const RESUME_VERSION = 1;              // bump when saved state stops being compatible
+const RESUME_EVERY_MS = 5000;
+
+function saveResume() {
+  if (!board || !settings.resume || !state.romId) return;
+  store.trySet(RESUME + state.romId, encode({ v: RESUME_VERSION, board: board.constructor.id, state: board.saveState() }));
+}
+
+function restoreResume(id) {
+  if (!settings.resume) return false;
+  const text = store.getRaw(RESUME + id);
+  if (!text) return false;
+  try {
+    const saved = decode(text);
+    if (saved.v !== RESUME_VERSION || saved.board !== board.constructor.id) throw new Error('stale');
+    board.loadState(saved.state);
+    return true;
+  } catch {
+    store.remove(RESUME + id);           // unreadable or from an older version: start fresh
+    board.reset();
+    return false;
+  }
+}
+
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveResume(); });
+window.addEventListener('pagehide', saveResume);
+
 // ---------------------------------------------------------------- ROM sets
 
 // Start a board from a ROM set (the zip as added) and record it.
 async function loadSet(bytes, name, id) {
   const { Board, roms } = identify(await extractAll(bytes));
+  saveResume();                          // keep the game being left
   board = new Board(roms);
   board.applySwitches(switchValues(Board));
   board.reset();
@@ -119,6 +154,7 @@ async function loadSet(bytes, name, id) {
   const res = library.add(name, bytes, Board.title);
   if (!res.stored) toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.');
   state.romId = id || res.id;
+  restoreResume(state.romId);
   if (res.stored) library.setLast(state.romId);
   refreshLibrary();
 }
@@ -129,6 +165,7 @@ function refreshLibrary() {
     onPlay: (entry) => playEntry(entry),
     onRemove: (entry) => {
       library.remove(entry.id);
+      store.remove(RESUME + entry.id);
       if (entry.id === state.romId) { board = null; state.romId = null; }
       refreshLibrary();
     },
@@ -220,6 +257,7 @@ function syncMenu() {
   $('hints').checked = settings.hints;
   $('sound').checked = settings.sound;
   $('volume').value = settings.volume;
+  $('resume').checked = settings.resume;
   applySound();
   $('hapticsRow').hidden = !navigator.vibrate;
   applyControls();
@@ -259,9 +297,15 @@ $('sound').addEventListener('change', (e) => {
 $('volume').addEventListener('input', (e) => { settings.volume = +e.target.value; applySound(); save(); });
 $('volume').addEventListener('change', () => audio.preview());
 
+$('resume').addEventListener('change', (e) => {
+  settings.resume = e.target.checked; save();
+  if (settings.resume) saveResume(); else if (state.romId) store.remove(RESUME + state.romId);
+});
+
 // Game switches take effect when the game restarts, as on the real boards.
 $('powerBtn').addEventListener('click', () => {
   if (!board) return;
+  store.remove(RESUME + state.romId);
   board.applySwitches(switchValues(board.constructor));
   board.reset();
   closeMenu();
@@ -350,7 +394,7 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', onRo
 
 // ---------------------------------------------------------------- loop
 
-let acc = 0, lastTime = performance.now();
+let acc = 0, lastTime = performance.now(), lastSave = performance.now();
 function tick(now) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
@@ -369,6 +413,7 @@ function tick(now) {
     if (ran === 4) acc = 0;
     audio.flush();
     if (ran) screen2d.draw(board.frame);
+    if (now - lastSave > RESUME_EVERY_MS) { lastSave = now; saveResume(); }
   } else {
     acc = 0;
   }

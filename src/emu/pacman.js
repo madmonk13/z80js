@@ -6,11 +6,18 @@
 import { Z80 } from './z80.js';
 import { WSG } from './wsg.js';
 import { decodeTiles, promPalette, rotate90, run } from './video.js';
+import { capture, apply } from './state.js';
 
 const NATIVE_W = 288, NATIVE_H = 224;
 const LINES = 264, LINE_CYCLES = 192, VBLANK_LINE = 224;
 
+const PACMAN_STATE = ['ram', 'spritePos', 'irqEnable', 'in0', 'in1', 'cpu', 'wsg'];
+
 export class PacMan {
+  // Save states: everything that changes while running (not ROM-derived data).
+  saveState() { return capture(this, PACMAN_STATE); }
+  loadState(s) { apply(this, PACMAN_STATE, s); }
+
   // roms: { main 16K, tiles 4K, sprites 4K, palette 32, lut 256, wave 256 }
   constructor(roms) {
     this.width = NATIVE_H;           // as displayed (rotated)

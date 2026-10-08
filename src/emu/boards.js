@@ -18,6 +18,7 @@
 import { Galaga } from './galaga.js';
 import { PacMan } from './pacman.js';
 import { Galaxian } from './galaxian.js';
+import { DonkeyKong } from './dkong.js';
 
 const BOARDS = [
   {
@@ -74,6 +75,31 @@ const BOARDS = [
     ],
     assemble: (c) => ({
       main: cat(c.main0, c.main1, c.main2, c.main3, c.main4), gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
+    }),
+  },
+  {
+    Board: DonkeyKong,
+    chips: [
+      ['main0', 0x1000, [/^c_5et/]],
+      ['main1', 0x1000, [/^c_5ct/]],
+      ['main2', 0x1000, [/^c_5bt/]],
+      ['main3', 0x1000, [/^c_5at/]],
+      ['sound0', 0x800, [/^s_3i/]],
+      ['sound1', 0x800, [/^s_3j/]],
+      ['tiles0', 0x800, [/^v_5h/]],
+      ['tiles1', 0x800, [/^v_3p/]],
+      ['sprites0', 0x800, [/^l_4m/]],
+      ['sprites1', 0x800, [/^l_4n/]],
+      ['sprites2', 0x800, [/^l_4r/]],
+      ['sprites3', 0x800, [/^l_4s/]],
+      ['palLow', 0x100, [/^c-2k/, /^dkong\.2k/]],
+      ['palHigh', 0x100, [/^c-2j/, /^dkong\.2j/]],
+      ['colors', 0x100, [/^v-5e/, /^dkong\.5f/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1),
+      tiles: cat(c.tiles0, c.tiles1), sprites: cat(c.sprites0, c.sprites1, c.sprites2, c.sprites3),
+      palLow: c.palLow, palHigh: c.palHigh, colors: c.colors,
     }),
   },
 ];

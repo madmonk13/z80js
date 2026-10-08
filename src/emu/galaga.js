@@ -11,6 +11,7 @@ import { Z80 } from './z80.js';
 import { WSG } from './wsg.js';
 import { STARS } from './galaga-stars.js';
 import { defaultSwitches } from './pacman.js';
+import { capture, apply } from './state.js';
 
 const SCREEN_W = 224, SCREEN_H = 288;   // as displayed (rotated)
 const NATIVE_W = 288, NATIVE_H = 224;
@@ -20,7 +21,18 @@ const NMI_06XX_CYCLES = 614;                     // 200 us at 3.072 MHz
 // 51xx joystick remap: LDRU bits (active low) to a direction code 0-8.
 const JOY_MAP = [0xF, 0xE, 0xD, 0x5, 0xC, 0x9, 0x7, 0x6, 0xB, 0x3, 0xA, 0x4, 0x1, 0x2, 0x0, 0x8];
 
+const GALAGA_STATE = ['ram', 'latch', 'subRunning', 'soundRegs', 'starControl', 'starScroll', 'cmd06', 'next06Nmi', 'io', 'frameCount', 'explosion', 'in0', 'in1', 'cpus', 'wsg'];
+
 export class Galaga {
+  // Save states: everything that changes while running (not ROM-derived data).
+  // RAM is kept by address for convenience; only 8000-9FFF is real.
+  saveState() { return { ...capture(this, GALAGA_STATE.filter((f) => f !== 'ram')), ram: this.ram.slice(0x8000, 0xA000) }; }
+  loadState(s) {
+    apply(this, GALAGA_STATE.filter((f) => f !== 'ram'), s);
+    this.ram.fill(0);
+    this.ram.set(s.ram, 0x8000);
+  }
+
   // roms: { main 16K, sub 4K, sound 4K, chars 4K, sprites 8K, palette 32,
   //         charLut 256, spriteLut 256, wave 256 }
   constructor(roms) {

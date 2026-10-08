@@ -7,6 +7,8 @@
 // and drives interrupts with `irq` (level, held until the host clears it) and
 // nmi() (edge, latched until taken).
 
+import { capture, apply } from './state.js';
+
 const FC = 0x01, FN = 0x02, FP = 0x04, FX = 0x08, FH = 0x10, FY = 0x20, FZ = 0x40, FS = 0x80;
 
 // Sign, zero and the undocumented 3/5 bits of a result; plus parity.
@@ -38,7 +40,13 @@ const CYC = [
   5, 10, 10, 4, 10, 11, 7, 11, 5, 6, 10, 4, 10, 0, 7, 11,
 ];
 
+const Z_STATE = ['a', 'f', 'b', 'c', 'd', 'e', 'h', 'l', 'a_', 'f_', 'b_', 'c_', 'd_', 'e_', 'h_', 'l_', 'ix', 'iy', 'sp', 'pc', 'i', 'r', 'iff1', 'iff2', 'im', 'halted', 'eiDelay', 'irq', 'irqVector', 'nmiPending', 'cycles'];
+
 export class Z80 {
+  // Save states: everything that changes while running (not ROM-derived data).
+  saveState() { return capture(this, Z_STATE); }
+  loadState(s) { apply(this, Z_STATE, s); }
+
   constructor({ read, write, input = () => 0xFF, output = () => {} }) {
     this.read = read;
     this.write = write;

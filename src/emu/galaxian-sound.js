@@ -8,6 +8,8 @@
 //   - shot: a short noise burst sweeping down in pitch, on each rising edge
 // Output goes into a ring buffer at RATE, like the other sound sources.
 
+import { capture, apply } from './state.js';
+
 export const RATE = 48000;
 const LINE_RATE = 264 * 60.606;
 const SAMPLES_PER_LINE = RATE / LINE_RATE;
@@ -18,7 +20,13 @@ const HUM = [139, 190, 267];
 // combinations on the real board); here, a sawtooth at four levels.
 const TOOTH = Array.from({ length: 4 }, (_, v) => Float32Array.from({ length: 16 }, (_, i) => ((i / 15) * 2 - 1) * (0.25 + v * 0.25)));
 
+const GALAXIAN_SOUND_STATE = ['pitch', 'vol', 'tonePhase', 'hum', 'humPhase', 'sweep', 'lfoBits', 'noiseOn', 'noiseLevel', 'noise', 'shot', 'lastShoot', 'shotValue', 'carry'];
+
 export class GalaxianSound {
+  // Save states: everything that changes while running (not ROM-derived data).
+  saveState() { return capture(this, GALAXIAN_SOUND_STATE); }
+  loadState(s) { apply(this, GALAXIAN_SOUND_STATE, s); }
+
   constructor() {
     this.buffer = new Float32Array(1 << 15);
     this.rate = RATE;

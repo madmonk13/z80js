@@ -10,12 +10,20 @@
 //
 // Output goes into a ring buffer at RATE, read by the browser audio output.
 
+import { capture, apply } from './state.js';
+
 export const RATE = 48000;
 const CLOCK = 96000;                       // 18.432 MHz / 6 / 32
 const LINE_RATE = 264 * 60.606;            // scanlines per second
 const SAMPLES_PER_LINE = RATE / LINE_RATE; // about 3
 
+const WSG_STATE = ['regs', 'enabled', 'counter', 'noise', 'noiseLevel', 'carry'];
+
 export class WSG {
+  // Save states: everything that changes while running (not ROM-derived data).
+  saveState() { return capture(this, WSG_STATE); }
+  loadState(s) { apply(this, WSG_STATE, s); }
+
   constructor(wavePROM) {
     this.wave = Uint8Array.from(wavePROM, (v) => v & 0x0F);
     this.buffer = new Float32Array(1 << 15);

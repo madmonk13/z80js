@@ -8,6 +8,7 @@ import { Z80 } from './z80.js';
 import { GalaxianSound } from './galaxian-sound.js';
 import { decodeTiles, promPalette, rgba, rotate90, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
+import { capture, apply } from './state.js';
 
 const NATIVE_W = 256, NATIVE_H = 224;
 const TOP = 16;                              // first visible line of the 256-line raster
@@ -37,7 +38,13 @@ const STARS = generateStars();
 const STAR_LEVEL = [0x00, 0x88, 0xCC, 0xFF];
 const STAR_COLORS = Array.from({ length: 64 }, (_, i) => rgba(STAR_LEVEL[i & 3], STAR_LEVEL[(i >> 2) & 3], STAR_LEVEL[(i >> 4) & 3]));
 
+const GALAXIAN_STATE = ['ram', 'vram', 'obj', 'nmiEnable', 'starsOn', 'starScroll', 'in0', 'in1', 'cpu', 'sound'];
+
 export class Galaxian {
+  // Save states: everything that changes while running (not ROM-derived data).
+  saveState() { return capture(this, GALAXIAN_STATE); }
+  loadState(s) { apply(this, GALAXIAN_STATE, s); }
+
   // roms: { main (up to 16K), gfx 4K (two 2K bitplanes), palette 32 }
   constructor(roms) {
     this.width = NATIVE_H;
