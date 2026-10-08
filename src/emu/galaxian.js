@@ -10,8 +10,8 @@ import { decodeTiles, promPalette, rgba, rotate90, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
-const NATIVE_W = 256, NATIVE_H = 224;
-const TOP = 16;                              // first visible line of the 256-line raster
+export const NATIVE_W = 256, NATIVE_H = 224;
+export const TOP = 16;                              // first visible line of the 256-line raster
 const LINES = 264, LINE_CYCLES = 192, VBLANK_LINE = 240;
 const SHELL = rgba(0xEF, 0xEF, 0xEF), MISSILE = rgba(0xEF, 0xEF, 0x00);
 
@@ -59,7 +59,7 @@ export class Galaxian {
     this.sound = new GalaxianSound();
     this.cpu = new Z80({ read: (a) => this.read(a), write: (a, v) => this.write(a, v) });
     this.in0 = 0; this.in1 = 0;
-    this.applySwitches(defaultSwitches(Galaxian.switches));
+    this.applySwitches(defaultSwitches(this.constructor.switches));
     this.frame = new Uint32Array(this.width * this.height);
     this.native = new Uint32Array(NATIVE_W * 256);
 
@@ -74,6 +74,7 @@ export class Galaxian {
       xs: [...run(0, 8), ...run(64, 8)], ys: [...run(0, 8, 8), ...run(128, 8, 8)], size: 256,
     });
     this.palette = promPalette(roms.palette, 32, [0x4F, 0xA8]);
+    this.bullets = true;
     this.reset();
   }
 
@@ -149,7 +150,7 @@ export class Galaxian {
 
   render() {
     const out = this.native, obj = this.obj, pal = this.palette;
-    out.fill(0xFF000000);
+    this.background(out);
 
     if (this.starsOn) {
       for (let i = 0; i < STARS.length; i += 3) {
@@ -163,7 +164,7 @@ export class Galaxian {
 
     // Tiles: each column scrolls vertically and has its own color.
     for (let col = 0; col < 32; col++) {
-      const scroll = obj[col * 2], color = (obj[col * 2 + 1] & 7) * 4;
+      const scroll = this.mapY(obj[col * 2]), color = this.mapColor(obj[col * 2 + 1] & 7) * 4;
       for (let y = TOP; y < TOP + NATIVE_H; y++) {
         const ty = (y + scroll) & 0xFF;
         const pix = this.vram[(ty >> 3) * 32 + col] * 64 + (ty & 7) * 8;
@@ -176,7 +177,7 @@ export class Galaxian {
     }
 
     // Bullets: 4-pixel dashes; the last one is the player's yellow missile.
-    for (let b = 0; b < 8; b++) {
+    for (let b = 0; this.bullets && b < 8; b++) {
       const y = 255 - obj[0x61 + b * 4], x = 255 - obj[0x63 + b * 4];
       if (y < TOP || y >= TOP + NATIVE_H) continue;
       for (let i = 1; i <= 4; i++) if (x - i >= 0) out[y * NATIVE_W + x - i] = b === 7 ? MISSILE : SHELL;
@@ -185,15 +186,21 @@ export class Galaxian {
     // Sprites, last to first so sprite 0 ends up on top.
     for (let s = 7; s >= 0; s--) {
       const o = 0x40 + s * 4;
-      const attr = obj[o + 1], color = (obj[o + 2] & 7) * 4;
+      const attr = obj[o + 1], color = this.mapColor(obj[o + 2] & 7) * 4;
       const sx = (obj[o + 3] + 1) & 0xFF;
-      const sy = ((240 - obj[o]) & 0xFF) + (s < 3 ? 1 : 0);
+      const sy = ((240 - this.mapY(obj[o])) & 0xFF) + (s < 3 ? 1 : 0);
       this.drawSprite(attr & 0x3F, color, attr & 0x40, attr & 0x80, sx, sy);
     }
 
     // Crop to the visible lines and rotate for the vertical monitor.
     rotate90(out.subarray(TOP * NATIVE_W, (TOP + NATIVE_H) * NATIVE_W), NATIVE_W, NATIVE_H, this.frame);
   }
+
+  // Hooks for boards built on this one (Frogger): the background behind the
+  // tiles, how color codes and vertical positions are wired.
+  background(out) { out.fill(0xFF000000); }
+  mapColor(c) { return c; }
+  mapY(v) { return v; }
 
   drawSprite(code, color, flipX, flipY, sx, sy) {
     const out = this.native, pix = code * 256;

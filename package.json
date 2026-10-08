@@ -2,7 +2,7 @@
   "name": "z80js",
   "version": "0.1.0",
   "private": true,
-  "description": "Touch-first Z80 arcade emulator (Galaga, Pac-Man, Ms. Pac-Man, Galaxian, Donkey Kong, Donkey Kong Jr.) for phones and desktop",
+  "description": "Touch-first Z80 arcade emulator (Galaga, Pac-Man, Ms. Pac-Man, Galaxian, Donkey Kong, Donkey Kong Jr., Frogger) for phones and desktop",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 1976",

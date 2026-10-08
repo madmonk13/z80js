@@ -18,6 +18,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Galaxian (1979) | Namco Galaxian: 1 Z80, analog sound | `galaxian` | **Tested:** boots, attract mode, coin, start and play |
 | Donkey Kong (1981) | Nintendo: Z80, an 8035 sound CPU with a DAC, analog effects | `dkong` (US set 1) | **Tested:** boots, attract mode, coin, start and play |
 | Ms. Pac-Man (1981) | Pac-Man board plus Midway's add-on board (its ROMs are stored scrambled; z80js unscrambles them) | `mspacman` | **Tested:** boots, attract mode, coin, start and play |
+| Frogger (1981) | Konami: Galaxian-style video, a second Z80 and an AY-3-8910 for sound | `frogger` | **Tested:** boots, attract mode, coin, start and play |
 | Donkey Kong Jr. (1982) | Donkey Kong board with a second tile bank and different sound wiring | `dkongjr` (US) | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
@@ -25,8 +26,8 @@ recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Na
 custom chips, which z80js emulates directly, so that CPU's ROM is ignored.
 
 Not supported: **Gatsbee** (Galaga hack with switchable graphics), **Puck Man** (Namco's
-set splits the program across eight smaller chips, not yet handled), and the many Galaxian-board clones and conversions (Moon Cresta,
-Scramble, Frogger and others), each of which changes the hardware a little.
+set splits the program across eight smaller chips, not yet handled), and the many other Galaxian-board clones and conversions (Moon Cresta,
+Scramble, Super Cobra, Amidar and others), each of which changes the hardware a little.
 
 ## Controls
 
@@ -34,7 +35,7 @@ The touch layout follows the game:
 
 - **Galaga, Galaxian:** the left half is a left/right pad, the right half is fire.
 - **Donkey Kong, Donkey Kong Jr.:** the left half is a 4-way joystick, the right half is jump.
-- **Pac-Man, Ms. Pac-Man:** no fire button, so the whole lower screen is a 4-way joystick.
+- **Pac-Man, Ms. Pac-Man, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z/X to fire, 5 or C for
   a coin, 1 or Return to start (2 for two players).
@@ -85,6 +86,9 @@ right, up, down, fire) then holds a control.
 - `src/emu/dkong.js`: Donkey Kong and Donkey Kong Jr.: tiles (colored per column and
   4-row block), 96 sprites and the interface to the sound CPU; `dkong-sound.js` is the DAC and analog effects.
 - `src/emu/i8035.js`: the Intel 8035/8039 (MCS-48) microcontroller, Donkey Kong's sound CPU.
+- `src/emu/frogger.js`: Frogger, built on the Galaxian board: its river background,
+  rewired color and position lines, the 8255 PPI interface, and the sound board's Z80.
+- `src/emu/ay8910.js`: the General Instrument AY-3-8910 sound chip.
 - `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.
 - `src/main.js`, `src/touch.js`, `src/input.js`, `src/audio-out.js`: the app shell.

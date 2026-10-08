@@ -52,6 +52,7 @@ export class Z80 {
     this.write = write;
     this.input = input;
     this.output = output;
+    this.onIrqAck = null;     // called when an IRQ is taken (for 'hold until acknowledged' lines)
     this.reset();
   }
 
@@ -67,7 +68,6 @@ export class Z80 {
     this.eiDelay = false;     // interrupts stay off for one instruction after EI
     this.irq = false;         // level-sensitive maskable interrupt line
     this.irqVector = 0xFF;    // data bus value during an IM 0/2 acknowledge
-    this.onIrqAck = null;     // called when an IRQ is taken (for 'hold until acknowledged' lines)
     this.nmiPending = false;
     this.cycles = 0;          // T-states executed since construction
   }

@@ -19,6 +19,7 @@ import { Galaga } from './galaga.js';
 import { PacMan, MsPacMan } from './pacman.js';
 import { Galaxian } from './galaxian.js';
 import { DonkeyKong, DonkeyKongJr } from './dkong.js';
+import { Frogger } from './frogger.js';
 
 const BOARDS = [
   {
@@ -157,7 +158,33 @@ const BOARDS = [
       };
     },
   },
+  {
+    Board: Frogger,
+    chips: [
+      ['main0', 0x1000, [/^frogger\.26/]],
+      ['main1', 0x1000, [/^frogger\.27/]],
+      ['main2', 0x1000, [/^frsm3\.7/]],
+      ['sound0', 0x800, [/^frogger\.608/]],
+      ['sound1', 0x800, [/^frogger\.609/]],
+      ['sound2', 0x800, [/^frogger\.610/]],
+      ['gfx0', 0x800, [/^frogger\.607/]],
+      ['gfx1', 0x800, [/^frogger\.606/]],
+      ['palette', 0x20, [/^pr-91\.6l/]],
+    ],
+    // Two chips are wired with data lines 0 and 1 swapped: the first sound
+    // ROM and the second graphics ROM.
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2),
+      sound: cat(swap01(c.sound0), c.sound1, c.sound2),
+      gfx: cat(c.gfx0, swap01(c.gfx1)),
+      palette: c.palette,
+    }),
+  },
 ];
+
+function swap01(rom) {
+  return rom.map((v) => (v & 0xFC) | ((v & 1) << 1) | ((v >> 1) & 1));
+}
 
 function cat(...parts) {
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
