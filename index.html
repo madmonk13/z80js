@@ -20,8 +20,15 @@
 
   <!-- Full-screen touch surface, split into joystick and fire halves. -->
   <div id="surface">
-    <div class="zone joy"><div class="hint"><b id="joyHintTitle">Move</b><span id="joyHintText">Drag left or right on this side</span></div></div>
-    <div class="zone fire"><div class="hint"><b id="fireHintTitle">Fire</b><span id="fireHintText">Tap on this side</span></div></div>
+    <div class="zone joy">
+      <div class="box stick"><b id="stickZoneTitle">Move</b><small id="stickZoneText"></small></div>
+      <div class="hint"><b id="joyHintTitle">Move</b><span id="joyHintText">Drag left or right on this side</span></div>
+    </div>
+    <div class="zone fire">
+      <div class="box fire2"><b id="fire2ZoneTitle"></b><small>Tap</small></div>
+      <div class="box fire"><b id="fireZoneTitle">Fire</b><small id="fireZoneText">Tap</small></div>
+      <div class="hint"><b id="fireHintTitle">Fire</b><span id="fireHintText">Tap on this side</span></div>
+    </div>
   </div>
   <div id="ripples"></div>
   <div id="dpad">
@@ -58,6 +65,11 @@
           <input id="dpadSize" type="range" min="90" max="220" step="10"></label>
         <label class="switch" id="hapticsRow"><span>Vibrate on fire</span><input id="haptics" type="checkbox"><i></i></label>
         <label class="switch"><span>Show zone hints</span><input id="hints" type="checkbox"><i></i></label>
+        <label class="switch"><span>Show control zones<small>Outline the area for each control</small></span><input id="zones" type="checkbox"><i></i></label>
+        <label class="field slider"><span>Zone opacity <output id="zoneOpacityVal"></output></span>
+          <input id="zoneOpacity" type="range" min="10" max="100" step="5"></label>
+        <label class="field slider"><span>Zone overlap <output id="zoneOverlapVal"></output></span>
+          <input id="zoneOverlap" type="range" min="0" max="100" step="5"></label>
       </section>
 
       <section class="sec-sound">

@@ -1,4 +1,4 @@
-import { identify, SUPPORTED } from './emu/boards.js';
+import { identify, SUPPORTED, ROM_FILES } from './emu/boards.js';
 import { extractAll } from './unzip.js';
 import { encode, decode } from './emu/state.js';
 import { Screen2D } from './render/screen2d.js';
@@ -17,6 +17,9 @@ const DEFAULTS = {
   dpadSize: 140,
   haptics: true,
   hints: true,
+  zones: true,       // outline each control's area
+  zoneOpacity: 25,   // percent
+  zoneOverlap: 25,   // percent: how far the control zones reach over the picture
   sound: true,
   volume: 70,        // percent
   switches: {},      // board id -> { switch id -> value }
@@ -151,12 +154,19 @@ async function loadSet(bytes, name, id) {
   touch.dial = !!board.dialControl;
   document.body.classList.toggle('two-way', twoWay);
   document.body.classList.toggle('stick-only', touch.stickOnly);
+  document.body.classList.toggle('two-buttons', touch.twoButtons);
   $('joyHintText').textContent = twoWay ? 'Drag left or right on this side'
     : touch.stickOnly ? 'Touch & drag anywhere' : 'Touch & drag on this side';
   const [dialTitle, dialText] = board.dialHint ?? ['Fire & aim', 'Hold to fire, drag sideways to aim'];
   $('fireHintTitle').textContent = touch.dial ? dialTitle : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
   $('fireHintText').textContent = touch.dial ? dialText
     : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
+  // The control-zone outlines' labels.
+  $('stickZoneTitle').textContent = 'Move';
+  $('stickZoneText').textContent = twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
+  $('fireZoneTitle').textContent = touch.dial ? dialTitle : 'Fire';
+  $('fireZoneText').textContent = touch.dial ? 'Hold · drag sideways' : 'Tap';
+  $('fire2ZoneTitle').textContent = board.button2 || '';
   renderSwitches();
   layout2D();
   const res = library.add(name, bytes, Board.title);
@@ -170,6 +180,7 @@ async function loadSet(bytes, name, id) {
 function refreshLibrary() {
   renderLibrary($('library'), {
     titles: SUPPORTED,
+    files: ROM_FILES,
     currentId: state.romId,
     onAdd: () => $('romFile').click(),
     onPlay: (entry) => playEntry(entry),
@@ -279,6 +290,11 @@ function applyControls() {
   touch.haptics = settings.haptics;
   touch.setSize(settings.dpadSize);
   $('dpadSizeVal').textContent = `${settings.dpadSize}px`;
+  document.body.classList.toggle('show-zones', settings.zones);
+  document.documentElement.style.setProperty('--zone-opacity', settings.zoneOpacity / 100);
+  $('zoneOpacityVal').textContent = `${settings.zoneOpacity}%`;
+  $('zoneOpacity').disabled = !settings.zones;
+  $('zoneOverlapVal').textContent = `${settings.zoneOverlap}%`;
 }
 
 function syncMenu() {
@@ -286,6 +302,9 @@ function syncMenu() {
   $('dpadSize').value = settings.dpadSize;
   $('haptics').checked = settings.haptics;
   $('hints').checked = settings.hints;
+  $('zones').checked = settings.zones;
+  $('zoneOpacity').value = settings.zoneOpacity;
+  $('zoneOverlap').value = settings.zoneOverlap;
   $('sound').checked = settings.sound;
   $('volume').value = settings.volume;
   $('resume').checked = settings.resume;
@@ -303,13 +322,16 @@ function flashHints(ms) {
 }
 
 $('leftHanded').addEventListener('change', (e) => {
-  settings.leftHanded = e.target.checked; applyControls(); save(); flashHints(2500);
+  settings.leftHanded = e.target.checked; applyControls(); layout2D(); save(); flashHints(2500);
 });
 $('dpadSize').addEventListener('input', (e) => { settings.dpadSize = +e.target.value; applyControls(); save(); });
 $('haptics').addEventListener('change', (e) => {
   settings.haptics = e.target.checked; applyControls(); save();
   if (settings.haptics && navigator.vibrate) navigator.vibrate(15);
 });
+$('zones').addEventListener('change', (e) => { settings.zones = e.target.checked; applyControls(); save(); });
+$('zoneOpacity').addEventListener('input', (e) => { settings.zoneOpacity = +e.target.value; applyControls(); save(); });
+$('zoneOverlap').addEventListener('input', (e) => { settings.zoneOverlap = +e.target.value; applyControls(); layout2D(); save(); });
 $('hints').addEventListener('change', (e) => {
   settings.hints = e.target.checked; save();
   if (settings.hints) flashHints(2500); else document.body.classList.remove('show-hints');
@@ -397,13 +419,51 @@ function layout2D() {
   const portrait = H > W;
   // Portrait sits below the bar and keeps the lower part of the screen free for
   // thumbs. Landscape uses the full height, running up behind the bar.
-  const availH = portrait ? (H - barH - sb) * 0.7 : H - st - sb;
+  // Two-button games give the picture a little less room in portrait, so the
+  // two stacked buttons below it are each a comfortable size.
+  const share = touch.twoButtons ? 0.65 : 0.7;
+  const availH = portrait ? (H - barH - sb) * share : H - st - sb;
   const w = Math.max(80, Math.min(availW, availH * aspect));
   const h = w / aspect;
+  const top = portrait ? barH + 4 : st + (availH - h) / 2;
   c.style.width = `${w}px`;
   c.style.height = `${h}px`;
   c.style.left = `${sl + pad + (availW - w) / 2}px`;
-  c.style.top = `${portrait ? barH + 4 : st + (availH - h) / 2}px`;
+  c.style.top = `${top}px`;
+  const left = sl + pad + (availW - w) / 2;
+  layoutZones(portrait, { left, top, right: left + w, bottom: top + h, w, h });
+}
+
+// The control zones keep mostly clear of the picture: they reach over its
+// edge by the "zone overlap" setting (a share of its height in portrait, of
+// the way to its middle in landscape; 100% is the whole surface). In portrait they sit in the band below the
+// picture; in landscape, in the margins beside it. The zone outlines are drawn
+// there, and a two-button game's second button is the upper half of the fire
+// side's zone. Other touches still count by side: stick on one, fire on the other.
+const MIN_ZONE = 80;   // px: a landscape zone never gets narrower than this
+function layoutZones(portrait, pic) {
+  const sr = $('surface').getBoundingClientRect(), style = $('surface').style;
+  const k = settings.zoneOverlap / 100, mid = sr.left + sr.width / 2;
+  document.body.classList.toggle('portrait', portrait);
+  if (portrait) {
+    const band = Math.max(sr.top, pic.bottom - pic.h * k), split = (band + sr.bottom) / 2;
+    const fireLeft = settings.leftHanded ? sr.left : mid, fireRight = settings.leftHanded ? mid : sr.right;
+    touch.fire2Area = { left: fireLeft, right: fireRight, top: band, bottom: split };
+    style.setProperty('--band-top', `${band - sr.top}px`);
+    style.setProperty('--split', `${split - sr.top}px`);
+    style.setProperty('--left-inner', '0px');
+    style.setProperty('--right-inner', '0px');
+  } else {
+    // How far each side's zone stops short of the middle line.
+    const room = sr.width / 2 - MIN_ZONE, reach = (pic.w / 2) * k;
+    const leftInner = Math.min(room, Math.max(0, mid - (pic.left + reach)));
+    const rightInner = Math.min(room, Math.max(0, (pic.right - reach) - mid));
+    touch.fire2Area = settings.leftHanded
+      ? { left: sr.left, right: mid - leftInner, top: sr.top, bottom: sr.top + sr.height / 2 }
+      : { left: mid + rightInner, right: sr.right, top: sr.top, bottom: sr.top + sr.height / 2 };
+    style.setProperty('--left-inner', `${leftInner}px`);
+    style.setProperty('--right-inner', `${rightInner}px`);
+  }
 }
 // Rotating can leave iOS with the page scrolled or zoomed a little, which shifts
 // where taps land relative to what's drawn. Snap back after every resize, and

@@ -48,14 +48,23 @@ by its chips' file names, so the zip's own name doesn't matter.
 | | | `shollow2` | Recognized, not yet tested |
 | Tron (1982) | MCR, as Satan's Hollow, plus the aiming dial | `tron` (set 1) | **Tested:** boots, attract mode, coin, start and play |
 | Tapper (1983) | MCR (91490 CPU board): 5 MHz Z80, bigger sprites with their own palettes | `tapper` (Budweiser) | **Tested:** boots, attract mode, coin, start and play |
+| Super Xevious (1984) | Xevious board, harder program | `sxevious` | **Tested:** boots, attract mode, coin, start and play |
+| Puck Man (1980) | Namco's Japanese Pac-Man, program in eight 2K chips | `puckman` | **Tested:** boots, attract mode, coin, start and play |
+| Pac-Man Plus (1982) | Pac-Man board, encrypted program (z80js decrypts it) | `pacplus` | **Tested:** boots, attract mode, coin, start and play |
+| Super Cobra (1981) | Konami: Scramble board with a different map | `scobra` | **Tested:** boots, attract mode, coin, start and play |
+| Space Invaders (1978) | Midway/Taito: Intel 8080 (run on the Z80 core), one-bit bitmap, barrel shifter, discrete sound, color overlay | `invaders` | **Tested:** boots, attract mode, coin, start and play |
+| Lady Bug (1981) | Universal: 1 Z80, tiles, 8x8 and 16x16 sprites, two SN76489s, coin-triggered NMI | `ladybug` | **Tested:** boots, attract mode, coin, start and play |
+| 1942 (1984) | Capcom: banked Z80, scrolling 16x16 background, stacked sprites, sound Z80 with two AY-3-8910s | `1942` | **Tested:** boots, attract mode, coin, start and play |
+| Mr. Do's Castle (1983) | Universal: two Z80s talking through a latch, 4-bit tiles with priority, four SN76489s | `docastle` | **Tested:** boots, attract mode, coin, start and play |
+| Popeye (1982) | Nintendo: encrypted Z80, 512x448 raster, background bitmap, protection shifter, AY-3-8910 | `popeye` (revision D) | **Tested:** boots, attract mode, coin, start and play |
+| Pengo (1982) | Sega: Pac-Man video and sound, Sega-encrypted Z80, graphics and color banks | `pengo` (set 1) | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
 custom chips, which z80js emulates directly, so that CPU's ROM is ignored.
 
-Not supported: **Gatsbee** (Galaga hack with switchable graphics), **Puck Man** (Namco's
-set splits the program across eight smaller chips, not yet handled), and the many other Galaxian-board clones and conversions (Moon Cresta,
-Scramble, Super Cobra, Amidar and others), each of which changes the hardware a little.
+Not supported: **Gatsbee** (Galaga hack with switchable graphics) and the many other
+Galaxian-board clones and conversions, each of which changes the hardware a little.
 
 ## Controls
 
@@ -84,20 +93,34 @@ The touch layout follows the game:
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
   aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
   cabinet's spinner).
-- **Pac-Man, Ms. Pac-Man, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
+- **Pac-Man, Ms. Pac-Man, Puck Man, Pac-Man Plus, Lady Bug, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
+- **Space Invaders:** a left/right pad and fire. **1942:** an 8-way joystick; the bottom of
+  the right half fires and the top loops. **Mr. Do's Castle:** 4-way stick, fire swings the
+  hammer. **Popeye:** 4-way stick, fire punches. **Pengo:** 4-way stick, fire pushes ice.
+  **Super Cobra:** as Scramble.
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
   for a second button (fire in one-button games), Q/E or the mouse wheel (or the
   gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
   (2 for two players).
 - **Left-handed** mode in settings swaps the halves.
+- **Show control zones** (settings, on by default): a faint outline of each control's area
+  with its name (Move, Fire, and the second button such as Blaster or Shield, which takes
+  the top half of the fire side). **Zone opacity** sets how faint.
+- **Zone overlap** (settings, 0-100%, 25% by default): the control zones keep mostly clear
+  of the picture, reaching over it by this much: up from the band below it in portrait (a
+  share of its height), in from the side margins in landscape (a share of the way to its
+  middle). 0% keeps them off the picture entirely; 100% covers the whole screen. Touches
+  outside the zones still count by side (stick on one, plain fire on the other).
+- **Two-button games:** the second button is the upper half of the fire side's zone, Fire
+  the lower half. In portrait the picture is a little smaller to leave room for both.
 - **Pause** (the ⏸ button in the top bar, or P on a keyboard): stops the game and its sound; tap
   the screen or the button again to resume. The game is saved for resume when paused.
 
 ## Settings (⚙) and Games
 
 - **Games:** every supported game, in alphabetical order. Games you haven't added a ROM
-  set for are greyed out ("Upload ROM to enable"); tap one, or **Add ROM set…**, to add
+  set for are greyed out and name the zip they expect ("Upload invaders.zip to enable"); tap one, or **Add ROM set…**, to add
   its zip. Sets are kept whole in `localStorage`; the last game played starts on launch.
 - **Controls, Sound and volume**, as in 6502js.
 - **Resume where I left off** (on by default): the game in progress is saved when the
@@ -173,7 +196,15 @@ right, up, down, fire) then holds a control.
 - `src/emu/z80ctc.js`: the Zilog Z80 CTC counter/timer, with mode 2 interrupts and RETI.
 - `src/emu/ay8910.js`: the General Instrument AY-3-8910 sound chip (with optional
   per-channel low-pass filters and volume gating).
-- `src/emu/sn76489.js`: the Texas Instruments SN76489 sound chip (Mr. Do!).
+- `src/emu/sn76489.js`: the Texas Instruments SN76489 sound chip (Mr. Do!, Lady Bug, Mr. Do's Castle).
+- `src/emu/invaders.js`: Space Invaders: the bitmap, the MB14241 shifter, the two
+  interrupts, the color overlay and a synthesized model of its sound effects.
+- `src/emu/ladybug.js`: Lady Bug. `src/emu/docastle.js`: Mr. Do's Castle (the two CPUs'
+  latch handshake, tile priority, the sprite mask pen).
+- `src/emu/c1942.js`: 1942. `src/emu/popeye.js`: Popeye (decryption, background bitmap,
+  protection). `src/emu/pengo.js`: Pengo (Sega decryption, on the Pac-Man board code).
+  `pacman.js` also holds Puck Man and Pac-Man Plus (decryption); `scramble.js` Super Cobra;
+  `bosco.js` Super Xevious.
 - `src/emu/mixer.js`: mixes a board's sound chips into one output.
 - `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga, Dig Dug).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.
@@ -322,6 +353,10 @@ flowchart LR
   as MAME does for this set; other Scramble sets may need different answers.
 - **Xevious** uses the same 50xx/54xx stand-ins as Bosconian, and its explosion sounds are
   noise bursts. Sound filters on the Konami boards (Scramble, Amidar) aren't modeled.
+- **Space Invaders' sound** is synthesized by ear (one small voice per effect) rather than
+  modeled from the discrete circuits; the color overlay is approximate.
+- **Mr. Do's Castle's third CPU** isn't run (the game doesn't depend on it), and the main
+  CPU's wait on the latch is modeled by pausing it until the second CPU answers.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware

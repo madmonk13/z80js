@@ -127,6 +127,8 @@ export class Z80 {
   // ---------------------------------------------------------------- helpers
 
   fetch() { const v = this.read(this.pc); this.pc = (this.pc + 1) & 0xFFFF; return v; }
+  // An opcode byte after a prefix (an M1 cycle, like the first).
+  fetchOp() { const v = this.opRead ? this.opRead(this.pc) : this.read(this.pc); this.pc = (this.pc + 1) & 0xFFFF; return v; }
   fetch16() { const lo = this.fetch(); return lo | (this.fetch() << 8); }
   fetchD() { const d = this.fetch(); return d < 128 ? d : d - 256; }
   read16(a) { return this.read(a) | (this.read((a + 1) & 0xFFFF) << 8); }
@@ -313,9 +315,9 @@ export class Z80 {
       case 0xC9: this.pc = this.pop(); return;
       case 0xCD: { const a = this.fetch16(); this.push(this.pc); this.pc = a; return; }
       case 0xCB: return this.execCB(x);
-      case 0xDD: this.incR(); return this.exec(this.fetch(), 1);
-      case 0xFD: this.incR(); return this.exec(this.fetch(), 2);
-      case 0xED: this.incR(); return this.execED(this.fetch());
+      case 0xDD: this.incR(); return this.exec(this.fetchOp(), 1);
+      case 0xFD: this.incR(); return this.exec(this.fetchOp(), 2);
+      case 0xED: this.incR(); return this.execED(this.fetchOp());
       case 0xD3: this.output((this.a << 8) | this.fetch(), this.a); return;
       case 0xDB: this.a = this.input((this.a << 8) | this.fetch()); return;
       case 0xD9: {
@@ -372,7 +374,7 @@ export class Z80 {
     // With a prefix the displacement comes before the opcode: DD CB d op.
     let addr;
     if (x) addr = (this.getXY(x) + this.fetchD()) & 0xFFFF;
-    const op = this.fetch();
+    const op = x ? this.fetch() : this.fetchOp();
     if (!x) { this.incR(); this.cycles += 4; }
     const y = (op >> 3) & 7, z = op & 7, kind = op >> 6;
     if (x || z === 6) {

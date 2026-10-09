@@ -197,3 +197,39 @@ Amidar.switches = [
   { id: 'bonus', label: 'Bonus', options: [['30K/50K', 0x00], ['50K/50K', 0x04]], default: 0x00 },
   { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x00], ['Off', 0x02]], default: 0x00 },
 ];
+
+// Konami Super Cobra (1981): the Scramble board with its memory map moved
+// (RAM 8000, tiles 8800, objects 9000, PPIs 9800/A000) and no protection.
+export class SuperCobra extends Scramble {
+  read(a) {
+    if (a < 0x8000) return this.roms.main[a] ?? 0xFF;
+    if (a < 0x8800) return this.ram[a - 0x8000];
+    if (a < 0x9000) return this.vram[a & 0x3FF];
+    if (a < 0x9100) return this.obj[a & 0xFF];
+    if (a >= 0x9800 && a < 0x9804) return [this.in0, this.in1, this.in2, 0xFF][a & 3];
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a >= 0x8000 && a < 0x8800) { this.ram[a - 0x8000] = v; return; }
+    if (a >= 0x8800 && a < 0x9000) { this.vram[a & 0x3FF] = v; return; }
+    if (a >= 0x9000 && a < 0x9100) { this.obj[a & 0xFF] = v; return; }
+    if (a >= 0xA000 && a < 0xA004) { this.soundPort(a & 3, v); return; }
+    switch (a) {
+      case 0xA801: this.nmiEnable = !!(v & 1); return;
+      case 0xA803: this.bgOn = v & 1; return;
+      case 0xA804: this.starsOn = !!(v & 1); return;
+    }
+  }
+
+  // As Scramble, with the coinage switch at 1 coin 1 credit.
+  setInputs(s) {
+    super.setInputs(s);
+    this.in2 |= 0x02;
+  }
+}
+SuperCobra.id = 'scobra';
+SuperCobra.title = 'Super Cobra';
+SuperCobra.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x02]], default: 0x00 },
+];

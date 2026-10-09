@@ -19,22 +19,28 @@
 //   Board.stateVersion   (optional) bumped when older saved states no longer restore correctly
 
 import { Galaga } from './galaga.js';
-import { PacMan, MsPacMan, JrPacMan, Piranha, CrushRoller } from './pacman.js';
+import { PacMan, MsPacMan, JrPacMan, Piranha, CrushRoller, PuckMan, PacManPlus } from './pacman.js';
 import { Galaxian, MoonCresta } from './galaxian.js';
 import { DonkeyKong, DonkeyKongJr } from './dkong.js';
 import { Frogger } from './frogger.js';
-import { Scramble, Amidar } from './scramble.js';
+import { Scramble, Amidar, SuperCobra } from './scramble.js';
 import { DigDug } from './digdug.js';
 import { TimePilot, Pooyan } from './timeplt.js';
 import { MrDo } from './mrdo.js';
 import { SatansHollow, Tron, Tapper, Kick } from './mcr.js';
-import { Bosconian, Xevious } from './bosco.js';
+import { Bosconian, Xevious, SuperXevious } from './bosco.js';
 import { Berzerk, Frenzy } from './berzerk.js';
 import { RallyX } from './rallyx.js';
 import { WarpWarp } from './warpwarp.js';
 import { Mappy } from './mappy.js';
 import { Centipede } from './centiped.js';
 import { Phoenix } from './phoenix.js';
+import { SpaceInvaders } from './invaders.js';
+import { LadyBug } from './ladybug.js';
+import { C1942 } from './c1942.js';
+import { DoCastle } from './docastle.js';
+import { Popeye } from './popeye.js';
+import { Pengo } from './pengo.js';
 
 const BOARDS = [
   {
@@ -62,10 +68,10 @@ const BOARDS = [
   {
     Board: PacMan,
     chips: [
-      ['main0', 0x1000, [/^pacman\.6e/, /^namcopac\.6e/]],
-      ['main1', 0x1000, [/^pacman\.6f/, /^namcopac\.6f/]],
-      ['main2', 0x1000, [/^pacman\.6h/, /^namcopac\.6h/]],
-      ['main3', 0x1000, [/^pacman\.6j/, /^namcopac\.6j/]],
+      ['main0', 0x1000, [/^pacman\.6e/]],
+      ['main1', 0x1000, [/^pacman\.6f/]],
+      ['main2', 0x1000, [/^pacman\.6h/]],
+      ['main3', 0x1000, [/^pacman\.6j/]],
       ['tiles', 0x1000, [/^pacman\.5e/]],
       ['sprites', 0x1000, [/^pacman\.5f/]],
       ['palette', 0x20, [/^82s123\.7f/, /^pm1-1\.7f/]],
@@ -131,6 +137,171 @@ const BOARDS = [
     ],
     assemble: (c) => ({
       main: cat(c.main0, c.main1, c.main2, c.main3), tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    Board: PuckMan,
+    chips: [
+      ['main0', 0x1000, [/^namcopac\.6e$/]],
+      ['main1', 0x1000, [/^namcopac\.6f$/]],
+      ['main2', 0x1000, [/^namcopac\.6h$/]],
+      ['main3', 0x1000, [/^namcopac\.6j$/]],
+      ['tiles', 0x1000, [/^pacman\.5e$/]],
+      ['sprites', 0x1000, [/^pacman\.5f$/]],
+      ['palette', 0x20, [/^82s123\.7f$/]],
+      ['lut', 0x100, [/^82s126\.4a$/]],
+      ['wave', 0x100, [/^82s126\.1m$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.main0, c.main1, c.main2, c.main3), tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: c.wave }),
+  },
+  {
+    Board: PacManPlus,
+    chips: [
+      ['main0', 0x1000, [/^pacplus\.6e$/]],
+      ['main1', 0x1000, [/^pacplus\.6f$/]],
+      ['main2', 0x1000, [/^pacplus\.6h$/]],
+      ['main3', 0x1000, [/^pacplus\.6j$/]],
+      ['tiles', 0x1000, [/^pacplus\.5e$/]],
+      ['sprites', 0x1000, [/^pacplus\.5f$/]],
+      ['palette', 0x20, [/^pacplus\.7f$/]],
+      ['lut', 0x100, [/^pacplus\.4a$/]],
+      ['wave', 0x100, [/^82s126\.1m$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.main0, c.main1, c.main2, c.main3), tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: c.wave }),
+  },
+  {
+    Board: SpaceInvaders,
+    chips: [
+      ['h', 0x800, [/^invaders\.h$/]],
+      ['g', 0x800, [/^invaders\.g$/]],
+      ['f', 0x800, [/^invaders\.f$/]],
+      ['e', 0x800, [/^invaders\.e$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.h, c.g, c.f, c.e) }),
+  },
+  {
+    Board: LadyBug,
+    chips: [
+      ...[1, 2, 3, 4, 5, 6].map((n) => [`main${n}`, 0x1000, [new RegExp(`^lb${n}\\.cpu$`)]]),
+      ['chars0', 0x1000, [/^lb9\.vid$/]],
+      ['chars1', 0x1000, [/^lb10\.vid$/]],
+      ['sprites0', 0x1000, [/^lb8\.cpu$/]],
+      ['sprites1', 0x1000, [/^lb7\.cpu$/]],
+      ['palette', 0x20, [/^10-2\.vid$/]],
+      ['spriteLut', 0x20, [/^10-1\.vid$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main1, c.main2, c.main3, c.main4, c.main5, c.main6),
+      chars: cat(c.chars0, c.chars1), sprites: cat(c.sprites0, c.sprites1), palette: c.palette, spriteLut: c.spriteLut,
+    }),
+  },
+  {
+    Board: C1942,
+    chips: [
+      ['n3', 0x4000, [/^1-n3a?\.bin$/]],
+      ['n4', 0x4000, [/^1-n4\.bin$/]],
+      ['n5', 0x4000, [/^1-n5\.bin$/]],
+      ['n6', 0x2000, [/^1-n6\.bin$/]],
+      ['n7', 0x4000, [/^1-n7\.bin$/]],
+      ['sound', 0x4000, [/^1-c11\.bin$/]],
+      ['chars', 0x2000, [/^1-f2\.bin$/]],
+      ...[1, 2, 3, 4, 5, 6].map((n) => [`a${n}`, 0x2000, [new RegExp(`^2-a${n}\\.bin$`)]]),
+      ['l1', 0x4000, [/^2-l1\.bin$/]],
+      ['l2', 0x4000, [/^2-l2\.bin$/]],
+      ['n1', 0x4000, [/^2-n1\.bin$/]],
+      ['n2', 0x4000, [/^2-n2\.bin$/]],
+      ['red', 0x100, [/^08e_sb-5\.bin$/]],
+      ['green', 0x100, [/^09e_sb-6\.bin$/]],
+      ['blue', 0x100, [/^10e_sb-7\.bin$/]],
+      ['charLut', 0x100, [/^f01_sb-0\.bin$/]],
+      ['tileLut', 0x100, [/^06d_sb-4\.bin$/]],
+      ['spriteLut', 0x100, [/^03k_sb-8\.bin$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.n3, c.n4), banks: cat(c.n5, c.n6, new Uint8Array(0x2000).fill(0xFF), c.n7), sound: c.sound, chars: c.chars,
+      tiles: cat(c.a1, c.a2, c.a3, c.a4, c.a5, c.a6), sprites: cat(c.l1, c.l2, c.n1, c.n2),
+      red: c.red, green: c.green, blue: c.blue, charLut: c.charLut, tileLut: c.tileLut, spriteLut: c.spriteLut,
+    }),
+  },
+  {
+    Board: DoCastle,
+    chips: [
+      ['a1', 0x2000, [/^01p_a1\.bin$/]],
+      ['a2', 0x2000, [/^01n_a2\.bin$/]],
+      ['a3', 0x2000, [/^01l_a3\.bin$/]],
+      ['a4', 0x2000, [/^01k_a4\.bin$/]],
+      ['sub', 0x4000, [/^07n_a0\.bin$/]],
+      ['chars', 0x4000, [/^03a_a5\.bin$/]],
+      ['a6', 0x2000, [/^04m_a6\.bin$/]],
+      ['a7', 0x2000, [/^04l_a7\.bin$/]],
+      ['a8', 0x2000, [/^04j_a8\.bin$/]],
+      ['a9', 0x2000, [/^04h_a9\.bin$/]],
+      ['palette', 0x200, [/^09c\.bin$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.a1, c.a2, c.a3, c.a4), sub: c.sub, chars: c.chars, sprites: cat(c.a6, c.a7, c.a8, c.a9), palette: c.palette.subarray(0, 0x100),
+    }),
+  },
+  {
+    Board: Popeye,
+    chips: [
+      ['a', 0x2000, [/^c-7a$/]],
+      ['b', 0x2000, [/^c-7b$/]],
+      ['c', 0x2000, [/^c-7c$/]],
+      ['e', 0x2000, [/^c-7e$/]],
+      ['chars', 0x1000, [/^v-5n$/]],
+      ['s1e', 0x2000, [/^v-1e$/]],
+      ['s1f', 0x2000, [/^v-1f$/]],
+      ['s1j', 0x2000, [/^v-1j$/]],
+      ['s1k', 0x2000, [/^v-1k$/]],
+      ['bgPal', 0x20, [/^prom-cpu\.4a$/]],
+      ['charPal', 0x20, [/^prom-cpu\.3a$/]],
+      ['spriteLo', 0x100, [/^prom-cpu\.5b$/]],
+      ['spriteHi', 0x100, [/^prom-cpu\.5a$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.a, c.b, c.c, c.e), chars: c.chars.subarray(0x800), sprites: cat(c.s1e, c.s1f, c.s1j, c.s1k),
+      bgPal: c.bgPal, charPal: c.charPal, spriteLo: c.spriteLo, spriteHi: c.spriteHi,
+    }),
+  },
+  {
+    Board: Pengo,
+    chips: [
+      ...['ep1689c.8', 'ep1690b.7', 'ep1691b.15', 'ep1692b.14', 'ep1693b.21', 'ep1694b.20', 'ep5118b.32', 'ep5119c.31']
+        .map((n, i) => [`main${i}`, 0x1000, [new RegExp(`^${n.replace('.', '\\.')}$`)]]),
+      ['gfx0', 0x2000, [/^ep1640\.92$/]],
+      ['gfx1', 0x2000, [/^ep1695\.105$/]],
+      ['palette', 0x20, [/^pr1633\.78$/]],
+      ['lut', 0x400, [/^pr1634\.88$/]],
+      ['wave', 0x100, [/^pr1635\.51$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => c[`main${i}`])),
+      // Each graphics ROM holds a bank of tiles, then a bank of sprites.
+      tiles: cat(c.gfx0.subarray(0, 0x1000), c.gfx1.subarray(0, 0x1000)),
+      sprites: cat(c.gfx0.subarray(0x1000), c.gfx1.subarray(0x1000)),
+      palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    Board: SuperCobra,
+    chips: [
+      ['main0', 0x1000, [/^epr1265\.2c$/, /^scobra2c/]],
+      ['main1', 0x1000, [/^2e$/, /^scobra2e/]],
+      ['main2', 0x1000, [/^epr1267\.2f$/, /^scobra2f/]],
+      ['main3', 0x1000, [/^2h$/, /^scobra2h/]],
+      ['main4', 0x1000, [/^epr1269\.2j$/, /^scobra2j/]],
+      ['main5', 0x1000, [/^2l$/, /^scobra2l/]],
+      ['sound0', 0x800, [/^5c$/]],
+      ['sound1', 0x800, [/^5d$/]],
+      ['sound2', 0x800, [/^5e$/]],
+      ['gfx0', 0x800, [/^epr1274\.5h$/]],
+      ['gfx1', 0x800, [/^epr1273\.5f$/]],
+      ['palette', 0x20, [/^82s123\.6e$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3, c.main4, c.main5), sound: cat(c.sound0, c.sound1, c.sound2),
+      gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
     }),
   },
   {
@@ -419,6 +590,42 @@ const BOARDS = [
     }),
   },
   {
+    Board: SuperXevious,
+    chips: [
+      ['main0', 0x1000, [/^cpu_3p\.rom$/]],
+      ['main1', 0x1000, [/^cpu_3m\.rom$/]],
+      ['main2', 0x1000, [/^cpu_2m\.rom$/]],
+      ['main3', 0x1000, [/^cpu_2l\.rom$/]],
+      ['sub0', 0x1000, [/^cpu_3f\.rom$/]],
+      ['sub1', 0x1000, [/^cpu_3j\.rom$/]],
+      ['sound', 0x1000, [/^xvi_7\.2c/]],
+      ['fg', 0x1000, [/^xvi_12\.3b/]],
+      ['bg0', 0x1000, [/^xvi_13\.3c/]],
+      ['bg1', 0x1000, [/^xvi_14\.3d/]],
+      ['sp15', 0x2000, [/^xvi_15\.4m/]],
+      ['sp17', 0x2000, [/^xvi_17\.4p/]],
+      ['sp16', 0x1000, [/^xvi_16\.4n/]],
+      ['sp18', 0x2000, [/^xvi_18\.4r/]],
+      ['map2a', 0x1000, [/^xvi_9\.2a/]],
+      ['map2b', 0x2000, [/^xvi_10\.2b/]],
+      ['map2c', 0x1000, [/^xvi_11\.2c/]],
+      ['red', 0x100, [/^xvi_8bpr\.6a/]],
+      ['green', 0x100, [/^xvi_9bpr\.6d/]],
+      ['blue', 0x100, [/^xvi10bpr\.6e/]],
+      ['bgLutLo', 0x200, [/^xvi_7bpr\.4h/]],
+      ['bgLutHi', 0x200, [/^xvi_6bpr\.4f/]],
+      ['spLutLo', 0x200, [/^xvi_4bpr\.3l/]],
+      ['spLutHi', 0x200, [/^xvi_5bpr\.3m/]],
+      ['wave', 0x100, [/^xvi_2bpr\.7n/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sub: cat(c.sub0, c.sub1), sound: c.sound,
+      fg: c.fg, bg: cat(c.bg0, c.bg1), sp15: c.sp15, sp17: c.sp17, sp16: c.sp16, sp18: c.sp18,
+      bgMap: cat(c.map2a, c.map2b, c.map2c), red: c.red, green: c.green, blue: c.blue,
+      bgLutLo: c.bgLutLo, bgLutHi: c.bgLutHi, spLutLo: c.spLutLo, spLutHi: c.spLutHi, wave: c.wave,
+    }),
+  },
+  {
     Board: Xevious,
     chips: [
       ['main0', 0x1000, [/^xvi_1\.3p/]],
@@ -653,3 +860,5 @@ export function identify(files) {
 }
 
 export const SUPPORTED = BOARDS.map((b) => b.Board.title);
+// The MAME set name each board expects (its id), for the "upload" hint.
+export const ROM_FILES = Object.fromEntries(BOARDS.map((b) => [b.Board.title, `${b.Board.id}.zip`]));

@@ -6,7 +6,8 @@
 //
 // Fire half: every touch presses fire. Each press is held for at least
 // MIN_PRESS so a quick tap is never shorter than a frame the game polls.
-// Two-button games split it: the top half is the second button. Dial games
+// Two-button games split it: the upper half of the fire side's zone is the
+// second button (the zones keep mostly clear of the picture; see main.js layoutZones). Dial games
 // (Tron) also turn the dial by the finger's sideways movement while it's down.
 
 const UP = 0x10, DOWN = 0x20, LEFT = 0x40, RIGHT = 0x80;
@@ -30,6 +31,7 @@ export class TouchControls {
     this.stickOnly = false;   // no fire button (e.g. Pac-Man): the whole surface is the stick
     this.twoButtons = false;  // top of the fire half is a second button (e.g. Satan's Hollow's shield)
     this.dial = false;        // dragging on the fire half turns a dial (Tron)
+    this.fire2Area = null;    // { left, right, top, bottom } in client px, set by the page layout
     this.size = 140;
     this.haptics = true;
     this.onTouch = null;      // called on every touch start (audio unlock, hints)
@@ -67,6 +69,14 @@ export class TouchControls {
     this.dpad.style.setProperty('--size', `${px}px`);
   }
 
+  // The second button's area: given by the layout, else the fire side's top half.
+  inFire2(x, y) {
+    const a = this.fire2Area;
+    if (a) return x >= a.left && x < a.right && y >= a.top && y < a.bottom;
+    const r = this.surface.getBoundingClientRect();
+    return y < r.top + r.height / 2;
+  }
+
   isJoystickSide(x) {
     if (this.stickOnly) return true;
     const leftHalf = x < this.surface.clientWidth / 2;
@@ -102,7 +112,7 @@ export class TouchControls {
       this.dpad.style.top = `${e.clientY}px`;
       this.knob.style.transform = 'translate(-50%, -50%)';
       this.dpad.className = 'show';
-    } else if (this.twoButtons && e.clientY < this.surface.getBoundingClientRect().top + this.surface.clientHeight / 2) {
+    } else if (this.twoButtons && this.inFire2(e.clientX, e.clientY)) {
       this.fire2Ids.add(e.pointerId);
       this.fire2Until = performance.now() + MIN_PRESS;
       this.ripple(e.clientX, e.clientY);

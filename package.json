@@ -2,7 +2,7 @@
   "name": "z80js",
   "version": "0.1.0",
   "private": true,
-  "description": "Touch-first Z80 arcade emulator (Galaga, Pac-Man, Ms. Pac-Man, Galaxian, Donkey Kong, Donkey Kong Jr., Frogger, Dig Dug, Time Pilot, Mr. Do!, Satan's Hollow, Tron, Tapper, Bosconian, Berzerk, Frenzy, Pooyan, Scramble, Amidar, Moon Cresta, Jr. Pac-Man, Xevious, Piranha, Crush Roller, Kick, Rally-X, Warp & Warp, Mappy, Centipede, Phoenix) for phones and desktop",
+  "description": "Touch-first Z80 arcade emulator (Galaga, Pac-Man, Ms. Pac-Man, Galaxian, Donkey Kong, Donkey Kong Jr., Frogger, Dig Dug, Time Pilot, Mr. Do!, Satan's Hollow, Tron, Tapper, Bosconian, Berzerk, Frenzy, Pooyan, Scramble, Amidar, Moon Cresta, Jr. Pac-Man, Xevious, Piranha, Crush Roller, Kick, Rally-X, Warp & Warp, Mappy, Centipede, Phoenix, Super Xevious, Puck Man, Pac-Man Plus, Super Cobra, Space Invaders, Lady Bug, 1942, Mr. Do's Castle, Popeye, Pengo) for phones and desktop",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 1976",

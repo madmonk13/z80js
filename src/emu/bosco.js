@@ -571,3 +571,13 @@ Xevious.switches = [
   { id: 'lives', label: 'Lives', options: [['1', 0x40], ['2', 0x20], ['3', 0x60], ['5', 0x00]], default: 0x60 },
   { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x40], ['Normal', 0x60], ['Hard', 0x20], ['Hardest', 0x00]], default: 0x60 },
 ];
+
+// Super Xevious (1984): a harder revision of Xevious on the same board.
+// Its Freeze switch reads the other way round (bit 7 low is off).
+export class SuperXevious extends Xevious {
+  applySwitches(v) { super.applySwitches(v); this.dswB &= 0x7F; }
+}
+SuperXevious.id = 'sxevious';
+SuperXevious.title = 'Super Xevious';
+SuperXevious.switches = Xevious.switches;
+SuperXevious.stateVersion = Xevious.stateVersion;

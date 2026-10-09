@@ -464,3 +464,38 @@ CrushRoller.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x04], ['5', 0x08], ['6', 0x0C]], default: 0x00 },
   { id: 'teleport', label: 'Teleport holes', options: [['On', 0x00], ['Off', 0x20]], default: 0x20 },
 ];
+
+// Puck Man (1980): Namco's original release of Pac-Man, on the same board.
+export class PuckMan extends PacMan {}
+PuckMan.id = 'puckman';
+PuckMan.title = 'Puck Man';
+PuckMan.switches = PacMan.switches;
+
+// Pac-Man Plus (1982): Pac-Man with new maze colors, fruit and ghost tricks,
+// sold as a conversion kit whose program ROMs are encrypted. Each byte has its
+// bits reordered and XORed by one of six keys, chosen by five address lines
+// (A0, A2, A5, A7, A9) and inverted in its low bit by A11.
+const PLUS_KEYS = [
+  [[7, 6, 5, 4, 3, 2, 1, 0], 0x00], [[7, 6, 5, 4, 3, 2, 1, 0], 0x28],
+  [[6, 1, 3, 2, 5, 7, 0, 4], 0x96], [[6, 1, 5, 2, 3, 7, 0, 4], 0xBE],
+  [[0, 3, 7, 6, 4, 2, 1, 5], 0xD5], [[0, 3, 4, 6, 7, 2, 1, 5], 0xDD],
+];
+const PLUS_PICK = [0, 2, 4, 2, 4, 0, 4, 2, 2, 0, 2, 2, 4, 0, 4, 2, 2, 2, 4, 0, 4, 2, 4, 0, 0, 4, 0, 4, 4, 2, 4, 2];
+
+function plusDecrypt(addr, e) {
+  let k = PLUS_PICK[(addr & 1) | ((addr >> 1) & 2) | ((addr >> 3) & 4) | ((addr >> 4) & 8) | ((addr >> 5) & 16)];
+  if (addr & 0x800) k ^= 1;
+  const [order, xor] = PLUS_KEYS[k];
+  let v = 0;
+  for (let i = 0; i < 8; i++) v |= ((e >> order[i]) & 1) << (7 - i);
+  return v ^ xor;
+}
+
+export class PacManPlus extends PacMan {
+  constructor(roms) {
+    super({ ...roms, main: roms.main.map((v, a) => plusDecrypt(a, v)) });
+  }
+}
+PacManPlus.id = 'pacplus';
+PacManPlus.title = 'Pac-Man Plus';
+PacManPlus.switches = PacMan.switches;
