@@ -105,7 +105,7 @@ const RESUME_EVERY_MS = 5000;
 
 function saveResume() {
   if (!board || !settings.resume || !state.romId) return;
-  store.trySet(RESUME + state.romId, encode({ v: RESUME_VERSION, board: board.constructor.id, state: board.saveState() }));
+  store.trySet(RESUME + state.romId, encode({ v: RESUME_VERSION, board: board.constructor.id, bv: board.constructor.stateVersion ?? 1, state: board.saveState() }));
 }
 
 function restoreResume(id) {
@@ -114,7 +114,8 @@ function restoreResume(id) {
   if (!text) return false;
   try {
     const saved = decode(text);
-    if (saved.v !== RESUME_VERSION || saved.board !== board.constructor.id) throw new Error('stale');
+    // A board bumps its own stateVersion when an emulation fix makes older saves wrong.
+    if (saved.v !== RESUME_VERSION || saved.board !== board.constructor.id || (saved.bv ?? 1) !== (board.constructor.stateVersion ?? 1)) throw new Error('stale');
     board.loadState(saved.state);
     return true;
   } catch {

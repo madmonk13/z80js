@@ -67,10 +67,10 @@ export class Galaxian {
     // in the second. A sprite is four tiles: 16x16.
     const half = roms.gfx.length * 4;           // bits per plane
     this.tilePix = decodeTiles(roms.gfx, {
-      count: 256, width: 8, height: 8, planes: [0, half], xs: run(0, 8), ys: run(0, 8, 8), size: 64,
+      count: roms.gfx.length / 16, width: 8, height: 8, planes: [0, half], xs: run(0, 8), ys: run(0, 8, 8), size: 64,
     });
     this.spritePix = decodeTiles(roms.gfx, {
-      count: 64, width: 16, height: 16, planes: [0, half],
+      count: roms.gfx.length / 64, width: 16, height: 16, planes: [0, half],
       xs: [...run(0, 8), ...run(64, 8)], ys: [...run(0, 8, 8), ...run(128, 8, 8)], size: 256,
     });
     this.palette = promPalette(roms.palette, 32, [0x4F, 0xA8]);
@@ -167,7 +167,7 @@ export class Galaxian {
       const scroll = this.mapY(obj[col * 2]), color = this.mapColor(obj[col * 2 + 1] & 7) * 4;
       for (let y = TOP; y < TOP + NATIVE_H; y++) {
         const ty = (y + scroll) & 0xFF;
-        const pix = this.vram[(ty >> 3) * 32 + col] * 64 + (ty & 7) * 8;
+        const pix = this.charCode(this.vram[(ty >> 3) * 32 + col]) * 64 + (ty & 7) * 8;
         let o = y * NATIVE_W + col * 8;
         for (let x = 0; x < 8; x++, o++) {
           const pen = this.tilePix[pix + x];
@@ -176,12 +176,7 @@ export class Galaxian {
       }
     }
 
-    // Bullets: 4-pixel dashes; the last one is the player's yellow missile.
-    for (let b = 0; this.bullets && b < 8; b++) {
-      const y = 255 - obj[0x61 + b * 4], x = 255 - obj[0x63 + b * 4];
-      if (y < TOP || y >= TOP + NATIVE_H) continue;
-      for (let i = 1; i <= 4; i++) if (x - i >= 0) out[y * NATIVE_W + x - i] = b === 7 ? MISSILE : SHELL;
-    }
+    if (this.bullets) this.drawBullets(out);
 
     // Sprites, last to first so sprite 0 ends up on top.
     for (let s = 7; s >= 0; s--) {
@@ -189,18 +184,30 @@ export class Galaxian {
       const attr = obj[o + 1], color = this.mapColor(obj[o + 2] & 7) * 4;
       const sx = (obj[o + 3] + 1) & 0xFF;
       const sy = ((240 - this.mapY(obj[o])) & 0xFF) + (s < 3 ? 1 : 0);
-      this.drawSprite(attr & 0x3F, color, attr & 0x40, attr & 0x80, sx, sy);
+      this.drawSprite(this.spriteCode(attr & 0x3F), color, attr & 0x40, attr & 0x80, sx, sy);
     }
 
     // Crop to the visible lines and rotate for the vertical monitor.
     rotate90(out.subarray(TOP * NATIVE_W, (TOP + NATIVE_H) * NATIVE_W), NATIVE_W, NATIVE_H, this.frame);
   }
 
-  // Hooks for boards built on this one (Frogger): the background behind the
-  // tiles, how color codes and vertical positions are wired.
+  // Hooks for boards built on this one (Frogger, Scramble): the background
+  // behind the tiles, the bullets, how color codes and vertical positions are wired.
   background(out) { out.fill(0xFF000000); }
+
+  // Bullets: 4-pixel dashes; the last one is the player's yellow missile.
+  drawBullets(out) {
+    const obj = this.obj;
+    for (let b = 0; b < 8; b++) {
+      const y = 255 - obj[0x61 + b * 4], x = 255 - obj[0x63 + b * 4];
+      if (y < TOP || y >= TOP + NATIVE_H) continue;
+      for (let i = 1; i <= 4; i++) if (x - i >= 0) out[y * NATIVE_W + x - i] = b === 7 ? MISSILE : SHELL;
+    }
+  }
   mapColor(c) { return c; }
   mapY(v) { return v; }
+  charCode(c) { return c; }                    // graphics banking (Moon Cresta)
+  spriteCode(c) { return c; }
 
   drawSprite(code, color, flipX, flipY, sx, sy) {
     const out = this.native, pix = code * 256;
@@ -223,4 +230,72 @@ Galaxian.title = 'Galaxian';
 Galaxian.switches = [
   { id: 'lives', label: 'Lives', options: [['2', 0x00], ['3', 0x04]], default: 0x04 },
   { id: 'bonus', label: 'Bonus life', options: [['7K', 0x00], ['10K', 0x01], ['12K', 0x02], ['20K', 0x03]], default: 0x00 },
+];
+
+// Nichibutsu Moon Cresta (1980): the Galaxian board with twice the graphics,
+// three latches that bank-switch part of the tile and sprite set, and the
+// memory map moved. The program ROMs are lightly encrypted (bits swapped and
+// flipped per byte), undone at load.
+export class MoonCresta extends Galaxian {
+  constructor(roms) {
+    super({ ...roms, main: MoonCresta.decrypt(roms.main) });
+    this.gfxBank = [0, 0, 0];
+  }
+
+  static decrypt(rom) {
+    return rom.map((d, a) => {
+      let r = d;
+      if (d & 0x02) r ^= 0x40;
+      if (d & 0x20) r ^= 0x04;
+      if (!(a & 1)) r = (r & 0xBB) | (((r >> 6) & 1) << 2) | (((r >> 2) & 1) << 6);   // swap bits 2 and 6
+      return r;
+    });
+  }
+
+  saveState() { return { ...super.saveState(), gfxBank: this.gfxBank.slice() }; }
+  loadState(s) { super.loadState(s); this.gfxBank = s.gfxBank ? s.gfxBank.slice() : [0, 0, 0]; }
+
+  // Same devices as Galaxian at new addresses: inputs at A000/A800/B000,
+  // sound at A004-A807, interrupt and stars at B000/B004, pitch at B800.
+  read(a) {
+    if (a < 0x4000) return this.roms.main[a] ?? 0xFF;
+    if (a >= 0x8000 && a < 0x8800) return this.ram[a - 0x8000];
+    if (a >= 0x9000 && a < 0x9800) return this.vram[a & 0x3FF];
+    if (a >= 0x9800 && a < 0x9900) return this.obj[a & 0xFF];
+    if (a === 0xA000) return this.in0;
+    if (a === 0xA800) return this.in1 | this.dip1;
+    if (a === 0xB000) return 0;                // coinage: 1 coin 1 credit
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a >= 0x8000 && a < 0x8800) { this.ram[a - 0x8000] = v; return; }
+    if (a >= 0x9000 && a < 0x9400) { this.vram[a & 0x3FF] = v; return; }
+    if (a >= 0x9800 && a < 0x9900) { this.obj[a & 0xFF] = v; return; }
+    if (a >= 0xA000 && a <= 0xA002) { this.gfxBank[a & 3] = v & 1; return; }
+    if (a >= 0xA004 && a <= 0xA007) super.write(0x6000 | (a & 7), v);
+    else if (a >= 0xA800 && a <= 0xA807) super.write(0x6800 | (a & 7), v);
+    else if (a === 0xB000) super.write(0x7001, v);
+    else if (a === 0xB004) super.write(0x7004, v);
+    else if (a === 0xB800) super.write(0x7800, v);
+  }
+
+  applySwitches(v) { this.dip1 = v.bonus | v.language; }
+
+  // With bank switching on (latch 2), codes 80-BF (tiles) and 20-2F
+  // (sprites) come from the bank picked by latches 0 and 1.
+  charCode(c) {
+    const b = this.gfxBank;
+    return b[2] && (c & 0xC0) === 0x80 ? (c & 0x3F) | (b[0] << 6) | (b[1] << 7) | 0x100 : c;
+  }
+  spriteCode(c) {
+    const b = this.gfxBank;
+    return b[2] && (c & 0x30) === 0x20 ? (c & 0x0F) | (b[0] << 4) | (b[1] << 5) | 0x40 : c;
+  }
+}
+MoonCresta.id = 'mooncrst';
+MoonCresta.title = 'Moon Cresta';
+MoonCresta.switches = [
+  { id: 'bonus', label: 'Bonus life', options: [['30K', 0x00], ['50K', 0x40]], default: 0x00 },
+  { id: 'language', label: 'Language', options: [['English', 0x80], ['Japanese', 0x00]], default: 0x80 },
 ];

@@ -14,7 +14,7 @@
 import { Z80 } from './z80.js';
 import { AY8910 } from './ay8910.js';
 import { SoundMix } from './mixer.js';
-import { decodeTiles, rgba, rotate90, run } from './video.js';
+import { decodeTiles, promPalette, rgba, rotate90, rotate270, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
@@ -76,6 +76,13 @@ export class TimePilot {
     this.native = new Uint32Array(NATIVE_W * NATIVE_H);
     this.front = new Uint8Array(NATIVE_W * NATIVE_H);   // tile pixels drawn over the sprites
 
+    this.decodeGraphics(roms);
+    this.in0 = this.in1 = 0xFF;
+    this.applySwitches(defaultSwitches(this.constructor.switches));
+    this.reset();
+  }
+
+  decodeGraphics(roms) {
     this.charPix = decodeTiles(roms.chars, {
       count: roms.chars.length / 16, width: 8, height: 8, planes: [4, 0], xs: [...run(0, 4), ...run(64, 4)], ys: run(0, 8, 8), size: 128,
     });
@@ -86,9 +93,6 @@ export class TimePilot {
     this.palette = palette(roms.palLo, roms.palHi);
     this.spriteLut = Uint8Array.from(roms.spriteLut, (v) => v & 0x0F);
     this.charLut = Uint8Array.from(roms.charLut, (v) => (v & 0x0F) + 0x10);
-    this.in0 = this.in1 = 0xFF;
-    this.applySwitches(defaultSwitches(this.constructor.switches));
-    this.reset();
   }
 
   reset() {
@@ -250,5 +254,112 @@ TimePilot.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x03], ['4', 0x02], ['5', 0x01]], default: 0x03 },
   { id: 'difficulty', label: 'Difficulty', options: [['Easiest', 0x70], ['Easy', 0x50], ['Normal', 0x30], ['Hard', 0x10], ['Hardest', 0x00]], default: 0x70 },
   { id: 'bonus', label: 'Bonus', options: [['10K/50K', 0x08], ['20K/60K', 0x00]], default: 0x08 },
+  { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x00], ['Off', 0x80]], default: 0x00 },
+];
+
+// Konami Pooyan (1982): Time Pilot's sound board and a similar video board
+// with 4-bit graphics, at 8000-97FF instead of A000-B7FF. One 32-color
+// palette PROM.
+export class Pooyan extends TimePilot {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'four-way';               // the gondola only goes up and down
+    this.flip = 0;
+  }
+  saveState() { return { ...super.saveState(), flip: this.flip }; }
+  loadState(s) { super.loadState(s); this.flip = s.flip ?? 0; }
+
+  decodeGraphics(roms) {
+    const planes = [0x8000 + 4, 0x8000, 4, 0];
+    this.charPix = decodeTiles(roms.chars, {
+      count: 256, width: 8, height: 8, planes, xs: [...run(0, 4), ...run(64, 4)], ys: run(0, 8, 8), size: 128,
+    });
+    this.spritePix = decodeTiles(roms.sprites, {
+      count: 64, width: 16, height: 16, planes,
+      xs: [...run(0, 4), ...run(64, 4), ...run(128, 4), ...run(192, 4)], ys: [...run(0, 8, 8), ...run(256, 8, 8)], size: 512,
+    });
+    this.palette = promPalette(roms.palette, 32, [0x47, 0x97]);
+    this.spriteLut = Uint8Array.from(roms.spriteLut, (v) => v & 0x0F);
+    this.charLut = Uint8Array.from(roms.charLut, (v) => (v & 0x0F) + 0x10);
+  }
+
+  read(a) {
+    if (a < 0x8000) return this.roms.main[a];
+    if (a < 0xA000) return this.ram[a - 0x8000];
+    switch (a) {
+      case 0xA000: return this.dsw1;
+      case 0xA080: return this.in0;
+      case 0xA0A0: return this.in1;
+      case 0xA0C0: return 0xFF;
+      case 0xA0E0: return this.dsw0;
+    }
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a >= 0x8000 && a < 0xA000) { this.ram[a - 0x8000] = v; return; }
+    switch (a) {
+      case 0xA100: this.latch = v; return;
+      case 0xA180: this.nmiEnable = !!(v & 1); return;
+      case 0xA181:                              // low then high interrupts the sound CPU
+        if (v && !this.lastTrigger) this.sndCpu.irq = true;
+        this.lastTrigger = v;
+        return;
+      case 0xA187: this.flip = v & 1; return;   // flips the tiles; the program places the sprites itself
+    }
+  }
+
+  // IN0: coin, starts. IN1: up, down, fire.
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x08 : 0) | (s.start2 ? 0x10 : 0));
+    this.in1 = 0xFF & ~((s.up ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.fire ? 0x10 : 0));
+  }
+
+  applySwitches(v) {
+    this.dsw0 = 0xFF;                          // 1 coin 1 credit
+    this.dsw1 = v.lives | v.bonus | v.difficulty | v.demoSounds;
+  }
+
+  render() {
+    const out = this.native, ram = this.ram, pal = this.palette;
+    for (let row = 2; row < 30; row++) {
+      for (let col = 0; col < 32; col++) {
+        const i = row * 32 + col, attr = ram[i];
+        const code = ram[0x400 + i] | ((attr & 0x20) << 3), color = (attr & 0x0F) * 16;
+        const f = this.flip, flipX = !(attr & 0x40) !== !f, flipY = !(attr & 0x80) !== !f;
+        const r = f ? 29 - row : row - 2, c = f ? 31 - col : col;
+        for (let y = 0; y < 8; y++) {
+          const src = code * 64 + (flipY ? 7 - y : y) * 8;
+          let o = (r * 8 + y) * NATIVE_W + c * 8;
+          for (let x = 0; x < 8; x++, o++) out[o] = pal[this.charLut[color + this.charPix[src + (flipX ? 7 - x : x)]]];
+        }
+      }
+    }
+    // Sprites: 24, registers at 9010-903F and 9410-943F; color 0 is see-through.
+    for (let offs = 0; offs < SPRITES; offs += 2) {
+      const a = ram[0x1010 + offs], code = ram[0x1011 + offs] & 0x3F, attr = ram[0x1410 + offs];
+      const sx = 240 - a, sy = ram[0x1411 + offs] - TOP, color = (attr & 0x0F) * 16;
+      const flipX = attr & 0x40, flipY = !(attr & 0x80);
+      for (let y = 0; y < 16; y++) {
+        const py = sy + y;
+        if (py < 0 || py >= NATIVE_H) continue;
+        const src = code * 256 + (flipY ? 15 - y : y) * 16;
+        for (let x = 0; x < 16; x++) {
+          const px = sx + x;
+          if (px < 0 || px >= NATIVE_W) continue;
+          const c = this.spriteLut[color + this.spritePix[src + (flipX ? 15 - x : x)]];
+          if (c) out[py * NATIVE_W + px] = pal[c];
+        }
+      }
+    }
+    rotate270(out, NATIVE_W, NATIVE_H, this.frame);
+  }
+}
+Pooyan.id = 'pooyan';
+Pooyan.title = 'Pooyan';
+Pooyan.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x03], ['4', 0x02], ['5', 0x01]], default: 0x03 },
+  { id: 'bonus', label: 'Bonus', options: [['50K/80K', 0x08], ['30K/70K', 0x00]], default: 0x08 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Easiest', 0x70], ['Easy', 0x50], ['Normal', 0x30], ['Hard', 0x10], ['Hardest', 0x00]], default: 0x70 },
   { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x00], ['Off', 0x80]], default: 0x00 },
 ];

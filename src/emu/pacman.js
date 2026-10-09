@@ -261,3 +261,136 @@ export class MsPacMan extends PacMan {
 MsPacMan.id = 'mspacman';
 MsPacMan.title = 'Ms. Pac-Man';
 MsPacMan.switches = PacMan.switches;
+
+// ---------------------------------------------------------------- Jr. Pac-Man
+
+// Jr. Pac-Man (1983): the Pac-Man board with more program ROM (8000-DFFF),
+// twice the graphics in switchable banks, a playfield 54 tiles long that
+// scrolls under fixed score columns, colors set per column of the maze, two
+// palette and lookup banks, and tiles that can be drawn over the sprites.
+//
+// The program ROMs are encrypted by PALs that flip bits 0, 2 and 7 in runs;
+// this is the XOR pattern from address 0 up, as [run length, XOR value].
+const JR_XOR = [
+  [0x00C1, 0x00], [0x0002, 0x80], [0x0004, 0x00], [0x0006, 0x80], [0x0003, 0x00], [0x0002, 0x80], [0x0009, 0x00], [0x0004, 0x80],
+  [0x9968, 0x00], [0x0001, 0x80], [0x0002, 0x00], [0x0001, 0x80], [0x0009, 0x00], [0x0002, 0x80], [0x0009, 0x00], [0x0001, 0x80],
+  [0x00AF, 0x00], [0x000E, 0x04], [0x0002, 0x00], [0x0004, 0x04], [0x001E, 0x00], [0x0001, 0x80], [0x0002, 0x00], [0x0001, 0x80],
+  [0x0002, 0x00], [0x0002, 0x80], [0x0009, 0x00], [0x0002, 0x80], [0x0009, 0x00], [0x0002, 0x80], [0x0083, 0x00], [0x0001, 0x04],
+  [0x0001, 0x01], [0x0001, 0x00], [0x0002, 0x05], [0x0001, 0x00], [0x0003, 0x04], [0x0003, 0x01], [0x0002, 0x00], [0x0001, 0x04],
+  [0x0003, 0x01], [0x0003, 0x00], [0x0003, 0x04], [0x0001, 0x01], [0x002E, 0x00], [0x0078, 0x01], [0x0001, 0x04], [0x0001, 0x05],
+  [0x0001, 0x00], [0x0001, 0x01], [0x0001, 0x04], [0x0002, 0x00], [0x0001, 0x01], [0x0001, 0x04], [0x0002, 0x00], [0x0001, 0x01],
+  [0x0001, 0x04], [0x0002, 0x00], [0x0001, 0x01], [0x0001, 0x04], [0x0001, 0x05], [0x0001, 0x00], [0x0001, 0x01], [0x0001, 0x04],
+  [0x0002, 0x00], [0x0001, 0x01], [0x0001, 0x04], [0x0002, 0x00], [0x0001, 0x01], [0x0001, 0x04], [0x0001, 0x05], [0x0001, 0x00],
+  [0x01B0, 0x01], [0x0001, 0x00], [0x0002, 0x01], [0x00AD, 0x00], [0x0031, 0x01], [0x005C, 0x00], [0x0005, 0x01], [0x604E, 0x00],
+];
+
+const JR_STATE = ['charBank', 'spriteBank', 'paletteBank', 'lutBank', 'bgPriority', 'scroll'];
+
+export class JrPacMan extends PacMan {
+  // roms: { main (0000-DFFF image), tiles 8K, sprites 8K, palette 32, lut 256, wave 256 }
+  constructor(roms) {
+    const main = roms.main.slice();
+    let a = 0;
+    for (const [n, x] of JR_XOR) for (let i = 0; i < n && a < main.length; i++) main[a++] ^= x;
+    super({ ...roms, main });
+    this.tilePix = decodeTiles(roms.tiles, {
+      count: 512, width: 8, height: 8, planes: [0, 4], xs: [64, 65, 66, 67, 0, 1, 2, 3], ys: run(0, 8, 8), size: 128,
+    });
+    this.spritePix = decodeTiles(roms.sprites, {
+      count: 128, width: 16, height: 16, planes: [0, 4],
+      xs: [...run(64, 4), ...run(128, 4), ...run(192, 4), ...run(0, 4)], ys: [...run(0, 8, 8), ...run(256, 8, 8)], size: 512,
+    });
+  }
+
+  reset() {
+    super.reset();
+    this.charBank = this.spriteBank = this.paletteBank = this.lutBank = this.bgPriority = this.scroll = 0;
+  }
+  saveState() { return { ...super.saveState(), ...capture(this, JR_STATE) }; }
+  loadState(s) { super.loadState(s); apply(this, JR_STATE, s); }
+
+  read(a) {
+    if (a < 0x4000 || (a >= 0x8000 && a < 0xE000)) return this.roms.main[a];
+    if (a < 0x5000) return this.ram[a - 0x4000];
+    if (a < 0x5100) return [this.in0, this.in1, this.dsw1, 0xFF][(a >> 6) & 3];
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a >= 0x4000 && a < 0x5000) { this.ram[a - 0x4000] = v; return; }
+    switch (a) {
+      case 0x5070: this.paletteBank = v & 1; return;
+      case 0x5071: this.lutBank = v & 1; return;
+      case 0x5073: this.bgPriority = v & 1; return;
+      case 0x5074: this.charBank = v & 1; return;
+      case 0x5075: this.spriteBank = v & 1; return;
+      case 0x5080: this.scroll = v; return;
+    }
+    if (a >= 0x5000 && a < 0x5080) super.write(a, v);          // interrupt and sound enables, sound, sprite positions
+  }
+
+  // A color code (5 bits plus the two bank latches) and pen to a palette entry.
+  colorOf(code, pen) {
+    const e = this.lut[((code & 0x3F) * 4) + pen];
+    return code & 0x40 ? 0x10 + e : e;
+  }
+
+  render() {
+    const out = this.native, ram = this.ram, pal = this.palette;
+    const banks = (this.lutBank << 5) | (this.paletteBank << 6);
+    const tileAt = (x, y) => {                    // -> [code, color code] for a screen pixel
+      const col = x >> 3;
+      const ty = col >= 2 && col < 34 ? (y + this.scroll) % 432 : y;
+      const row = (ty >> 3) + 2, c = col - 2;
+      let offs;
+      if ((c & 0x20) && (row & 0x20)) offs = 0;
+      else if (c & 0x20) offs = row + (((c & 3) | 0x38) << 5);
+      else offs = c + (row << 5);
+      const colorAt = offs < 1792 ? offs & 0x1F : offs + 0x80;
+      return [offs, (ram[colorAt] & 0x1F) | banks, ty & 7];
+    };
+    const tiles = (front) => {
+      for (let y = 0; y < NATIVE_H; y++) {
+        for (let x = 0; x < NATIVE_W; x += 8) {
+          const [offs, color, py] = tileAt(x, y);
+          const pix = (ram[offs] | (this.charBank << 8)) * 64 + py * 8;
+          for (let i = 0; i < 8; i++) {
+            const pen = this.tilePix[pix + i];
+            if (!front || pen) out[y * NATIVE_W + x + i] = pal[this.colorOf(color, pen)];
+          }
+        }
+      }
+    };
+    if (this.bgPriority) out.fill(pal[0]); else tiles(false);
+
+    for (let n = 7; n >= 0; n--) {
+      const code = ram[0xFF0 + n * 2], color = (ram[0xFF1 + n * 2] & 0x1F) | banks;
+      const sx = 272 - this.spritePos[n * 2 + 1], sy = this.spritePos[n * 2] - 31 + (n <= 2 ? 1 : 0);
+      this.drawJrSprite((code >> 2) | (this.spriteBank << 6), color, code & 1, code & 2, sx, sy);
+    }
+    if (this.bgPriority) tiles(true);
+    rotate90(out, NATIVE_W, NATIVE_H, this.frame);
+  }
+
+  drawJrSprite(code, color, flipX, flipY, sx, sy) {
+    const out = this.native, pix = code * 256;
+    for (let y = 0; y < 16; y++) {
+      const py = sy + y;
+      if (py < 0 || py >= NATIVE_H) continue;
+      const srcY = flipY ? 15 - y : y;
+      for (let x = 0; x < 16; x++) {
+        const px = sx + x;
+        if (px < 16 || px >= 272) continue;
+        const pen = this.spritePix[pix + srcY * 16 + (flipX ? 15 - x : x)];
+        if (this.lut[(color & 0x3F) * 4 + pen]) out[py * NATIVE_W + px] = this.palette[this.colorOf(color, pen)];
+      }
+    }
+  }
+}
+JrPacMan.id = 'jrpacman';
+JrPacMan.title = 'Jr. Pac-Man';
+JrPacMan.switches = [
+  { id: 'lives', label: 'Lives', options: [['1', 0x00], ['2', 0x04], ['3', 0x08], ['5', 0x0C]], default: 0x08 },
+  { id: 'bonus', label: 'Bonus life', options: [['10K', 0x00], ['15K', 0x10], ['20K', 0x20], ['30K', 0x30]], default: 0x00 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Normal', 0x40], ['Hard', 0x00]], default: 0x40 },
+];

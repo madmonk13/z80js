@@ -307,3 +307,27 @@ Berzerk.switches = [
   { id: 'bonus', label: 'Bonus life', options: [['5K & 10K', 0xC0], ['5K', 0x40], ['10K', 0x80], ['None', 0x00]], default: 0xC0 },
   { id: 'language', label: 'Language', options: [['English', 0x00], ['German', 0x40], ['French', 0x80], ['Spanish', 0xC0]], default: 0x00 },
 ];
+
+// Stern Frenzy (1982): the Berzerk board with a bigger program (0000-3FFF and
+// C000-CFFF) and its battery-backed RAM moved to F800.
+export class Frenzy extends Berzerk {
+  read(a) {
+    if (a < 0x4000) return this.roms.main[a];
+    if (a >= 0xC000 && a < 0xD000) return this.roms.high[a - 0xC000];
+    if (a >= 0xF800) return this.ram[a & 0x3FF];
+    return super.read(a);
+  }
+  write(a, v) {
+    if (a >= 0xF800) { this.ram[a & 0x3FF] = v; return; }
+    if (a < 0x4000 || (a >= 0xC000 && a < 0xD000)) return;
+    super.write(a, v);
+  }
+  // Ports 60-65: bonus life and language, test switches off, coinage 1/1, free play off.
+  applySwitches(v) { this.dsw = [v.bonus | v.language, 0xF0, 0x01, 0x01, 0x01, 0x7E, 0, 0]; }
+}
+Frenzy.id = 'frenzy';
+Frenzy.title = 'Frenzy';
+Frenzy.switches = [
+  { id: 'bonus', label: 'Bonus life', options: [['1K', 0x01], ['2K', 0x02], ['3K', 0x03], ['4K', 0x04], ['5K', 0x05], ['None', 0x00]], default: 0x03 },
+  { id: 'language', label: 'Language', options: [['English', 0x00], ['German', 0x40], ['French', 0x80], ['Spanish', 0xC0]], default: 0x00 },
+];

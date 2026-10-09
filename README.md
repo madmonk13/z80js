@@ -27,6 +27,13 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Bosconian (1981) | Galaga design plus two 06xx, two 50xx score chips, 52xx speech and a scrolling playfield with radar | `bosco` (new version) | **Tested:** boots, attract mode, coin, start and play, speech |
 | Berzerk (1980) | Stern: 1 Z80, one-bit bitmap with "magic RAM" shifter/ALU and collision detection, 6840 sound effects | `berzerk` (set 1) | **Tested:** boots, attract mode, coin, start and play (no speech: see below) |
 | | | `berzerk1` | Recognized, not yet tested |
+| Frenzy (1982) | Berzerk board, bigger program | `frenzy` | **Tested:** boots, coin, start and play (no speech) |
+| Pooyan (1982) | Konami: Time Pilot's sound board, 4-bit tiles and sprites | `pooyan` | **Tested:** boots, attract mode, coin, start and play |
+| Scramble (1981) | Konami: Galaxian-style video, two AY-3-8910s, a protection check | `scramble` | **Tested:** boots, attract mode, coin, start and play |
+| Amidar (1981) | Konami: as Scramble, different map and background color | `amidar` | **Tested:** boots, attract mode, coin, start and play |
+| Moon Cresta (1980) | Nichibutsu: Galaxian board with graphics banking, encrypted program | `mooncrst` | **Tested:** boots, attract mode, coin, start and play |
+| Jr. Pac-Man (1983) | Pac-Man board, encrypted program, scrolling 54-row playfield, banks | `jrpacman` | **Tested:** boots, attract mode, coin, start and play |
+| Xevious (1982) | Galaga family: two scrolling tile layers, 3-bit sprites, terrain-map ROMs | `xevious` (Namco) | **Tested:** boots, attract mode, coin, start and play |
 | Mr. Do! (1982) | Universal: 1 Z80, two tile layers (one scrolling), two SN76489s | `mrdo` | **Tested:** boots, attract mode, coin, start and play |
 | | | `mrdot` | Recognized, not yet tested |
 | Satan's Hollow (1981) | Bally Midway MCR (90010 CPU board): Z80 with a Z80 CTC, Super Sound I/O (Z80, two AY-3-8910s) | `shollow` | **Tested:** boots, attract mode, coin, start and play |
@@ -48,7 +55,11 @@ The touch layout follows the game:
 
 - **Galaga, Galaxian:** the left half is a left/right pad, the right half is fire.
 - **Donkey Kong, Donkey Kong Jr.:** the left half is a 4-way joystick, the right half is jump.
-- **Bosconian, Berzerk:** the left half is an 8-way joystick, the right half is fire.
+- **Bosconian, Berzerk, Frenzy:** the left half is an 8-way joystick, the right half is fire.
+- **Scramble, Xevious:** an 8-way joystick; the right half's bottom fires and its top drops
+  bombs (Scramble's Bomb, Xevious's Blaster).
+- **Moon Cresta:** a left/right pad and fire. **Pooyan:** the stick moves Mama up and down;
+  fire shoots. **Amidar:** a 4-way joystick and the jump button. **Jr. Pac-Man:** stick only.
 - **Dig Dug:** the left half is a 4-way joystick, the right half is the pump.
 - **Time Pilot:** the left half is an 8-way joystick, the right half is fire.
 - **Mr. Do!, Tapper:** the left half is a 4-way joystick, the right half is fire (Mr. Do!'s
@@ -124,6 +135,10 @@ right, up, down, fire) then holds a control.
   panel and dots, and the two-way starfield.
 - `src/emu/berzerk.js`: Berzerk: the bitmap, the magic-RAM shifter and ALU with collision
   detection, scanline-timed interrupts, and the 6840 sound effects.
+- `src/emu/scramble.js`: Scramble and Amidar, built on Frogger (two-AY sound board).
+- `src/emu/galaxian.js` also holds Moon Cresta (decryption, graphics banks); `pacman.js`
+  holds Jr. Pac-Man (decryption, scrolling playfield, banks); `timeplt.js` holds Pooyan;
+  `berzerk.js` holds Frenzy; `bosco.js` holds Xevious (tile layers, sprites, terrain reader).
 - `src/emu/mrdo.js`: Mr. Do!: two tile layers, sprites, and its protection read.
 - `src/emu/mcr.js`: the Bally Midway MCR boards (Satan's Hollow, Tron, Tapper): tiles,
   both sprite generators, palette RAM, and the Super Sound I/O board (its sound Z80, two
@@ -265,6 +280,10 @@ flowchart LR
 - **Berzerk's robot voice** lives on a separate speech board whose two ROMs (`1c`, `2c`)
   many Berzerk sets don't include; the speech chip isn't emulated yet, so the robots are
   silent. The 6840 sound effects play.
+- **Scramble's protection** answers come from a table of the values the program checks for,
+  as MAME does for this set; other Scramble sets may need different answers.
+- **Xevious** uses the same 50xx/54xx stand-ins as Bosconian, and its explosion sounds are
+  noise bursts. Sound filters on the Konami boards (Scramble, Amidar) aren't modeled.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware

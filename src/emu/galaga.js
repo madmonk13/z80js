@@ -167,7 +167,9 @@ export class Galaga {
       return;
     }
     switch (v) {
-      case 1: io.coinCredMode = 4; io.credits = 0; break;
+      // Xevious follows this command with six bytes rather than four (the first
+      // two unused), and expects joystick remapping from then on.
+      case 1: io.coinCredMode = this.coinageBytes ?? 4; io.credits = 0; if (this.coinageBytes === 6) io.remapJoy = 1; break;
       case 2: io.mode = 1; io.count = 0; break;
       case 3: io.remapJoy = 0; break;
       case 4: io.remapJoy = 1; break;

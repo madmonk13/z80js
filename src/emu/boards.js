@@ -15,18 +15,20 @@
 //   runFrame(), reset()
 //   setInputs({ left, right, up, down, fire, fire2, spin, coin, start1, start2 })
 //   applySwitches({ id: value }) with the options listed in Board.switches
+//   Board.stateVersion   (optional) bumped when older saved states no longer restore correctly
 
 import { Galaga } from './galaga.js';
-import { PacMan, MsPacMan } from './pacman.js';
-import { Galaxian } from './galaxian.js';
+import { PacMan, MsPacMan, JrPacMan } from './pacman.js';
+import { Galaxian, MoonCresta } from './galaxian.js';
 import { DonkeyKong, DonkeyKongJr } from './dkong.js';
 import { Frogger } from './frogger.js';
+import { Scramble, Amidar } from './scramble.js';
 import { DigDug } from './digdug.js';
-import { TimePilot } from './timeplt.js';
+import { TimePilot, Pooyan } from './timeplt.js';
 import { MrDo } from './mrdo.js';
 import { SatansHollow, Tron, Tapper } from './mcr.js';
-import { Bosconian } from './bosco.js';
-import { Berzerk } from './berzerk.js';
+import { Bosconian, Xevious } from './bosco.js';
+import { Berzerk, Frenzy } from './berzerk.js';
 
 const BOARDS = [
   {
@@ -67,6 +69,28 @@ const BOARDS = [
     assemble: (c) => ({
       main: cat(c.main0, c.main1, c.main2, c.main3), tiles: c.tiles, sprites: c.sprites,
       palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    Board: JrPacMan,
+    chips: [
+      ['p8d', 0x2000, [/^jrp8d/]],
+      ['p8e', 0x2000, [/^jrp8e/]],
+      ['p8h', 0x2000, [/^jrp8h/]],
+      ['p8j', 0x2000, [/^jrp8j/]],
+      ['p8k', 0x2000, [/^jrp8k/]],
+      ['tiles', 0x2000, [/^jrp2c/]],
+      ['sprites', 0x2000, [/^jrp2e/]],
+      ['palLow', 0x100, [/^jrprom\.9e/]],
+      ['palHigh', 0x100, [/^jrprom\.9f/]],
+      ['lut', 0x100, [/^jrprom\.9p/]],
+      ['wave', 0x100, [/^jrprom\.7p/]],
+    ],
+    // The palette is two 4-bit PROMs side by side; 4000-7FFF is RAM and I/O.
+    assemble: (c) => ({
+      main: cat(c.p8d, c.p8e, new Uint8Array(0x4000), c.p8h, c.p8j, c.p8k), tiles: c.tiles, sprites: c.sprites,
+      palette: Uint8Array.from({ length: 32 }, (_, i) => (c.palLow[i] & 0x0F) | ((c.palHigh[i] & 0x0F) << 4)),
+      lut: c.lut, wave: c.wave,
     }),
   },
   {
@@ -188,6 +212,54 @@ const BOARDS = [
     }),
   },
   {
+    Board: Scramble,
+    chips: [
+      ...['2d', '2e', '2f', '2h', '2j', '2l', '2m', '2p'].map((l, n) => [`main${n}`, 0x800, [new RegExp(`^${l}\\.k$`), new RegExp(`^s${n + 1}\\.${l}$`)]]),
+      ['sound0', 0x800, [/^5c$/, /^ot1\.5c$/]],
+      ['sound1', 0x800, [/^5d$/, /^ot2\.5d$/]],
+      ['sound2', 0x800, [/^5e$/, /^ot3\.5e$/]],
+      ['gfx0', 0x800, [/^5f\.k$/, /^c2\.5f$/]],
+      ['gfx1', 0x800, [/^5h\.k$/, /^c1\.5h$/]],
+      ['palette', 0x20, [/^82s123\.6e$/, /^c01s\.6e$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => c[`main${n}`])), sound: cat(c.sound0, c.sound1, c.sound2),
+      gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
+    }),
+  },
+  {
+    Board: Amidar,
+    chips: [
+      ['main0', 0x1000, [/^amidar\.2c$/]],
+      ['main1', 0x1000, [/^amidar\.2e$/]],
+      ['main2', 0x1000, [/^amidar\.2f$/]],
+      ['main3', 0x1000, [/^amidar\.2h$/]],
+      ['sound0', 0x1000, [/^amidar\.5c$/]],
+      ['sound1', 0x1000, [/^amidar\.5d$/]],
+      ['gfx0', 0x800, [/^amidar\.5f$/]],
+      ['gfx1', 0x800, [/^amidar\.5h$/]],
+      ['palette', 0x20, [/^amidar\.clr$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1),
+      gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
+    }),
+  },
+  {
+    Board: MoonCresta,
+    chips: [
+      ...['mc1', 'mc2', 'mc3', 'mc4', 'mc5\\.7r', 'mc6\\.8d', 'mc7\\.8e', 'mc8'].map((n, i) => [`main${i}`, 0x800, [new RegExp(`^${n}$`)]]),
+      ['gfxB', 0x800, [/^mcs_b$/]],
+      ['gfxD', 0x800, [/^mcs_d$/]],
+      ['gfxA', 0x800, [/^mcs_a$/]],
+      ['gfxC', 0x800, [/^mcs_c$/]],
+      ['palette', 0x20, [/^l06_prom\.bin$/, /^mmi6331\.6l$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => c[`main${n}`])), gfx: cat(c.gfxB, c.gfxD, c.gfxA, c.gfxC), palette: c.palette,
+    }),
+  },
+  {
     Board: DigDug,
     chips: [
       ['main0', 0x1000, [/^136007\.101/, /^dd1a\.1$/, /^136007\.201/]],
@@ -233,6 +305,29 @@ const BOARDS = [
     assemble: (c) => ({
       main: cat(c.main0, c.main1, c.main2), sound: c.sound, chars: c.chars, sprites: cat(c.sprites0, c.sprites1),
       palLo: c.palLo, palHi: c.palHi, spriteLut: c.spriteLut, charLut: c.charLut,
+    }),
+  },
+  {
+    Board: Pooyan,
+    chips: [
+      ['main0', 0x2000, [/^1\.4a$/, /^ic22_a4/]],
+      ['main1', 0x2000, [/^2\.5a$/, /^ic23_a5/]],
+      ['main2', 0x2000, [/^3\.6a$/, /^ic24_a6/]],
+      ['main3', 0x2000, [/^4\.7a$/, /^ic25_a7/]],
+      ['sound0', 0x1000, [/^xx\.7a$/]],
+      ['sound1', 0x1000, [/^xx\.8a$/]],
+      ['chars0', 0x1000, [/^8\.10g$/]],
+      ['chars1', 0x1000, [/^7\.9g$/]],
+      ['sprites0', 0x1000, [/^6\.9a$/]],
+      ['sprites1', 0x1000, [/^5\.8a$/]],
+      ['palette', 0x20, [/^pooyan\.pr1/]],
+      ['spriteLut', 0x100, [/^pooyan\.pr2/]],
+      ['charLut', 0x100, [/^pooyan\.pr3/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1),
+      chars: cat(c.chars0, c.chars1), sprites: cat(c.sprites0, c.sprites1),
+      palette: c.palette, spriteLut: c.spriteLut, charLut: c.charLut,
     }),
   },
   {
@@ -284,6 +379,42 @@ const BOARDS = [
     }),
   },
   {
+    Board: Xevious,
+    chips: [
+      ['main0', 0x1000, [/^xvi_1\.3p/]],
+      ['main1', 0x1000, [/^xvi_2\.3m/]],
+      ['main2', 0x1000, [/^xvi_3\.2m/]],
+      ['main3', 0x1000, [/^xvi_4\.2l/]],
+      ['sub0', 0x1000, [/^xvi_5\.3f/]],
+      ['sub1', 0x1000, [/^xvi_6\.3j/]],
+      ['sound', 0x1000, [/^xvi_7\.2c/]],
+      ['fg', 0x1000, [/^xvi_12\.3b/]],
+      ['bg0', 0x1000, [/^xvi_13\.3c/]],
+      ['bg1', 0x1000, [/^xvi_14\.3d/]],
+      ['sp15', 0x2000, [/^xvi_15\.4m/]],
+      ['sp17', 0x2000, [/^xvi_17\.4p/]],
+      ['sp16', 0x1000, [/^xvi_16\.4n/]],
+      ['sp18', 0x2000, [/^xvi_18\.4r/]],
+      ['map2a', 0x1000, [/^xvi_9\.2a/]],
+      ['map2b', 0x2000, [/^xvi_10\.2b/]],
+      ['map2c', 0x1000, [/^xvi_11\.2c/]],
+      ['red', 0x100, [/^xvi_8bpr\.6a/]],
+      ['green', 0x100, [/^xvi_9bpr\.6d/]],
+      ['blue', 0x100, [/^xvi10bpr\.6e/]],
+      ['bgLutLo', 0x200, [/^xvi_7bpr\.4h/]],
+      ['bgLutHi', 0x200, [/^xvi_6bpr\.4f/]],
+      ['spLutLo', 0x200, [/^xvi_4bpr\.3l/]],
+      ['spLutHi', 0x200, [/^xvi_5bpr\.3m/]],
+      ['wave', 0x100, [/^xvi_2bpr\.7n/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sub: cat(c.sub0, c.sub1), sound: c.sound,
+      fg: c.fg, bg: cat(c.bg0, c.bg1), sp15: c.sp15, sp17: c.sp17, sp16: c.sp16, sp18: c.sp18,
+      bgMap: cat(c.map2a, c.map2b, c.map2c), red: c.red, green: c.green, blue: c.blue,
+      bgLutLo: c.bgLutLo, bgLutHi: c.bgLutHi, spLutLo: c.spLutLo, spLutHi: c.spLutHi, wave: c.wave,
+    }),
+  },
+  {
     Board: Berzerk,
     chips: [
       ['r0', 0x800, [/^1c-0/, /^rom0\.1c/]],
@@ -295,6 +426,17 @@ const BOARDS = [
     ],
     // 0800-0FFF is RAM; the program sits at 0000-07FF and 1000-37FF.
     assemble: (c) => ({ main: cat(c.r0, new Uint8Array(0x800), c.r1, c.r2, c.r3, c.r4, c.r5, new Uint8Array(0x800).fill(0xFF)) }),
+  },
+  {
+    Board: Frenzy,
+    chips: [
+      ['r0', 0x1000, [/^1c-0/]],
+      ['r1', 0x1000, [/^1d-1/]],
+      ['r2', 0x1000, [/^3d-2/]],
+      ['r3', 0x1000, [/^5d-3/]],
+      ['r4', 0x1000, [/^6d-4/]],
+    ],
+    assemble: (c) => ({ main: cat(c.r0, c.r1, c.r2, c.r3), high: c.r4 }),
   },
   {
     Board: SatansHollow,
