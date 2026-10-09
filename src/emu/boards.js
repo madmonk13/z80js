@@ -41,6 +41,8 @@ import { C1942 } from './c1942.js';
 import { DoCastle } from './docastle.js';
 import { Popeye } from './popeye.js';
 import { Pengo } from './pengo.js';
+import { BombJack } from './bombjack.js';
+import { MarioBros } from './mario.js';
 
 const BOARDS = [
   {
@@ -281,6 +283,49 @@ const BOARDS = [
       tiles: cat(c.gfx0.subarray(0, 0x1000), c.gfx1.subarray(0, 0x1000)),
       sprites: cat(c.gfx0.subarray(0x1000), c.gfx1.subarray(0x1000)),
       palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    Board: BombJack,
+    chips: [
+      ['m09', 0x2000, [/^09_j01b\.bin$/]],
+      ['m10', 0x2000, [/^10_l01b\.bin$/]],
+      ['m11', 0x2000, [/^11_m01b\.bin$/]],
+      ['m12', 0x2000, [/^12_n01b\.bin$/]],
+      ['m13', 0x2000, [/^13\.1r$/, /^13_r01b\.bin$/]],
+      ['sound', 0x2000, [/^01_h03t\.bin$/]],
+      ['c03', 0x1000, [/^03_e08t\.bin$/]],
+      ['c04', 0x1000, [/^04_h08t\.bin$/]],
+      ['c05', 0x1000, [/^05_k08t\.bin$/]],
+      ['t06', 0x2000, [/^06_l08t\.bin$/]],
+      ['t07', 0x2000, [/^07_n08t\.bin$/]],
+      ['t08', 0x2000, [/^08_r08t\.bin$/]],
+      ['s16', 0x2000, [/^16_m07b\.bin$/]],
+      ['s15', 0x2000, [/^15_l07b\.bin$/]],
+      ['s14', 0x2000, [/^14_j07b\.bin$/]],
+      ['map', 0x1000, [/^02_p04t\.bin$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.m09, c.m10, c.m11, c.m12, c.m13), sound: c.sound, chars: cat(c.c03, c.c04, c.c05),
+      tiles: cat(c.t06, c.t07, c.t08), sprites: cat(c.s16, c.s15, c.s14), map: c.map,
+    }),
+  },
+  {
+    Board: MarioBros,
+    chips: [
+      ['f', 0x2000, [/^mario\.7f$/, /^tma1-c\.7f/]],
+      ['e', 0x2000, [/^mario\.7e$/, /^tma1-c\.7e/]],
+      ['d', 0x2000, [/^mario\.7d$/, /^tma1-c\.7d/]],
+      ['c', 0x1000, [/^mario\.7c$/, /^tma1-c\.7c/]],
+      ['sound', 0x1000, [/^tma1c-a\.6k$/]],
+      ['c3f', 0x1000, [/^mario\.3f$/]],
+      ['c3j', 0x1000, [/^mario\.3j$/]],
+      ...['7m', '7n', '7p', '7s', '7t', '7u'].map((n) => [`s${n}`, 0x1000, [new RegExp(`^(mario|tma1-v)\\.${n}$`)]]),
+      ['palette', 0x200, [/^mario\.4p$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.f, c.e, c.d, new Uint8Array(0x3000), c.c), sound: c.sound, chars: cat(c.c3f, c.c3j),
+      sprites: cat(c.s7m, c.s7n, c.s7p, c.s7s, c.s7t, c.s7u), palette: c.palette,
     }),
   },
   {

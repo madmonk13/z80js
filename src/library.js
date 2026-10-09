@@ -127,14 +127,21 @@ export function renderLibrary(el, { titles, files = {}, currentId, onPlay, onRem
 
   const entries = library.list();
   const byTitle = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-  for (const title of [...titles].sort(byTitle)) {
+  // Games you have first, then the ones still waiting for a ROM set; each
+  // group alphabetical.
+  const sorted = [...titles].sort(byTitle);
+  const have = sorted.filter((t) => entries.some((e) => e.mapper === t));
+  // Sets that aren't a known game (shouldn't happen, but keep them reachable) go with the uploaded ones.
+  const others = entries.filter((x) => !titles.includes(x.mapper));
+  const uploaded = [...have.map((t) => ({ title: t })), ...others.map((e) => ({ title: e.name, entry: e }))].sort((a, b) => byTitle(a.title, b.title));
+  for (const { title, entry } of uploaded) {
+    if (entry) { row(entry.name, detail(entry), { entry }); continue; }
     const sets = entries.filter((e) => e.mapper === title);
-    if (!sets.length) { row(title, `Upload ${files[title] || 'ROM'} to enable`, { missing: true }); continue; }
     // Two sets for one game (a clone, say) are told apart by file name.
     for (const e of sets) row(title, sets.length > 1 ? `${e.name} · ${detail(e)}` : detail(e), { entry: e });
   }
-  for (const e of entries.filter((x) => !titles.includes(x.mapper)).sort((a, b) => byTitle(a.name, b.name))) {
-    row(e.name, detail(e), { entry: e });
+  for (const title of sorted.filter((t) => !have.includes(t))) {
+    row(title, `Upload ${files[title] || 'ROM'} to enable`, { missing: true });
   }
 }
 
