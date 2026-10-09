@@ -28,13 +28,13 @@ const audio = new AudioOut(SOUND_RATE);
 let screen2d = null;
 const touch = new TouchControls({
   surface: $('surface'), dpad: $('dpad'), ripples: $('ripples'),
-  buttons: [$('menuBtn'), $('cartBtn'), $('coinBtn'), $('startBtn')],
+  buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn')],
 });
 input.sources.push(touch);
 
 const settings = { ...DEFAULTS, ...(store.get('settings') || {}) };
 settings.switches = { ...settings.switches };
-const state = { romId: null, menuOpen: false };
+const state = { romId: null, menuOpen: false, paused: false };
 let board = null;
 
 // Block page-level zoom/scroll gestures; this is a full-screen app.
@@ -132,6 +132,7 @@ window.addEventListener('pagehide', saveResume);
 
 // Start a board from a ROM set (the zip as added) and record it.
 async function loadSet(bytes, name, id) {
+  if (state.paused) setPaused(false);
   const { Board, roms } = identify(await extractAll(bytes));
   saveResume();                          // keep the game being left
   board = new Board(roms);
@@ -152,8 +153,9 @@ async function loadSet(bytes, name, id) {
   document.body.classList.toggle('stick-only', touch.stickOnly);
   $('joyHintText').textContent = twoWay ? 'Drag left or right on this side'
     : touch.stickOnly ? 'Touch & drag anywhere' : 'Touch & drag on this side';
-  $('fireHintTitle').textContent = touch.dial ? 'Fire & aim' : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
-  $('fireHintText').textContent = touch.dial ? 'Hold to fire, drag sideways to aim'
+  const [dialTitle, dialText] = board.dialHint ?? ['Fire & aim', 'Hold to fire, drag sideways to aim'];
+  $('fireHintTitle').textContent = touch.dial ? dialTitle : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
+  $('fireHintText').textContent = touch.dial ? dialText
     : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
   renderSwitches();
   layout2D();
@@ -228,12 +230,33 @@ function openSheet(id) {
 function closeMenu() {
   if (!board) return;                // nothing to go back to until a game is loaded
   state.menuOpen = false;
-  touch.enabled = true;
-  audio.setMuted(!settings.sound);
+  touch.enabled = !state.paused;
+  audio.setMuted(!settings.sound || state.paused);
   for (const id of Object.keys(SHEETS)) $(id).hidden = true;
 }
 // Open on release rather than 'click': mobile browsers can drop the click when
 // the finger shifts slightly or another finger is already on the screen.
+// Pause: stops the game (and its sound) until resumed from the bar button,
+// the veil over the game, or P on a keyboard. The game is saved for resume.
+function setPaused(paused) {
+  state.paused = paused;
+  document.body.classList.toggle('paused', paused);
+  $('paused').hidden = !paused;
+  $('pauseBtn').setAttribute('aria-pressed', String(paused));
+  $('pauseBtn').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  if (paused) { touch.releaseAll(); saveResume(); }
+  touch.enabled = !paused && !state.menuOpen;
+  audio.setMuted(paused || state.menuOpen || !settings.sound);
+}
+$('pauseBtn').addEventListener('pointerup', (e) => { e.preventDefault(); setPaused(!state.paused); });
+$('pauseBtn').addEventListener('click', (e) => { if (e.detail === 0) setPaused(!state.paused); }); // keyboard
+$('paused').addEventListener('pointerup', (e) => { e.preventDefault(); setPaused(false); });
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyP' || e.metaKey || e.ctrlKey || e.altKey || state.menuOpen) return;
+  e.preventDefault();
+  setPaused(!state.paused);
+});
+
 for (const [btn, sheet] of [['menuBtn', 'menu'], ['cartBtn', 'cartsMenu']]) {
   $(btn).addEventListener('pointerup', (e) => { e.preventDefault(); openSheet(sheet); });
   $(btn).addEventListener('click', (e) => { if (e.detail === 0) openSheet(sheet); }); // keyboard
@@ -406,7 +429,10 @@ let acc = 0, lastTime = performance.now(), lastSave = performance.now();
 function tick(now) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
-  const running = board && !state.menuOpen && !document.hidden;
+  const running = board && !state.menuOpen && !state.paused && !document.hidden;
+  // The pause button only means something with a game loaded.
+  const pauseBtn = $('pauseBtn');
+  if (pauseBtn.disabled === !!board) pauseBtn.disabled = !board;
 
   if (running) {
     acc += dt;

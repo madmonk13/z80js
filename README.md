@@ -34,6 +34,14 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Moon Cresta (1980) | Nichibutsu: Galaxian board with graphics banking, encrypted program | `mooncrst` | **Tested:** boots, attract mode, coin, start and play |
 | Jr. Pac-Man (1983) | Pac-Man board, encrypted program, scrolling 54-row playfield, banks | `jrpacman` | **Tested:** boots, attract mode, coin, start and play |
 | Xevious (1982) | Galaga family: two scrolling tile layers, 3-bit sprites, terrain-map ROMs | `xevious` (Namco) | **Tested:** boots, attract mode, coin, start and play |
+| Piranha (1981) | Pac-Man board, program and graphics with swapped lines | `piranha` | **Tested:** boots, coin, start and play |
+| Crush Roller (1981) | Pac-Man board with a protection device | `crush` (Kural Samno) | **Tested:** boots, coin, start and play |
+| Kick (1981) | Bally Midway MCR (90009 CPU board), dial | `kick` (upright) | **Tested:** boots, attract mode, coin, start and play |
+| Rally-X (1980) | Namco: 1 Z80, waveform sound, scrolling playfield, radar panel | `rallyx` | **Tested:** boots, attract mode, coin, start and play |
+| Warp & Warp (1981) | Namco: Intel 8080 (run on the Z80 core), 1-bit characters with 8-bit color, a hardware ball | `warpwarp` | **Tested:** boots, attract mode, coin, start and play |
+| Mappy (1983) | Namco: two Motorola 6809s, 58xx I/O chips, 8-voice 15xx waveform sound, scrolling map | `mappy` (US) | **Tested:** boots, attract mode, coin, start and play |
+| Centipede (1980) | Atari: MOS 6502, tiles and 8x16 sprites with palette RAM, POKEY sound, trackball | `centiped` (revision 3) | **Tested:** boots, attract mode, coin, start and play |
+| Phoenix (1980) | Amstar: Intel 8085 (run on the Z80 core), two tile layers in banked video RAM, analog sound and a melody chip | `phoenix` (Amstar) | **Tested:** boots, attract mode, coin, start and play |
 | Mr. Do! (1982) | Universal: 1 Z80, two tile layers (one scrolling), two SN76489s | `mrdo` | **Tested:** boots, attract mode, coin, start and play |
 | | | `mrdot` | Recognized, not yet tested |
 | Satan's Hollow (1981) | Bally Midway MCR (90010 CPU board): Z80 with a Z80 CTC, Super Sound I/O (Z80, two AY-3-8910s) | `shollow` | **Tested:** boots, attract mode, coin, start and play |
@@ -59,7 +67,14 @@ The touch layout follows the game:
 - **Scramble, Xevious:** an 8-way joystick; the right half's bottom fires and its top drops
   bombs (Scramble's Bomb, Xevious's Blaster).
 - **Moon Cresta:** a left/right pad and fire. **Pooyan:** the stick moves Mama up and down;
-  fire shoots. **Amidar:** a 4-way joystick and the jump button. **Jr. Pac-Man:** stick only.
+  fire shoots. **Amidar:** a 4-way joystick and the jump button. **Jr. Pac-Man, Piranha, Crush Roller:** stick only. **Rally-X:** a 4-way stick;
+  fire lays a smoke screen. **Warp & Warp:** 4-way stick and fire. **Mappy:** left/right,
+  and the button opens and closes doors.
+- **Centipede:** the stick rolls the trackball at a steady speed (Q/E or the mouse wheel
+  also roll it sideways); fire on the right. **Phoenix:** left/right; the bottom of the right half
+  fires and the top raises the shield.
+- **Kick:** drag sideways on the right half (or use left/right, Q/E or the mouse wheel) to
+  move the clown, as the cabinet's dial did; tapping kicks.
 - **Dig Dug:** the left half is a 4-way joystick, the right half is the pump.
 - **Time Pilot:** the left half is an 8-way joystick, the right half is fire.
 - **Mr. Do!, Tapper:** the left half is a 4-way joystick, the right half is fire (Mr. Do!'s
@@ -76,6 +91,8 @@ The touch layout follows the game:
   gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
   (2 for two players).
 - **Left-handed** mode in settings swaps the halves.
+- **Pause** (the ⏸ button in the top bar, or P on a keyboard): stops the game and its sound; tap
+  the screen or the button again to resume. The game is saved for resume when paused.
 
 ## Settings (⚙) and Games
 
@@ -139,6 +156,16 @@ right, up, down, fire) then holds a control.
 - `src/emu/galaxian.js` also holds Moon Cresta (decryption, graphics banks); `pacman.js`
   holds Jr. Pac-Man (decryption, scrolling playfield, banks); `timeplt.js` holds Pooyan;
   `berzerk.js` holds Frenzy; `bosco.js` holds Xevious (tile layers, sprites, terrain reader).
+- `src/emu/rallyx.js`: Rally-X. `src/emu/warpwarp.js`: Warp & Warp and its sound circuit.
+- `src/emu/m6809.js`: the Motorola 6809 CPU (documented instruction set, indexed
+  addressing, NMI/FIRQ/IRQ).
+- `src/emu/mappy.js`: Mappy: two 6809s, the 58xx I/O chips, the 15xx sound, the
+  scrolling map and sprites. The same design runs Super Pac-Man, Pac & Pal, Dig Dug II,
+  Motos, The Tower of Druaga, Grobda and Phozon.
+- `src/emu/m6502.js`: the MOS 6502, shared with 6502js, plus IRQ/NMI.
+- `src/emu/pokey.js`: Atari's POKEY sound chip (dividers, polynomial distortion, joined
+  16-bit channels, high-pass, the random register).
+- `src/emu/centiped.js`: Centipede. `src/emu/phoenix.js`: Phoenix and its sound.
 - `src/emu/mrdo.js`: Mr. Do!: two tile layers, sprites, and its protection read.
 - `src/emu/mcr.js`: the Bally Midway MCR boards (Satan's Hollow, Tron, Tapper): tiles,
   both sprite generators, palette RAM, and the Super Sound I/O board (its sound Z80, two
@@ -280,6 +307,17 @@ flowchart LR
 - **Berzerk's robot voice** lives on a separate speech board whose two ROMs (`1c`, `2c`)
   many Berzerk sets don't include; the speech chip isn't emulated yet, so the robots are
   silent. The 6840 sound effects play.
+- **Crush Roller's protection** is handled as MAME does for this set: fixed answers to its
+  checks and a few instructions patched in the instruction stream only.
+- **Mappy's I/O chips** answer their power-on check with the documented result for
+  Mappy's own query; other games in the family send different queries and will need
+  theirs added.
+- **Warp & Warp's sound** is modeled from the circuit's description (tones, noise and
+  decays), so it's close but not exact.
+- **Phoenix's sound** is modeled from its circuit descriptions; the melody chip's two tunes
+  ("Für Elise" and "Romance de Amor") are transcribed by hand, and which tune number is
+  which (besides the opening one) is a guess. **Centipede's trackball** moves at a fixed
+  speed from the stick rather than following a real ball.
 - **Scramble's protection** answers come from a table of the values the program checks for,
   as MAME does for this set; other Scramble sets may need different answers.
 - **Xevious** uses the same 50xx/54xx stand-ins as Bosconian, and its explosion sounds are

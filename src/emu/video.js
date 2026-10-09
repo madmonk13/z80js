@@ -60,3 +60,11 @@ export function rotate270(src, w, h, dst) {
     for (let x = 0; x < w; x++) dst[(w - 1 - x) * h + y] = src[y * w + x];
   }
 }
+
+// Swap rows and columns of a w x h picture into `dst` (h wide, w tall): a
+// vertical monitor mounted so the picture comes out mirrored as well as turned.
+export function transpose(src, w, h, dst) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) dst[x * h + y] = src[y * w + x];
+  }
+}

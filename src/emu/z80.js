@@ -47,8 +47,11 @@ export class Z80 {
   saveState() { return capture(this, Z_STATE); }
   loadState(s) { apply(this, Z_STATE, s); }
 
-  constructor({ read, write, input = () => 0xFF, output = () => {} }) {
+  // opRead (optional): reads opcode fetches separately from data, for boards
+  // that patch or decrypt only the instruction stream.
+  constructor({ read, write, input = () => 0xFF, output = () => {}, opRead = null }) {
     this.read = read;
+    this.opRead = opRead;
     this.write = write;
     this.input = input;
     this.output = output;
@@ -111,7 +114,9 @@ export class Z80 {
     }
     this.eiDelay = false;
     if (this.halted) { this.cycles += 4; this.incR(); return; }
-    const op = this.fetch();
+    this.opPc = this.pc;      // where the current instruction starts (some protection checks key on it)
+    const op = this.opRead ? this.opRead(this.pc) : this.read(this.pc);
+    this.pc = (this.pc + 1) & 0xFFFF;
     this.incR();
     this.exec(op, 0);
   }

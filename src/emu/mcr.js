@@ -17,7 +17,7 @@ import { Z80 } from './z80.js';
 import { Z80CTC } from './z80ctc.js';
 import { AY8910 } from './ay8910.js';
 import { SoundMix } from './mixer.js';
-import { decodeTiles, rgba, rotate90, run } from './video.js';
+import { decodeTiles, rgba, rotate90, transpose, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
@@ -45,8 +45,8 @@ export class MCR {
     const cfg = this.constructor.config;
     this.cfg = cfg;
     this.rotated = cfg.rotate;
-    this.width = cfg.rotate ? H : W;
-    this.height = cfg.rotate ? W : H;
+    this.width = cfg.rotate || cfg.transpose ? H : W;
+    this.height = cfg.rotate || cfg.transpose ? W : H;
     this.refresh = 60;
     this.roms = roms;
     this.ram = new Uint8Array(0x800);
@@ -84,7 +84,7 @@ export class MCR {
 
     this.native = new Uint32Array(W * H);
     this.pri = new Uint8Array(W * H);
-    this.frame = cfg.rotate ? new Uint32Array(W * H) : this.native;
+    this.frame = cfg.rotate || cfg.transpose ? new Uint32Array(W * H) : this.native;
     this.ip = new Uint8Array(5).fill(0xFF);
     this.dial = 0;
     this.applySwitches(defaultSwitches(this.constructor.switches));
@@ -110,6 +110,12 @@ export class MCR {
 
   read(a) {
     if (a < this.cfg.romEnd) return this.roms.main[a] ?? 0xFF;
+    if (this.cfg.board === 90009) {
+      if (a < 0x8000) return this.ram[a & 0x7FF];
+      if (a >= 0xF000 && a < 0xF400) return this.spriteRam[a & 0x1FF];
+      if (a >= 0xFC00) return this.vram[a & 0x3FF];
+      return 0xFF;
+    }
     if (this.cfg.board === 90010) {
       if (a < 0xE000) return a >= 0xC000 ? this.ram[a & 0x7FF] : 0xFF;
       return a & 0x800 ? this.vram[a & 0x7FF] : this.spriteRam[a & 0x1FF];
@@ -122,6 +128,14 @@ export class MCR {
 
   write(a, v) {
     if (a < this.cfg.romEnd) return;
+    if (this.cfg.board === 90009) {
+      if (a < 0x8000) this.ram[a & 0x7FF] = v;
+      else if (a >= 0xF000 && a < 0xF400) this.spriteRam[a & 0x1FF] = v;
+      else if (a >= 0xFC00) this.vram[a & 0x3FF] = v;
+      else if (a >= 0xF400 && a < 0xF800) this.setColor(a & 0x1F, (this.paletteRam[a & 0x1F] & 0xF00) | v);          // blue, green
+      else if (a >= 0xF800 && a < 0xFC00) this.setColor(a & 0x1F, (this.paletteRam[a & 0x1F] & 0xFF) | ((v & 15) << 8));   // red
+      return;
+    }
     if (this.cfg.board === 90010) {
       if (a < 0xE000) { if (a >= 0xC000) this.ram[a & 0x7FF] = v; return; }
       if (!(a & 0x800)) { this.spriteRam[a & 0x1FF] = v; return; }
@@ -139,6 +153,10 @@ export class MCR {
   // 9-bit color: red in bits 6-8, blue 3-5, green 0-2.
   setColor(i, v) {
     this.paletteRam[i] = v;
+    if (this.cfg.board === 90009) {                // 4 bits each: red 8-11, blue 4-7, green 0-3
+      this.palette[i] = rgba(((v >> 8) & 15) * 17, (v & 15) * 17, ((v >> 4) & 15) * 17);
+      return;
+    }
     this.palette[i] = rgba(level3(v >> 6), level3(v), level3(v >> 3));
   }
 
@@ -246,14 +264,15 @@ export class MCR {
 
   render() {
     const out = this.native, pri = this.pri, vram = this.vram, pal = this.palette, bg = this.bgPix;
-    const tapper = this.cfg.board !== 90010;
+    const tapper = this.cfg.board === 91490;
     for (let row = 0; row < 30; row++) {
       for (let col = 0; col < 32; col++) {
         const i = row * 32 + col, data = vram[i * 2] | (vram[i * 2 + 1] << 8);
         let code, color, flip;
-        if (tapper) { code = data & 0x3FF; color = (data >> 12) & 3; flip = (data >> 10) & 3; }
+        if (this.cfg.board === 90009) { code = vram[i]; color = 0; flip = 0; }     // one byte per tile; sprites always use colors 16-31
+        else if (tapper) { code = data & 0x3FF; color = (data >> 12) & 3; flip = (data >> 10) & 3; }
         else { code = data & 0x1FF; color = (data >> 11) & 3; flip = (data >> 9) & 3; }
-        const bank = ((data >> 14) & 3) << 4, base = color * 16;
+        const bank = this.cfg.board === 90009 ? 0x10 : ((data >> 14) & 3) << 4, base = color * 16;
         for (let y = 0; y < 16; y++) {
           const src = code * 64 + ((flip & 2 ? 15 - y : y) >> 1) * 8;
           let o = (row * 16 + y) * W + col * 16;
@@ -266,6 +285,7 @@ export class MCR {
     }
     if (tapper) this.spritesFrontToBack(); else this.spritesOred();
     if (this.cfg.rotate) rotate90(out, W, H, this.frame);
+    else if (this.cfg.transpose) transpose(out, W, H, this.frame);
   }
 
   // 90010: sprites ORed into a line buffer that starts out holding each
@@ -397,4 +417,28 @@ Tapper.id = 'tapper';
 Tapper.title = 'Tapper';
 Tapper.switches = [
   { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x00], ['Off', 0x04]], default: 0x00 },
+];
+
+export class Kick extends MCR {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'two-way';
+    this.buttons = 1;
+    this.dialControl = true;
+    this.dialHint = ['Kick & move', 'Tap to kick, drag sideways to move'];
+  }
+  // IP0: coin, starts, kick. IP1: the dial (its low four bits); the stick also turns it.
+  setInputs(s) {
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0) | (s.fire ? 0x10 : 0));
+    const spin = (s.spin || 0) + (s.right ? 3 : 0) - (s.left ? 3 : 0);
+    if (spin) this.dial = (this.dial - Math.round(spin)) & 0xFF;
+    this.ip[1] = 0xF0 | (this.dial & 0x0F);
+  }
+  applySwitches(v) { this.ip[3] = 0xFE | v.music; }
+}
+Kick.config = { board: 90009, clock: 19968000 / 8, romEnd: 0x7000, transpose: true };
+Kick.id = 'kick';
+Kick.title = 'Kick';
+Kick.switches = [
+  { id: 'music', label: 'Music', options: [['On', 0x00], ['Off', 0x01]], default: 0x00 },
 ];

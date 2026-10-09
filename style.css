@@ -449,3 +449,24 @@ label.switch input:focus-visible + i { outline: 2px solid var(--accent); outline
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.info { background: var(--panel); border-color: var(--accent); }
+
+/* Pause: the bar button swaps its icon, and a veil over the game says so. */
+#pauseBtn .i-play { display: none; }
+#pauseBtn:disabled { opacity: 0.35; pointer-events: none; }
+body.paused #pauseBtn .i-pause { display: none; }
+body.paused #pauseBtn .i-play { display: block; }
+#paused {
+  position: fixed; inset: 0; z-index: 4;
+  display: grid; place-items: center;
+  background: rgba(11, 13, 20, 0.55);
+  -webkit-tap-highlight-color: transparent;
+}
+#paused[hidden] { display: none; }
+#paused .card {
+  display: grid; gap: 4px; justify-items: center;
+  padding: 16px 28px; border-radius: 16px;
+  background: rgba(20, 23, 34, 0.92); color: var(--fg, #e8eaf2);
+  font-weight: 600;
+}
+#paused .card b { font-size: 20px; letter-spacing: 0.04em; }
+#paused .card span { font-size: 13px; opacity: 0.7; font-weight: 500; }

@@ -394,3 +394,73 @@ JrPacMan.switches = [
   { id: 'bonus', label: 'Bonus life', options: [['10K', 0x00], ['15K', 0x10], ['20K', 0x20], ['30K', 0x30]], default: 0x00 },
   { id: 'difficulty', label: 'Difficulty', options: [['Normal', 0x40], ['Hard', 0x00]], default: 0x40 },
 ];
+
+// ---------------------------------------------------------------- Pac-Man board variants
+
+const swapBits = (v, a, b) => (((v >> a) & 1) === ((v >> b) & 1) ? v : v ^ ((1 << a) | (1 << b)));
+
+// Piranha (1981): a Pac-Man variant whose program ROMs have data lines 3 and
+// 5 swapped, and graphics ROMs data lines 4 and 6 and address lines 0 and 2
+// swapped. Its interrupt vector is also written as FA where the code needs 78.
+export class Piranha extends PacMan {
+  constructor(roms) {
+    const main = roms.main.map((v) => swapBits(v, 3, 5));
+    const gfx = (rom) => {
+      const out = new Uint8Array(rom.length);
+      for (let i = 0; i < rom.length; i++) out[i] = swapBits(rom[(i & ~7) | (((i >> 2) & 1) | (i & 2) | ((i & 1) << 2))], 4, 6);
+      return out;
+    };
+    super({ ...roms, main, tiles: gfx(roms.tiles), sprites: gfx(roms.sprites) });
+  }
+  out(port, v) { super.out(port, v === 0xFA ? 0x78 : v); }
+}
+Piranha.id = 'piranha';
+Piranha.title = 'Piranha';
+Piranha.switches = PacMan.switches;
+
+// Crush Roller (1981): Pac-Man hardware with a protection device. It answers
+// reads in the switch areas (5080-50FF) depending on where the program is,
+// and a few instructions are replaced in the instruction stream only (so the
+// program's own ROM checksum still passes).
+const CRUSH_PATCHES = [[0x0415, 0xC9], [0x1978, 0x18], [0x238E, 0xC9], [0x3AE5, 0xE6], [0x3AE7, 0x00], [0x3AE8, 0xC9],
+  [0x3AED, 0x86], [0x3AEE, 0xC0], [0x3AEF, 0xB0]];
+
+export class CrushRoller extends PacMan {
+  constructor(roms) {
+    super(roms);
+    this.ops = roms.main.slice(0, 0x4000);
+    for (const [a, v] of CRUSH_PATCHES) this.ops[a] = v;
+    this.cpu.opRead = (a) => (a < 0x4000 ? this.ops[a] : this.read(a));
+  }
+
+  read(a) {
+    a &= 0x7FFF;
+    if (a >= 0x5080 && a < 0x5100) {
+      const pc = this.cpu.opPc, off = a & 0x3F;
+      if (a < 0x50C0) {
+        if (pc === 0x1973 || pc === 0x2389) return this.dsw1 | 0x40;
+        if (off === 1 || off === 4) return this.dsw1 | 0x40;
+        if (off === 5) return this.dsw1 | 0xC0;
+        return this.dsw1 & 0x3F;
+      }
+      if (pc === 0x040E) return 0x20;
+      if (pc === 0x115E || pc === 0x3AE2) return 0x00;
+      return off === 0x00 ? 0x1F : off === 0x09 ? 0x30 : off === 0x0C ? 0x00 : 0x20;
+    }
+    return super.read(a);
+  }
+
+  // IN0: stick, coin (cabinet switch upright). IN1: starts.
+  setInputs(s) {
+    this.in0 = 0xEF & ~((s.up ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.right ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.coin ? 0x20 : 0));
+    this.in1 = 0x6F & ~((s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0));
+  }
+  // Switches: 1 coin 1 credit, lives, first pattern, teleport holes.
+  applySwitches(v) { this.dsw1 = 0x01 | v.lives | 0x10 | v.teleport; }
+}
+CrushRoller.id = 'crush';
+CrushRoller.title = 'Crush Roller';
+CrushRoller.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x04], ['5', 0x08], ['6', 0x0C]], default: 0x00 },
+  { id: 'teleport', label: 'Teleport holes', options: [['On', 0x00], ['Off', 0x20]], default: 0x20 },
+];
