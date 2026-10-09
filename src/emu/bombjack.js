@@ -43,7 +43,7 @@ export class BombJack {
       output: (p, v) => this.soundOut(p & 0xFF, v),
     });
     this.ay = [0, 1, 2].map(() => new AY8910(1500000, () => 0xFF, 1));
-    this.sound = new SoundMix(this.ay, 0.9);
+    this.sound = new SoundMix(this.ay, 0.5);
 
     const planes = (len) => [0, len * 8 / 3, len * 16 / 3];
     this.charPix = decodeTiles(roms.chars, { count: 512, width: 8, height: 8, planes: planes(roms.chars.length), xs: run(0, 8), ys: run(0, 8, 8), size: 64 });

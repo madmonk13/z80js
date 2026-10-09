@@ -58,6 +58,8 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Mr. Do's Castle (1983) | Universal: two Z80s talking through a latch, 4-bit tiles with priority, four SN76489s | `docastle` | **Tested:** boots, attract mode, coin, start and play |
 | Popeye (1982) | Nintendo: encrypted Z80, 512x448 raster, background bitmap, protection shifter, AY-3-8910 | `popeye` (revision D) | **Tested:** boots, attract mode, coin, start and play |
 | Pengo (1982) | Sega: Pac-Man video and sound, Sega-encrypted Z80, graphics and color banks | `pengo` (set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Bomb Jack (1984) | Tehkan: Z80, background pictures from a map ROM, 16x16 and 32x32 sprites, palette RAM, sound Z80 with three AY-3-8910s | `bombjack` | **Tested:** boots, self-test, attract mode, coin, start and play |
+| Mario Bros. (1983) | Nintendo: Donkey Kong's design with a scrolling tile layer (the POW bump) and an 8039 driving a DAC | `mario` (MAME 2003 naming; `marioo` in newer MAME) | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -93,6 +95,7 @@ The touch layout follows the game:
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
   aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
   cabinet's spinner).
+- **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps.
 - **Pac-Man, Ms. Pac-Man, Puck Man, Pac-Man Plus, Lady Bug, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
 - **Space Invaders:** a left/right pad and fire. **1942:** an 8-way joystick; the bottom of
   the right half fires and the top loops. **Mr. Do's Castle:** 4-way stick, fire swings the
@@ -357,6 +360,9 @@ flowchart LR
   modeled from the discrete circuits; the color overlay is approximate.
 - **Mr. Do's Castle's third CPU** isn't run (the game doesn't depend on it), and the main
   CPU's wait on the latch is modeled by pausing it until the second CPU answers.
+- **Mario Bros.' running, skid, ice and coin sounds** were analog circuits (MAME plays
+  recordings of them); they're silent here. The music and other effects, from its 8039, play.
+- **Bomb Jack** runs its power-on self test for about 20 seconds before the attract mode.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware
