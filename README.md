@@ -60,6 +60,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Pengo (1982) | Sega: Pac-Man video and sound, Sega-encrypted Z80, graphics and color banks | `pengo` (set 1) | **Tested:** boots, attract mode, coin, start and play |
 | Bomb Jack (1984) | Tehkan: Z80, background pictures from a map ROM, 16x16 and 32x32 sprites, palette RAM, sound Z80 with three AY-3-8910s | `bombjack` | **Tested:** boots, self-test, attract mode, coin, start and play |
 | Mario Bros. (1983) | Nintendo: Donkey Kong's design with a scrolling tile layer (the POW bump) and an 8039 driving a DAC | `mario` (MAME 2003 naming; `marioo` in newer MAME) | **Tested:** boots, attract mode, coin, start and play |
+| Moon Patrol (1982) | Irem M52: Z80, three parallax backgrounds from ROM, a scrolling ground strip; sound board with a Motorola 6803, two AY-3-8910s and two MSM5205s | `mpatrol` | **Tested:** boots, attract mode, coin, start and play (jump and fire) |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -95,7 +96,8 @@ The touch layout follows the game:
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
   aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
   cabinet's spinner).
-- **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps.
+- **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps. **Moon Patrol:** left/right
+  slows and speeds the buggy; the bottom of the right half fires, the top jumps.
 - **Pac-Man, Ms. Pac-Man, Puck Man, Pac-Man Plus, Lady Bug, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
 - **Space Invaders:** a left/right pad and fire. **1942:** an 8-way joystick; the bottom of
   the right half fires and the top loops. **Mr. Do's Castle:** 4-way stick, fire swings the
@@ -208,6 +210,9 @@ right, up, down, fire) then holds a control.
   protection). `src/emu/pengo.js`: Pengo (Sega decryption, on the Pac-Man board code).
   `pacman.js` also holds Puck Man and Pac-Man Plus (decryption); `scramble.js` Super Cobra;
   `bosco.js` Super Xevious.
+- `src/emu/mpatrol.js`: Moon Patrol and Irem's sound board; `src/emu/m6803.js` is the
+  Motorola 6803 (6800 instructions plus the 6801 additions, internal RAM, ports and
+  timer); `src/emu/msm5205.js` the OKI ADPCM decoder.
 - `src/emu/mixer.js`: mixes a board's sound chips into one output.
 - `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga, Dig Dug).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.

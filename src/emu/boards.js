@@ -43,6 +43,7 @@ import { Popeye } from './popeye.js';
 import { Pengo } from './pengo.js';
 import { BombJack } from './bombjack.js';
 import { MarioBros } from './mario.js';
+import { MoonPatrol } from './mpatrol.js';
 
 const BOARDS = [
   {
@@ -326,6 +327,32 @@ const BOARDS = [
     assemble: (c) => ({
       main: cat(c.f, c.e, c.d, new Uint8Array(0x3000), c.c), sound: c.sound, chars: cat(c.c3f, c.c3j),
       sprites: cat(c.s7m, c.s7n, c.s7p, c.s7s, c.s7t, c.s7u), palette: c.palette,
+    }),
+  },
+  {
+    Board: MoonPatrol,
+    chips: [
+      ['m', 0x1000, [/^mp-?a-?1?\.3m$/, /^mpa-1\.3m$/]],
+      ['l', 0x1000, [/^mp-?a-?2?\.3l$/, /^mpa-2\.3l$/]],
+      ['k', 0x1000, [/^mp-?a-?3?\.3k$/, /^mpa-3\.3k$/]],
+      ['j', 0x1000, [/^mp-?a-?4?\.3j$/, /^mpa-4\.3j$/]],
+      ['sound', 0x1000, [/^mp-snd\.1a$/, /^mp-s1\.1a$/]],
+      ['c3e', 0x1000, [/^mp-?e-?5?\.3e$/]],
+      ['c3f', 0x1000, [/^mp-?e-?4?\.3f$/]],
+      ['s3m', 0x1000, [/^mp-?b-?2?\.3m$/]],
+      ['s3n', 0x1000, [/^mp-?b-?1?\.3n$/]],
+      ['bg3l', 0x1000, [/^mp-?e-?1?\.3l$/]],
+      ['bg3k', 0x1000, [/^mp-?e-?2?\.3k$/]],
+      ['bg3h', 0x1000, [/^mp-?e-?3?\.3h$/]],
+      ['charPal', 0x100, [/^2a$/, /^mpc-4\.2a$/]],
+      ['bgPal', 0x20, [/^1m$/, /^mpc-3\.1m$/]],
+      ['spritePal', 0x20, [/^1c1j$/, /^mpc-1\.1f$/]],
+      ['spriteLut', 0x100, [/^2hx$/, /^mpc-2\.2h$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.m, c.l, c.k, c.j), sound: c.sound, chars: cat(c.c3e, c.c3f), sprites: cat(c.s3m, c.s3n),
+      mountains: c.bg3l, hills: c.bg3k, city: c.bg3h,
+      charPal: c.charPal, bgPal: c.bgPal, spritePal: c.spritePal, spriteLut: c.spriteLut,
     }),
   },
   {
