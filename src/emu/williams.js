@@ -257,9 +257,12 @@ export class Williams {
       // lines), CA1 goes high from line 240 to the end of the frame.
       pia1.setC1('B', line & 0x20);
       pia1.setC1('A', line >= 240);
-      if (line === 248) this.render();
       this.cycleCarry += LINE_CYCLES;
       this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
+      // Draw each line as the beam passes it: the games erase and redraw
+      // objects just behind the beam, so a whole-frame snapshot catches some
+      // of them half-drawn.
+      if (line >= TOP && line < TOP + H) this.renderLine(line - TOP);
       this.sampleCarry += SAMPLES_PER_LINE;
       while (this.sampleCarry >= 1) {
         this.sampleCarry -= 1;
@@ -274,15 +277,12 @@ export class Williams {
 
   // ---------------------------------------------------------------- video
 
-  render() {
-    const out = this.frame, vram = this.vram, pal = this.palette;
-    for (let y = 0; y < H; y++) {
-      const sy = y + TOP;
-      let o = y * W;
-      for (let x = 0; x < W; x++) {
-        const sx = x + LEFT, byte = vram[(sx >> 1) * 256 + sy];
-        out[o++] = pal[sx & 1 ? byte & 15 : byte >> 4];
-      }
+  renderLine(y) {
+    const out = this.frame, vram = this.vram, pal = this.palette, sy = y + TOP;
+    let o = y * W;
+    for (let x = 0; x < W; x++) {
+      const sx = x + LEFT, byte = vram[(sx >> 1) * 256 + sy];
+      out[o++] = pal[sx & 1 ? byte & 15 : byte >> 4];
     }
   }
 }
