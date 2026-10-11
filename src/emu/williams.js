@@ -364,3 +364,86 @@ export class Splat extends Robotron {
 Splat.id = 'splat';
 Splat.title = 'Splat!';
 Splat.switches = [];
+
+// ---------------------------------------------------------------- Stargate and Defender
+
+// Five buttons plus an up/down stick on the cabinet. Here an 8-way stick
+// flies the ship: up/down as on the stick, left/right "fly that way" -
+// thrust if the ship faces that way, else Reverse first. The facing comes
+// from the game's own RAM (facingAt / facingRight). The fire side's bottom
+// fires and its top drops a smart bomb; hyperspace (and Stargate's inviso)
+// are on the keyboard (H, V) and gamepad.
+// IN0: fire, thrust, smart bomb, hyperspace, start 2, start 1, reverse, down. IN1: up, inviso.
+const DefenderControls = (Base) => class extends Base {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 2;
+    this.button2 = 'Smart bomb';
+    this.reverseHeld = 0;
+  }
+  facing() { return this.ramAt(this.facingAt) === this.facingRight ? 'right' : 'left'; }
+  setInputs(s) {
+    const want = s.left ? 'left' : s.right ? 'right' : null;
+    let thrust = false, reverse = false;
+    if (want) {
+      if (want === this.facing()) thrust = true;
+      else if (this.reverseHeld === 0) reverse = true;     // tap Reverse, then wait for the turn
+    }
+    this.reverseHeld = reverse ? 6 : Math.max(0, this.reverseHeld - 1);
+    this.in0 = (s.fire ? 0x01 : 0) | (thrust ? 0x02 : 0) | (s.fire2 ? 0x04 : 0) | (s.hyper ? 0x08 : 0)
+      | (s.start2 ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (reverse ? 0x40 : 0) | (s.down ? 0x80 : 0);
+    this.in1 = (s.up ? 0x01 : 0) | (s.inviso ? 0x02 : 0);
+    this.in2 = s.coin ? 0x10 : 0;
+  }
+};
+
+export class Stargate extends DefenderControls(Williams) {
+  constructor(roms) { super(roms); this.facingAt = 0x9C92; this.facingRight = 0x03; }   // FD when facing left
+  ramAt(a) { return this.read(a); }
+}
+Stargate.id = 'stargate';
+Stargate.title = 'Stargate';
+Stargate.switches = [];
+
+// Defender's earlier board: RAM all the way to BFFF, and C000-CFFF is either
+// the I/O page or one of nine ROM banks, picked by a write to D000-DFFF.
+export class Defender extends DefenderControls(Williams) {
+  constructor(roms) { super(roms); this.bank = 0; this.cmosFresh = false; this.facingAt = 0xA0BB; this.facingRight = 0x03; }   // FD when facing left
+  // This set reads the Auto Up and Advance switches the other way round:
+  // idle is both high.
+  setInputs(s) { super.setInputs(s); this.in2 |= 0x03; }
+  reset() { super.reset(); this.bank = 0; }
+  saveState() { return { ...super.saveState(), bank: this.bank }; }
+  loadState(s) { super.loadState(s); this.bank = s.bank; }
+  ramAt(a) { return this.read(a); }
+
+  read(a) {
+    if (a < 0x9800) return this.vram[a];
+    if (a < 0xC000) return this.ram[a - 0x9800];
+    if (a >= 0xD000) return this.roms.main[a - 0xD000];
+    if (this.bank) return this.roms.banked[(this.bank - 1) * 0x1000 + (a & 0xFFF)] ?? 0xFF;
+    const o = a & 0xFFF;
+    if (o >= 0x400 && o < 0x800) return this.cmos[o & 0xFF];
+    if (o >= 0x800 && o < 0xC00) return this.line & 0xFC;
+    if (o >= 0xC00) {
+      if (!(o & 7)) this.switchReads++;          // PIA 1 port A: see the Advance note above
+      return this.pia[o & 4 ? 0 : 1].read(o & 3);
+    }
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a < 0x9800) { this.vram[a] = v; return; }
+    if (a < 0xC000) { this.ram[a - 0x9800] = v; return; }
+    if (a >= 0xD000) { if (a < 0xE000) this.bank = v & 0x0F; return; }
+    if (this.bank) return;
+    const o = a & 0xFFF;
+    if (o < 0x400) { if (!(o & 0x10)) { this.palRam[o & 15] = v; this.palette[o & 15] = COLOR[v]; } return; }
+    if (o < 0x800) { this.cmos[o & 0xFF] = v | 0xF0; return; }
+    if (o >= 0xC00) this.pia[o & 4 ? 0 : 1].write(o & 3, v);
+  }
+}
+Defender.id = 'defender';
+Defender.title = 'Defender';
+Defender.switches = [];

@@ -65,6 +65,8 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Robotron: 2084 (1982) | Same Williams board, twin joysticks | `robotron` (Solid Blue label) | **Tested:** boots, self-test, attract mode, coin, start and play (move and aimed fire) |
 | Bubbles (1982) | Same Williams board, 8-bit CMOS | `bubbles` | **Tested:** boots, attract mode, coin, start and play |
 | Splat! (1982) | Same Williams board, the second-generation blitter, twin sticks | `splat` | **Tested:** boots, attract mode, coin, start and play |
+| Stargate (1981) | Williams board without the blitter | `stargate` | **Tested:** boots, attract mode, coin, start and play |
+| Defender (1980) | The earlier Williams board: RAM to BFFF, an I/O page banked with ROM at C000 | `defender` (Red label) | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -102,6 +104,10 @@ The touch layout follows the game:
   cabinet's spinner).
 - **Robotron: 2084, Splat!:** twin sticks. The left half moves; the right half is a second stick
   that fires in the direction you drag (keyboard: I/J/K/L; gamepad: the right stick).
+- **Defender, Stargate:** an 8-way stick flies the ship: up/down as on the cabinet, and
+  left/right means "fly that way" (z80js presses Reverse when the ship faces the other way,
+  reading which way it faces from the game's RAM, then Thrust). The bottom of the right half
+  fires, the top drops a smart bomb; H is hyperspace and V inviso (gamepad triggers).
 - **Joust:** left/right, and fire flaps. **Bubbles:** an 8-way stick only.
 - **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps. **Moon Patrol:** left/right
   slows and speeds the buggy; the bottom of the right half fires, the top jumps.

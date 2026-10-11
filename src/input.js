@@ -3,7 +3,8 @@
 //
 // Keys: arrows / WASD to move, Space / Z to fire, X / Shift for a second
 // button (also fire in one-button games), Q / E (or the mouse wheel) to turn
-// a dial, I / J / K / L to aim in twin-stick games (Robotron), 5 or C for a
+// a dial, I / J / K / L to aim in twin-stick games (Robotron), H for
+// hyperspace and V for inviso (Defender, Stargate), 5 or C for a
 // coin, 1 or Return to start (2 for a two-player start).
 
 const LEFT = new Set(['ArrowLeft', 'KeyA']);
@@ -15,11 +16,12 @@ const FIRE2 = new Set(['KeyX', 'ShiftLeft', 'ShiftRight']);
 const SPIN_LEFT = new Set(['KeyQ']);
 const SPIN_RIGHT = new Set(['KeyE']);
 const KEY_SPIN = 3;           // dial counts per frame while Q / E is held
+const HYPER = new Set(['KeyH']), INVISO = new Set(['KeyV']);   // Defender / Stargate extras
 const AIM_UP = new Set(['KeyI']), AIM_DOWN = new Set(['KeyK']), AIM_LEFT = new Set(['KeyJ']), AIM_RIGHT = new Set(['KeyL']);
 const COIN = new Set(['Digit5', 'KeyC', 'Tab']);
 const START1 = new Set(['Digit1', 'Enter', 'NumpadEnter']);
 const START2 = new Set(['Digit2']);
-const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...COIN, ...START1, ...START2]);
+const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...HYPER, ...INVISO, ...COIN, ...START1, ...START2]);
 
 export class Input {
   constructor() {
@@ -58,6 +60,7 @@ export class Input {
     this.wheel = 0;
     let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = any(START2);
     const aim = { up: any(AIM_UP), down: any(AIM_DOWN), left: any(AIM_LEFT), right: any(AIM_RIGHT) };
+    let hyper = any(HYPER), inviso = any(INVISO);
 
     for (const src of this.sources) {
       const d = src.dir();
@@ -83,6 +86,7 @@ export class Input {
       // The right stick aims in twin-stick games.
       const rx = pad.axes[2] || 0, ry = pad.axes[3] || 0;
       aim.left ||= rx < -0.5; aim.right ||= rx > 0.5; aim.up ||= ry < -0.5; aim.down ||= ry > 0.5;
+      hyper ||= b(6); inviso ||= b(7);                 // the triggers
       if (b(4)) spin -= KEY_SPIN;  // shoulder buttons turn a dial
       if (b(5)) spin += KEY_SPIN;
       if (b(8)) coin = true;      // Back / Select
@@ -91,6 +95,6 @@ export class Input {
       break;                      // one player
     }
 
-    return { left, right, up, down, fire, fire2, spin, coin, start1, start2, aim };
+    return { left, right, up, down, fire, fire2, spin, coin, start1, start2, aim, hyper, inviso };
   }
 }

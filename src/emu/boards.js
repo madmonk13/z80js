@@ -44,7 +44,7 @@ import { Pengo } from './pengo.js';
 import { BombJack } from './bombjack.js';
 import { MarioBros } from './mario.js';
 import { MoonPatrol } from './mpatrol.js';
-import { Robotron, Joust, Bubbles, Splat } from './williams.js';
+import { Robotron, Joust, Bubbles, Splat, Stargate, Defender } from './williams.js';
 
 const BOARDS = [
   {
@@ -403,6 +403,30 @@ const BOARDS = [
       main: cat(c.top0, c.top1, c.top2), sound: c.sound,
       banked: cat(...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => c[`bank${n}`])),
     }),
+  },
+  {
+    Board: Stargate,
+    chips: [
+      ...['10', '11', '12'].map((n, i) => [`top${i}`, 0x1000, [new RegExp(`^${n}$`)]]),
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`bank${n}`, 0x1000, [new RegExp(`^0${n}$`)]]),
+      ['sound', 0x800, [/^sg\.snd$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.top0, c.top1, c.top2), sound: cat(c.sound, c.sound),
+      banked: cat(...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => c[`bank${n}`])),
+    }),
+  },
+  {
+    Board: Defender,
+    chips: [
+      ...[1, 4, 2, 3, 9, 12, 8, 11, 7, 10, 6].map((n) => [`d${n}`, n === 2 || n === 3 ? 0x1000 : 0x800, [new RegExp(`^defend\\.${n}$`)]]),
+      ['sound', 0x800, [/^defend\.snd$/]],
+    ],
+    assemble: (c) => {
+      const banked = new Uint8Array(0x9000).fill(0xFF);
+      [[9, 0], [12, 0x800], [8, 0x1000], [11, 0x1800], [7, 0x2000], [10, 0x2800], [6, 0x6000]].forEach(([n, o]) => banked.set(c[`d${n}`], o));
+      return { main: cat(c.d1, c.d4, c.d2, c.d3), sound: cat(c.sound, c.sound), banked };
+    },
   },
   {
     Board: SuperCobra,
