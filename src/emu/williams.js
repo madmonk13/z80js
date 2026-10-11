@@ -26,7 +26,7 @@ const LINES = 260, REFRESH = 8000000 / 512 / LINES;          // 60.1 Hz
 const LINE_CYCLES = 1000000 / REFRESH / LINES;
 const SOUND_CLOCK = 3579545 / 4, SOUND_PER_SAMPLE = SOUND_CLOCK / 48000;
 const SAMPLES_PER_LINE = 48000 / REFRESH / LINES;
-const STATE = ['vram', 'ram', 'palRam', 'cmos', 'romBank', 'blitter', 'line', 'portSelect', 'soundRam', 'cmosFresh', 'advance', 'command', 'irqLines',
+const STATE = ['vram', 'ram', 'palRam', 'cmos', 'romBank', 'blitter', 'line', 'portSelect', 'in4', 'soundRam', 'cmosFresh', 'advance', 'command', 'irqLines',
   'cycleCarry', 'soundCarry', 'sampleCarry', 'in0', 'in1', 'in2', 'in3', 'cpu', 'snd', 'pia', 'sound'];
 
 // Palette byte BBGGGRRR through 1200/560/330 ohm (red, green) and 560/330
@@ -83,7 +83,11 @@ export class Williams {
     };
     this.pia = [
       // Controls (Joust multiplexes two players through CB2).
-      new PIA6821({ inA: () => (this.muxed && this.portSelect ? this.in3 : this.in0), inB: () => this.in1, cb2: (v) => { this.portSelect = v; } }),
+      new PIA6821({
+        inA: () => (this.muxed && this.portSelect ? this.in3 : this.in0),
+        inB: () => (this.muxed === 2 && this.portSelect ? this.in4 : this.in1),
+        cb2: (v) => { this.portSelect = v; },
+      }),
       // Coins and switches in, sound commands out, the video interrupts.
       new PIA6821({
         inA: () => this.in2 | (this.advance > 0 ? 0x02 : 0),
@@ -98,7 +102,9 @@ export class Williams {
     ];
     this.command = 0xFF;
     this.frame = new Uint32Array(W * H);
-    this.in0 = this.in1 = this.in2 = this.in3 = 0;
+    this.in0 = this.in1 = this.in2 = this.in3 = this.in4 = 0;
+    this.blitterXor = 4;                         // the first special chip's size bug (fixed in the SC2)
+    this.cmosMask = 0xF0;                        // 4-bit CMOS (Bubbles has 8)
     this.reset();
   }
 
@@ -131,7 +137,7 @@ export class Williams {
     if (a < 0x9800) { this.vram[a] = v; return; }           // writes always reach video RAM
     if (a < 0xC000) { this.ram[a - 0x9800] = v; return; }
     if (a >= 0xD000) return;
-    if (a >= 0xCC00) { this.cmos[a - 0xCC00] = v | 0xF0; return; }   // 4 bits wide
+    if (a >= 0xCC00) { this.cmos[a - 0xCC00] = v | this.cmosMask; return; }   // usually 4 bits wide
     if (a < 0xC400) { this.palRam[a & 15] = v; this.palette[a & 15] = COLOR[v]; return; }
     if ((a & 0xFF0C) === 0xC804) { this.pia[0].write(a & 3, v); return; }
     if ((a & 0xFF0C) === 0xC80C) { this.pia[1].write(a & 3, v); return; }
@@ -152,7 +158,7 @@ export class Williams {
     b[r] = v;
     if (r !== 0) return;
     const sstart0 = (b[2] << 8) | b[3], dstart0 = (b[4] << 8) | b[5];
-    let w = b[6] ^ 4, h = b[7] ^ 4;
+    let w = b[6] ^ this.blitterXor, h = b[7] ^ this.blitterXor;
     if (w === 0) w = 1; if (h === 0) h = 1;
     if (w === 255) w = 256; if (h === 255) h = 256;
     const accesses = this.blit(sstart0, dstart0, w, h, v);
@@ -323,3 +329,38 @@ export class Joust extends Williams {
 Joust.id = 'joust';
 Joust.title = 'Joust';
 Joust.switches = [];
+
+export class Bubbles extends Williams {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 0;
+    this.cmosMask = 0;                           // a full 8-bit CMOS
+  }
+  // IN0: up, down, left, right, start 2, start 1. IN2: coin.
+  setInputs(s) {
+    this.in0 = (s.up ? 0x01 : 0) | (s.down ? 0x02 : 0) | (s.left ? 0x04 : 0) | (s.right ? 0x08 : 0)
+      | (s.start2 ? 0x10 : 0) | (s.start1 ? 0x20 : 0);
+    this.in2 = s.coin ? 0x10 : 0;
+  }
+}
+Bubbles.id = 'bubbles';
+Bubbles.title = 'Bubbles';
+Bubbles.switches = [];
+
+// Splat!: Robotron's twin sticks, both players' controls multiplexed through
+// both ports, and the second-generation blitter.
+export class Splat extends Robotron {
+  constructor(roms) {
+    super(roms);
+    this.muxed = 2;
+    this.blitterXor = 0;
+  }
+  setInputs(s) {
+    super.setInputs(s);
+    this.in3 = this.in0; this.in4 = this.in1;
+  }
+}
+Splat.id = 'splat';
+Splat.title = 'Splat!';
+Splat.switches = [];
