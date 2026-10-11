@@ -129,7 +129,7 @@ body.two-buttons.portrait .zone .box.fire { top: calc(var(--split, 50%) + 5px); 
 /* Games without a fire button: one stick zone across the whole surface. */
 body.stick-only .zone.fire { display: none; }
 
-#dpad {
+.dpad {
   --size: 140px;
   position: fixed;
   width: var(--size); height: var(--size);
@@ -143,7 +143,7 @@ body.stick-only .zone.fire { display: none; }
   pointer-events: none;
   z-index: 4;
 }
-#dpad.show { opacity: 1; transform: scale(1); }
+.dpad.show { opacity: 1; transform: scale(1); }
 /* Two-way mode: a left/right pad, half as tall as the d-pad. */
 body.two-way #dpad {
   height: calc(var(--size) / 2);
@@ -153,19 +153,19 @@ body.two-way #dpad {
 body.two-way #dpad .arrow { height: 44%; }
 body.two-way #dpad .arrow.up, body.two-way #dpad .arrow.down { display: none; }
 body.two-way #dpad .knob { height: 76%; }
-#dpad .arrow {
+.dpad .arrow {
   position: absolute; left: 50%; top: 50%;
   width: 22%; height: 22%;
   background: rgba(255, 255, 255, 0.35);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   transition: background 0.08s ease;
 }
-#dpad .arrow.up { transform: translate(-50%, -205%); }
-#dpad .arrow.down { transform: translate(-50%, 105%) rotate(180deg); }
-#dpad .arrow.left { transform: translate(-205%, -50%) rotate(-90deg); }
-#dpad .arrow.right { transform: translate(105%, -50%) rotate(90deg); }
-#dpad.up .arrow.up, #dpad.down .arrow.down, #dpad.left .arrow.left, #dpad.right .arrow.right { background: var(--accent); }
-#dpad .knob {
+.dpad .arrow.up { transform: translate(-50%, -205%); }
+.dpad .arrow.down { transform: translate(-50%, 105%) rotate(180deg); }
+.dpad .arrow.left { transform: translate(-205%, -50%) rotate(-90deg); }
+.dpad .arrow.right { transform: translate(105%, -50%) rotate(90deg); }
+.dpad.up .arrow.up, .dpad.down .arrow.down, .dpad.left .arrow.left, .dpad.right .arrow.right { background: var(--accent); }
+.dpad .knob {
   position: absolute; left: 50%; top: 50%;
   width: 38%; height: 38%;
   border-radius: 50%;

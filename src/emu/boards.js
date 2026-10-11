@@ -44,6 +44,7 @@ import { Pengo } from './pengo.js';
 import { BombJack } from './bombjack.js';
 import { MarioBros } from './mario.js';
 import { MoonPatrol } from './mpatrol.js';
+import { Robotron, Joust } from './williams.js';
 
 const BOARDS = [
   {
@@ -353,6 +354,30 @@ const BOARDS = [
       main: cat(c.m, c.l, c.k, c.j), sound: c.sound, chars: cat(c.c3e, c.c3f), sprites: cat(c.s3m, c.s3n),
       mountains: c.bg3l, hills: c.bg3k, city: c.bg3h,
       charPal: c.charPal, bgPal: c.bgPal, spritePal: c.spritePal, spriteLut: c.spriteLut,
+    }),
+  },
+  {
+    Board: Joust,
+    chips: [
+      ...['a', 'b', 'c'].map((n) => [`top${n}`, 0x1000, [new RegExp(`^joust\\.wg${n}$`)]]),
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`bank${n}`, 0x1000, [new RegExp(`^joust\\.wg${n}$`)]]),
+      ['sound', 0x1000, [/^joust\.snd$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.topa, c.topb, c.topc), sound: c.sound,
+      banked: cat(...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => c[`bank${n}`])),
+    }),
+  },
+  {
+    Board: Robotron,
+    chips: [
+      ...['a', 'b', 'c'].map((n) => [`top${n}`, 0x1000, [new RegExp(`^robotron\\.sb${n}$`)]]),
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`bank${n}`, 0x1000, [new RegExp(`^robotron\\.sb${n}$`)]]),
+      ['sound', 0x1000, [/^robotron\.snd$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.topa, c.topb, c.topc), sound: c.sound,
+      banked: cat(...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => c[`bank${n}`])),
     }),
   },
   {

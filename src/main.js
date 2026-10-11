@@ -30,7 +30,7 @@ const input = new Input();
 const audio = new AudioOut(SOUND_RATE);
 let screen2d = null;
 const touch = new TouchControls({
-  surface: $('surface'), dpad: $('dpad'), ripples: $('ripples'),
+  surface: $('surface'), dpad: $('dpad'), aimPad: $('aimpad'), ripples: $('ripples'),
   buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn')],
 });
 input.sources.push(touch);
@@ -149,7 +149,8 @@ async function loadSet(bytes, name, id) {
   const twoWay = board.controls === 'two-way';
   touch.twoWay = twoWay;
   touch.eightWay = board.controls === 'eight-way';
-  touch.stickOnly = board.buttons === 0;
+  touch.twinStick = !!board.twinStick;
+  touch.stickOnly = board.buttons === 0 && !touch.twinStick;
   touch.twoButtons = board.buttons === 2;
   touch.dial = !!board.dialControl;
   document.body.classList.toggle('two-way', twoWay);
@@ -164,8 +165,12 @@ async function loadSet(bytes, name, id) {
   // The control-zone outlines' labels.
   $('stickZoneTitle').textContent = 'Move';
   $('stickZoneText').textContent = twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
-  $('fireZoneTitle').textContent = touch.dial ? dialTitle : 'Fire';
-  $('fireZoneText').textContent = touch.dial ? 'Hold · drag sideways' : 'Tap';
+  $('fireZoneTitle').textContent = touch.twinStick ? 'Fire' : touch.dial ? dialTitle : 'Fire';
+  $('fireZoneText').textContent = touch.twinStick ? 'Drag to aim' : touch.dial ? 'Hold · drag sideways' : 'Tap';
+  if (touch.twinStick) {
+    $('fireHintTitle').textContent = 'Fire';
+    $('fireHintText').textContent = 'Drag on this side to shoot that way';
+  }
   $('fire2ZoneTitle').textContent = board.button2 || '';
   renderSwitches();
   layout2D();

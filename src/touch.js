@@ -9,6 +9,7 @@
 // Two-button games split it: the upper half of the fire side's zone is the
 // second button (the zones keep mostly clear of the picture; see main.js layoutZones). Dial games
 // (Tron) also turn the dial by the finger's sideways movement while it's down.
+// Twin-stick games (Robotron) make the fire half a second stick that aims.
 
 const UP = 0x10, DOWN = 0x20, LEFT = 0x40, RIGHT = 0x80;
 const MIN_PRESS = 70;     // ms
@@ -19,11 +20,15 @@ const DIAL_PX = 4;        // finger movement (px) per dial count
 const DIR8 = [RIGHT, RIGHT | DOWN, DOWN, DOWN | LEFT, LEFT, LEFT | UP, UP, UP | RIGHT];
 
 export class TouchControls {
-  constructor({ surface, dpad, ripples, buttons = [] }) {
+  constructor({ surface, dpad, aimPad = null, ripples, buttons = [] }) {
     this.surface = surface;
     this.buttons = buttons;   // on-screen buttons the stick and fire must never steal from
     this.dpad = dpad;
     this.knob = dpad.querySelector('.knob');
+    this.aimPad = aimPad;     // the second stick, for twin-stick games
+    this.aimKnob = aimPad && aimPad.querySelector('.knob');
+    this.twinStick = false;   // the fire half is a second stick that aims (Robotron)
+    this.aimJoy = null;       // { id, ox, oy, dir }
     this.ripples = ripples;
     this.leftHanded = false;
     this.eightWay = true;
@@ -56,6 +61,7 @@ export class TouchControls {
 
   // Input source interface (see Input.sources).
   dir() { return this.joy ? this.joy.dir : 0; }
+  aim() { return this.aimJoy ? this.aimJoy.dir : 0; }
   fire() { return this.fireIds.size > 0 || performance.now() < this.fireUntil; }
   fire2() { return this.fire2Ids.size > 0 || performance.now() < this.fire2Until; }
   spin() {
@@ -67,6 +73,7 @@ export class TouchControls {
   setSize(px) {
     this.size = px;
     this.dpad.style.setProperty('--size', `${px}px`);
+    if (this.aimPad) this.aimPad.style.setProperty('--size', `${px}px`);
   }
 
   // The second button's area: given by the layout, else the fire side's top half.
@@ -107,11 +114,9 @@ export class TouchControls {
     try { this.surface.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
     if (this.isJoystickSide(e.clientX)) {
       if (this.joy) return; // one finger drives the stick; extra fingers are ignored
-      this.joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dir: 0 };
-      this.dpad.style.left = `${e.clientX}px`;
-      this.dpad.style.top = `${e.clientY}px`;
-      this.knob.style.transform = 'translate(-50%, -50%)';
-      this.dpad.className = 'show';
+      this.joy = this.grab(e, this.dpad, this.knob);
+    } else if (this.twinStick && this.aimPad) {
+      if (!this.aimJoy) this.aimJoy = this.grab(e, this.aimPad, this.aimKnob);
     } else if (this.twoButtons && this.inFire2(e.clientX, e.clientY)) {
       this.fire2Ids.add(e.pointerId);
       this.fire2Until = performance.now() + MIN_PRESS;
@@ -133,25 +138,43 @@ export class TouchControls {
       this.dialX.set(e.pointerId, e.clientX);
       return;
     }
+    if (this.aimJoy && e.pointerId === this.aimJoy.id) {
+      e.preventDefault();
+      this.steer(this.aimJoy, e, this.aimPad, this.aimKnob, false, true);   // aiming is always 8-way
+      return;
+    }
     const j = this.joy;
     if (!j || e.pointerId !== j.id) return;
     e.preventDefault();
+    this.steer(j, e, this.dpad, this.knob, this.twoWay, this.eightWay);
+  }
+
+  // A stick appears where the finger lands.
+  grab(e, pad, knob) {
+    pad.style.left = `${e.clientX}px`;
+    pad.style.top = `${e.clientY}px`;
+    knob.style.transform = 'translate(-50%, -50%)';
+    pad.className = 'dpad show';
+    return { id: e.pointerId, ox: e.clientX, oy: e.clientY, dir: 0 };
+  }
+
+  steer(j, e, pad, knob, twoWay, eightWay) {
     const dx = e.clientX - j.ox, dy = e.clientY - j.oy;
     const r = this.size / 2;
-    if (this.twoWay) {
+    if (twoWay) {
       // Two-way pad: only the horizontal offset counts, past the dead zone.
       const x = Math.max(-r, Math.min(r, dx));
       j.dir = Math.abs(dx) < r * DEADZONE ? 0 : dx < 0 ? LEFT : RIGHT;
-      this.knob.style.transform = `translate(calc(-50% + ${x}px), -50%)`;
-      this.showDir(j.dir);
+      knob.style.transform = `translate(calc(-50% + ${x}px), -50%)`;
+      this.showDir(j.dir, pad);
       return;
     }
     const dist = Math.hypot(dx, dy);
-    j.dir = dist < r * DEADZONE ? 0 : this.direction(dx, dy);
+    j.dir = dist < r * DEADZONE ? 0 : this.direction(dx, dy, eightWay);
     // Past the rim the direction still follows the finger's angle; the knob pins to the edge.
     const k = Math.min(1, r / dist);
-    this.knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
-    this.showDir(j.dir);
+    knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
+    this.showDir(j.dir, pad);
   }
 
   up(e) {
@@ -164,26 +187,30 @@ export class TouchControls {
     }
     if (this.joy && e.pointerId === this.joy.id) {
       this.joy = null;
-      this.dpad.className = '';
+      this.dpad.className = 'dpad';
+    }
+    if (this.aimJoy && e.pointerId === this.aimJoy.id) {
+      this.aimJoy = null;
+      this.aimPad.className = 'dpad';
     }
     this.fireIds.delete(e.pointerId);
     this.fire2Ids.delete(e.pointerId);
     this.dialX.delete(e.pointerId);
   }
 
-  direction(dx, dy) {
+  direction(dx, dy, eightWay = this.eightWay) {
     const a = Math.atan2(dy, dx);
-    if (this.eightWay) return DIR8[(Math.round(a / (Math.PI / 4)) + 8) % 8];
+    if (eightWay) return DIR8[(Math.round(a / (Math.PI / 4)) + 8) % 8];
     return DIR8[((Math.round(a / (Math.PI / 2)) + 4) % 4) * 2];
   }
 
-  showDir(d) {
-    let c = 'show';
+  showDir(d, pad = this.dpad) {
+    let c = 'dpad show';
     if (d & UP) c += ' up';
     if (d & DOWN) c += ' down';
     if (d & LEFT) c += ' left';
     if (d & RIGHT) c += ' right';
-    if (this.dpad.className !== c) this.dpad.className = c;
+    if (pad.className !== c) pad.className = c;
   }
 
   ripple(x, y) {
@@ -205,6 +232,8 @@ export class TouchControls {
     this.fire2Until = 0;
     this.dialX.clear();
     this.spinAcc = 0;
-    this.dpad.className = '';
+    this.aimJoy = null;
+    this.dpad.className = 'dpad';
+    if (this.aimPad) this.aimPad.className = 'dpad';
   }
 }

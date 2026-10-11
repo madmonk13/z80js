@@ -61,6 +61,8 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Bomb Jack (1984) | Tehkan: Z80, background pictures from a map ROM, 16x16 and 32x32 sprites, palette RAM, sound Z80 with three AY-3-8910s | `bombjack` | **Tested:** boots, self-test, attract mode, coin, start and play |
 | Mario Bros. (1983) | Nintendo: Donkey Kong's design with a scrolling tile layer (the POW bump) and an 8039 driving a DAC | `mario` (MAME 2003 naming; `marioo` in newer MAME) | **Tested:** boots, attract mode, coin, start and play |
 | Moon Patrol (1982) | Irem M52: Z80, three parallax backgrounds from ROM, a scrolling ground strip; sound board with a Motorola 6803, two AY-3-8910s and two MSM5205s | `mpatrol` | **Tested:** boots, attract mode, coin, start and play (jump and fire) |
+| Joust (1982) | Williams: Motorola 6809, a 16-color bitmap drawn by the "special chip" blitter, 6821 PIAs, CMOS settings RAM; sound board with a 6808 and a DAC | `joust` (White/Green label) | **Tested:** boots, self-test, attract mode, coin, start and play |
+| Robotron: 2084 (1982) | Same Williams board, twin joysticks | `robotron` (Solid Blue label) | **Tested:** boots, self-test, attract mode, coin, start and play (move and aimed fire) |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -96,6 +98,9 @@ The touch layout follows the game:
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
   aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
   cabinet's spinner).
+- **Robotron: 2084:** twin sticks. The left half moves; the right half is a second stick
+  that fires in the direction you drag (keyboard: I/J/K/L; gamepad: the right stick).
+- **Joust:** left/right, and fire flaps.
 - **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps. **Moon Patrol:** left/right
   slows and speeds the buggy; the bottom of the right half fires, the top jumps.
 - **Pac-Man, Ms. Pac-Man, Puck Man, Pac-Man Plus, Lady Bug, Frogger:** no fire button, so the whole lower screen is a 4-way joystick.
@@ -213,6 +218,10 @@ right, up, down, fire) then holds a control.
 - `src/emu/mpatrol.js`: Moon Patrol and Irem's sound board; `src/emu/m6803.js` is the
   Motorola 6803 (6800 instructions plus the 6801 additions, internal RAM, ports and
   timer); `src/emu/msm5205.js` the OKI ADPCM decoder.
+- `src/emu/williams.js`: the Williams board (Joust, Robotron): bitmap, blitter, ROM/RAM
+  banking, CMOS, the video-counter interrupts and the 6808 sound board;
+  `src/emu/pia6821.js` is the Motorola 6821 PIA. The 6808 runs on the 6803 core with its
+  on-chip parts switched off.
 - `src/emu/mixer.js`: mixes a board's sound chips into one output.
 - `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga, Dig Dug).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.
@@ -368,6 +377,10 @@ flowchart LR
 - **Mario Bros.' running, skid, ice and coin sounds** were analog circuits (MAME plays
   recordings of them); they're silent here. The music and other effects, from its 8039, play.
 - **Bomb Jack** runs its power-on self test for about 20 seconds before the attract mode.
+- **Joust and Robotron** keep their settings and high scores in battery-backed CMOS RAM,
+  which starts blank in a new session: the game restores its factory settings and waits
+  for the operator's Advance switch, which z80js presses for you. The CMOS is part of the
+  saved game, so it persists with "Resume where I left off".
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware

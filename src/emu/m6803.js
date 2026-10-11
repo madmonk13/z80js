@@ -6,7 +6,7 @@
 //
 // Counts E-clock cycles. The host supplies read(a) / write(a, v) for the
 // external bus and portIn(n) / portOut(n, v) for ports 1 and 2; it raises
-// the IRQ line by setting `irq` (held until the CPU takes it) and pulses NMI
+// the IRQ line by setting `irq` (see holdIrq below) and pulses NMI
 // with nmi().
 
 import { capture, apply } from './state.js';
@@ -39,7 +39,12 @@ export class M6803 {
   saveState() { return capture(this, STATE); }
   loadState(s) { apply(this, STATE, s); }
 
-  constructor({ read, write, portIn = () => 0xFF, portOut = () => {} }) {
+  // internal: false makes it a plain 6800/6808 (no on-chip RAM, ports or
+  // timer). holdIrq: true clears `irq` when the CPU takes it (a held line);
+  // false leaves it to the host (a level, e.g. from a PIA).
+  constructor({ read, write, portIn = () => 0xFF, portOut = () => {}, internal = true, holdIrq = true }) {
+    this.internal = internal;
+    this.holdIrq = holdIrq;
     this.readBus = read;
     this.writeBus = write;
     this.portIn = portIn;
@@ -64,14 +69,18 @@ export class M6803 {
 
   read(a) {
     a &= 0xFFFF;
-    if (a < 0x20) return this.readReg(a);
-    if (a >= 0x80 && a < 0x100) return this.ram[a - 0x80];
+    if (this.internal) {
+      if (a < 0x20) return this.readReg(a);
+      if (a >= 0x80 && a < 0x100) return this.ram[a - 0x80];
+    }
     return this.readBus(a);
   }
   write(a, v) {
     a &= 0xFFFF; v &= 0xFF;
-    if (a < 0x20) { this.writeReg(a, v); return; }
-    if (a >= 0x80 && a < 0x100) { this.ram[a - 0x80] = v; return; }
+    if (this.internal) {
+      if (a < 0x20) { this.writeReg(a, v); return; }
+      if (a >= 0x80 && a < 0x100) { this.ram[a - 0x80] = v; return; }
+    }
     this.writeBus(a, v);
   }
   read16(a) { return (this.read(a) << 8) | this.read((a + 1) & 0xFFFF); }
@@ -195,7 +204,7 @@ export class M6803 {
     while (this.cycles < end) {
       const before = this.cycles;
       this.step();
-      this.clockTimer(this.cycles - before);
+      if (this.internal) this.clockTimer(this.cycles - before);
     }
   }
 
@@ -217,7 +226,7 @@ export class M6803 {
       return;
     }
     if (!(this.cc & I)) {
-      if (this.irq) { this.irq = false; this.interrupt(0xFFF8); this.cycles += 12; return; }   // held until taken
+      if (this.irq) { if (this.holdIrq) this.irq = false; this.interrupt(0xFFF8); this.cycles += 12; return; }
       if ((this.tcsr & 0x48) === 0x48) { this.interrupt(0xFFF4); this.cycles += 12; return; }   // output compare
       if ((this.tcsr & 0x24) === 0x24) { this.interrupt(0xFFF2); this.cycles += 12; return; }   // overflow
     }
