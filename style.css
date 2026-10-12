@@ -4,8 +4,9 @@
   --line: rgba(255, 255, 255, 0.09);
   --text: #e6e8ef;
   --dim: #8a90a3;
-  --accent: #ff8a2a;
-  --accent-ink: #1a0d02;
+  --accent: #2448c4;          /* the app icon's color */
+  --accent-ink: #fff;
+  --accent-text: #7c9bff;     /* lighter, for text on the dark background */
   --radius: 12px;
   --bar-h: 52px;
   --safe-t: env(safe-area-inset-top, 0px);
@@ -80,7 +81,7 @@ body.lefty .zone + .zone { border-left: 0; border-right: 1px dashed rgba(255, 25
   display: block;
   font: 800 13px/1 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 6px;
 }
 .zone .hint span { font-size: 13px; color: var(--dim); }
@@ -172,7 +173,7 @@ body.two-way #dpad .knob, .dpad.dial .knob { height: 76%; }
   position: absolute; left: 50%; top: 50%;
   width: 38%; height: 38%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffb070, var(--accent) 60%, #c95f10);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 55%, white), var(--accent) 60%, color-mix(in srgb, var(--accent) 70%, black));
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   transform: translate(-50%, -50%);
 }
@@ -279,7 +280,7 @@ button.pill.held { background: var(--accent); color: var(--accent-ink); }
   background: linear-gradient(var(--bg) 80%, transparent);
 }
 .sheet h1 { margin: 0; font: 800 20px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.04em; }
-.sheet h1 span { color: var(--accent); }
+.sheet h1 span { color: var(--accent-text); }
 .sheet section { padding: 14px 0; border-top: 1px solid var(--line); }
 .sheet h2 {
   margin: 0 0 10px;
@@ -317,8 +318,8 @@ button.wide { width: 100%; }
 }
 .cart-play b { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .cart-play small { color: var(--dim); font-size: 12px; }
-.cart-item.playing .cart-play { border-color: var(--accent); background: rgba(255, 138, 42, 0.12); }
-.cart-item.playing .cart-play small { color: var(--accent); font-weight: 600; }
+.cart-item.playing .cart-play { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.cart-item.playing .cart-play small { color: var(--accent-text); font-weight: 600; }
 .cart-item.missing .cart-play { opacity: 0.45; border-style: dashed; }
 .cart-remove {
   flex: none; min-width: 44px;
