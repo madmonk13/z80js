@@ -67,6 +67,21 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Splat! (1982) | Same Williams board, the second-generation blitter, twin sticks | `splat` | **Tested:** boots, attract mode, coin, start and play |
 | Stargate (1981) | Williams board without the blitter | `stargate` | **Tested:** boots, attract mode, coin, start and play |
 | Defender (1980) | The earlier Williams board: RAM to BFFF, an I/O page banked with ROM at C000 | `defender` (Red label) | **Tested:** boots, attract mode, coin, start and play |
+| Sinistar (1982) | Williams board on its side, blitter clipping window, 49-position stick, HC-55516 CVSD speech | `sinistar` (revision 3) | **Tested:** boots, attract mode, coin, start and play, speech |
+| Zaxxon (1982) | Sega: Z80, a ROM-map background sheared into the isometric view, 32x32 sprites, text layer; analog sound effects (synthesized here) | `zaxxon` (set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Ghosts'n Goblins (1985) | Capcom: Motorola 6809, scrolling 16x16 background split by priority, 4-bit sprites, text layer; sound Z80 with two YM2203s | `gng` (World set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Asteroids (1979) | Atari: 6502, Digital Vector Generator on a black-and-white vector monitor; analog sound effects (synthesized here) | `asteroid` (rev 2) | **Tested:** boots, attract mode, coin, start and play |
+| Tempest (1981) | Atari: 6502, color Analog Vector Generator, math box, two POKEYs (sound and the spinner) | `tempest` (rev 3) | **Tested:** boots, attract mode, coin, start and play |
+| Battlezone (1980) | Atari: 6502, Analog Vector Generator with the red/green overlay, math box, POKEY; analog sound (synthesized here) | `bzone` (rev 2) | **Tested:** boots, attract mode, coin, start and play |
+| Star Wars (1983) | Atari: two 6809s, color Analog Vector Generator, matrix processor, four POKEYs and TMS5220 speech; analog yoke | `starwars` (rev 1) | **Tested:** boots, attract mode, coin, start and play, speech |
+| Tail Gunner (1979) | Cinematronics: the Cinematronics CPU drawing on a vector monitor; analog stick; sound synthesized here | `tailg` | **Tested:** boots, attract mode, coin, start and play |
+| New Rally-X (1981) | Namco: the Rally-X board with new code and graphics | `nrallyx` | **Tested:** boots, attract mode, coin, start and play |
+| Dig Dug II (1985) | Namco: the Mappy board with a 56xx I/O chip | `digdug2` (new version) | **Tested:** boots, attract mode, coin, start and play |
+| Motos (1985) | Namco: the Mappy board with two 56xx I/O chips | `motos` | **Tested:** boots, attract mode, coin, start and play |
+| The Tower of Druaga (1984) | Namco: the Mappy board with a 56xx I/O chip, 64 sprite colors | `todruaga` (new version) | **Tested:** boots, attract mode, coin, start and play |
+| Do! Run Run (1984) | Universal: the Mr. Do's Castle board, horizontal, memory rearranged | `dorunrun` (set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Mr. Do's Wild Ride (1984) | Universal: the Do! Run Run board | `dowild` | **Tested:** boots, attract mode, coin, start and play |
+| Domino Man (1982) | Bally Midway MCR2: the Satan's Hollow / Tron board | `domino` | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -97,6 +112,10 @@ The touch layout follows the game:
 - **Time Pilot:** the left half is an 8-way joystick, the right half is fire.
 - **Mr. Do!, Tapper:** the left half is a 4-way joystick, the right half is fire (Mr. Do!'s
   power ball, Tapper's pour/serve).
+- **Dig Dug II:** a 4-way stick; the bottom of the right half pumps, the top drills.
+- **Motos:** an 8-way stick; the bottom of the right half pushes, the top jumps.
+- **The Tower of Druaga**, **Do! Run Run**, **Mr. Do's Wild Ride:** a 4-way stick and one button.
+- **Domino Man:** an 8-way stick; the button sets down a domino.
 - **Satan's Hollow:** the left half is a left/right pad; on the right half, the bottom
   fires and the top raises the shield.
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
@@ -108,6 +127,19 @@ The touch layout follows the game:
   left/right means "fly that way" (z80js presses Reverse when the ship faces the other way,
   reading which way it faces from the game's RAM, then Thrust). The bottom of the right half
   fires, the top drops a smart bomb; H is hyperspace and V inviso (gamepad triggers).
+- **Sinistar:** an 8-way stick (the cabinet's 49-position stick at its extremes); the bottom
+  of the right half fires, the top throws a Sinibomb.
+- **Zaxxon:** an 8-way stick, as the cabinet's flight stick (pull back to climb), and fire.
+- **Ghosts'n Goblins:** an 8-way stick; the bottom of the right half throws, the top jumps.
+- **Asteroids:** left/right rotate; the bottom of the right half fires, the top thrusts.
+  Hyperspace is H on a keyboard or a gamepad trigger (not yet on touch).
+- **Tempest:** drag left/right on the left half to turn the spinner (a stick or Q/E also
+  turns it); the bottom of the right half fires, the top is the Superzapper.
+- **Battlezone:** one stick drives both treads: up/down move, left/right turn on the spot,
+  diagonals turn with one tread. Tap the right half to fire.
+- **Star Wars** and **Tail Gunner:** the stick is analog: on touch, how far the finger is
+  from where it landed sets the yoke (up aims up); a gamepad's left stick works the same.
+  Arrow keys steer it too, springing back to center. Tail Gunner's second button is the shield.
 - **Joust:** left/right, and fire flaps. **Bubbles:** an 8-way stick only.
 - **Bomb Jack:** 8-way stick, fire jumps. **Mario Bros.:** left/right, fire jumps. **Moon Patrol:** left/right
   slows and speeds the buggy; the bottom of the right half fires, the top jumps.
@@ -133,7 +165,8 @@ The touch layout follows the game:
 - **Two-button games:** the second button is the upper half of the fire side's zone, Fire
   the lower half. In portrait the picture is a little smaller to leave room for both.
 - **Pause** (the ⏸ button in the top bar, or P on a keyboard): stops the game and its sound; tap
-  the screen or the button again to resume. The game is saved for resume when paused.
+  the screen or the button again to resume. The game is saved for resume when paused, and
+  after a reload the game comes back paused, so play starts when you're ready.
 
 ## Settings (⚙) and Games
 
@@ -162,7 +195,8 @@ Headless check (boots a set and saves the screen as a PNG):
 node tools/run-board.mjs path/to/set.zip 1500 out/frame.png
 ```
 
-`COIN=600 START=700` in the environment drops a coin and starts a game; `HOLD=left` (or
+`node tools/state-check.mjs [set ...]` checks that saved games restore exactly;
+`node tools/sound-check.mjs path/to/set.zip` prints sound levels. `COIN=600 START=700` in the environment drops a coin and starts a game; `HOLD=left` (or
 right, up, down, fire) then holds a control.
 
 ## Layout
@@ -230,6 +264,17 @@ right, up, down, fire) then holds a control.
   banking, CMOS, the video-counter interrupts and the 6808 sound board;
   `src/emu/pia6821.js` is the Motorola 6821 PIA. The 6808 runs on the 6803 core with its
   on-chip parts switched off.
+- `src/emu/hc55516.js`: the Harris HC-55516 CVSD speech decoder (Sinistar).
+- `src/emu/zaxxon.js`: Zaxxon. `src/emu/gng.js`: Ghosts'n Goblins; `src/emu/ym2203.js` is the
+  Yamaha YM2203 (three 4-operator FM channels plus the SSG, on the AY-3-8910 core).
+- `src/emu/asteroids.js`: Asteroids; `src/emu/dvg.js` is Atari's Digital Vector Generator.
+- `src/emu/tempest.js`: Tempest. `src/emu/bzone.js`: Battlezone. `src/emu/avg.js` is Atari's
+  Analog Vector Generator (per instruction), `src/emu/mathbox.js` the math box for both.
+- `src/emu/starwars.js`: Star Wars (including the matrix processor, which runs the
+  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip.
+- `src/emu/tailg.js`: Tail Gunner; `src/emu/ccpu.js` is the Cinematronics CPU.
+  `src/render/vector.js` draws vector games' display lists at the screen's own resolution,
+  with a soft phosphor glow.
 - `src/emu/mixer.js`: mixes a board's sound chips into one output.
 - `src/emu/wsg.js`: Namco's 3-voice waveform sound generator (Pac-Man, Galaga, Dig Dug).
 - `src/emu/video.js`: graphics decoding, PROM palettes and rotation for vertical monitors.
@@ -389,6 +434,20 @@ flowchart LR
   which starts blank in a new session: the game restores its factory settings and waits
   for the operator's Advance switch, which z80js presses for you. The CMOS is part of the
   saved game, so it persists with "Resume where I left off".
+- **Zaxxon's sound** effects were analog circuits that MAME plays from recordings (not part of
+  the ROM set); z80js synthesizes rough stand-ins for the engine, missiles, laser, explosions
+  and alarms.
+- **Ghosts'n Goblins' FM sound** is modeled from the YM2203's documented behavior (operators,
+  algorithms, feedback, envelopes) rather than reproduced bit for bit, so instruments sound
+  close but not identical; detune isn't applied.
+- **Vector generators** are modeled per instruction: the real state-machine PROMs aren't in
+  the ROM sets. Monitor effects (beam overshoot, Star Wars' flash when hit) aren't drawn.
+- **Battlezone's** engine, shells and explosions and **Tail Gunner's** sounds were analog
+  boards (MAME plays recordings that aren't in the sets); z80js synthesizes stand-ins.
+- **Star Wars' speech** follows the TMS5220's documented synthesis (frames, interpolation,
+  lattice filter), so the film's voices are recognizable but not bit-exact.
+- **Asteroids' sound** came from analog circuits; z80js synthesizes stand-ins for the
+  heartbeat, saucers, shots, thrust, explosions and extra-life tone.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware

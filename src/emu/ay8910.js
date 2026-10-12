@@ -10,7 +10,9 @@
 //   8-10  amplitude A, B, C (4 bits; bit 4 = use the envelope)
 //   11-12 envelope period (16 bits), 13 envelope shape
 //   14-15 I/O ports A, B
-// Tones and noise step at clock/16, the envelope at clock/256.
+// The chip counts at clock/8: a tone's output flips every TP counts (so
+// fT = clock / 16TP), the noise register shifts every 2NP counts, and the
+// envelope steps every 2EP counts (a 16-step cycle lasts 256EP clocks).
 //
 // Output goes into a ring buffer at RATE: the board calls sample() 48,000
 // times a second.
@@ -90,20 +92,19 @@ export class AY8910 {
 
   tonePeriod(ch) { return (this.regs[ch * 2] | (this.regs[ch * 2 + 1] << 8)) || 1; }
 
-  // Advance one clock/16 tick.
+  // Advance one clock/8 count.
   tick() {
     for (let ch = 0; ch < 3; ch++) {
       if (++this.toneCount[ch] >= this.tonePeriod(ch)) { this.toneCount[ch] = 0; this.toneOut[ch] ^= 1; }
     }
-    // Noise steps at half the tone rate (its period counts clock/16 ticks, twice).
+    // Noise steps at half the tone rate.
     if (++this.noiseCount >= (this.regs[6] || 1) * 2) {
       this.noiseCount = 0;
       const bit = (this.noise ^ (this.noise >> 3)) & 1;
       this.noise = (this.noise >> 1) | (bit << 16);
     }
-    // The envelope steps every 16 ticks (clock/256) times its period.
     const envPeriod = (this.regs[11] | (this.regs[12] << 8)) || 1;
-    if (++this.envCount >= envPeriod * 16) {
+    if (++this.envCount >= envPeriod * 2) {
       this.envCount = 0;
       if (!this.envHold) {
         if (this.envStep > 0) this.envStep--;
@@ -117,7 +118,7 @@ export class AY8910 {
   envLevel() { return (this.envStep ^ this.envAttack) & 0x0F; }
 
   sample() {
-    this.acc += this.clock / 16 / RATE;
+    this.acc += this.clock / 8 / RATE;
     let a = 0, b = 0, c = 0, n = 0;
     while (this.acc >= 1) {
       this.acc -= 1;

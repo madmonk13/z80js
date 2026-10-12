@@ -31,8 +31,10 @@ export class DoCastle {
 
   // roms: { main 32K, sub 16K, chars 16K, sprites 32K, palette 256 }
   constructor(roms) {
-    this.width = NATIVE_H;
-    this.height = NATIVE_W;
+    this.vertical = this.constructor.vertical !== false;
+    this.width = this.vertical ? NATIVE_H : NATIVE_W;
+    this.height = this.vertical ? NATIVE_W : NATIVE_H;
+    this.frontPens = 8;                        // tile pens drawn over the sprites
     this.refresh = 60;
     this.controls = 'four-way';
     this.buttons = 1;
@@ -195,15 +197,17 @@ export class DoCastle {
       }
     }
 
-    // Tile pixels with the top pen bit go in front.
+    // Tile pixels with the top pen bit go in front (in Do! Run Run, those without it).
+    const front = this.frontPens;
     for (let y = 0; y < NATIVE_H; y++) {
       for (let x = 0; x < NATIVE_W; x++) {
         const [pen, color] = tile(x, y);
-        if (pen & 8) out[y * NATIVE_W + x] = pal[color * 8 + (pen & 7)];
+        if ((pen & 8) === front) out[y * NATIVE_W + x] = pal[color * 8 + (pen & 7)];
       }
     }
 
-    rotate270(out, NATIVE_W, NATIVE_H, this.frame);
+    if (this.vertical) rotate270(out, NATIVE_W, NATIVE_H, this.frame);
+    else this.frame.set(out);
   }
 }
 
@@ -214,3 +218,63 @@ DoCastle.switches = [
   { id: 'difficulty', label: 'Difficulty', options: [['1', 0x03], ['2', 0x02], ['3', 0x01], ['4', 0x00]], default: 0x03 },
   { id: 'extra', label: 'EXTRA', options: [['Easy', 0x10], ['Hard', 0x00]], default: 0x10 },
 ];
+
+// Do! Run Run (1984): the same board turned horizontal, with the memory
+// rearranged (program at 0000-1FFF and 4000-9FFF, work RAM at 2000, the
+// sprites at 3800; the second CPU's sound chips at A000 and its mailbox at
+// E000) and the tiles' front pens the other way round.
+export class DoRunRun extends DoCastle {
+  constructor(roms) { super(roms); this.frontPens = 0; }
+
+  read(a) {
+    if (a < 0x2000 || (a >= 0x4000 && a < 0xA000)) return this.roms.main[a];
+    if (a < 0x3800) return this.ram[a - 0x2000];
+    if (a < 0x3A00) return this.sprites[a - 0x3800];
+    if (a >= 0xA000 && a <= 0xA008) return this.toMain[a - 0xA000];
+    if (a >= 0xB000 && a < 0xB800) return this.vram[a & 0x7FF];
+    return 0xFF;
+  }
+
+  write(a, v) {
+    if (a >= 0x2000 && a < 0x3800) this.ram[a - 0x2000] = v;
+    else if (a >= 0x3800 && a < 0x3A00) this.sprites[a - 0x3800] = v;
+    else if (a >= 0xA000 && a <= 0xA008) {
+      this.toSub[a - 0xA000] = v;
+      if (a === 0xA008) this.waiting = true;
+    } else if (a >= 0xB000 && a < 0xB800) this.vram[a & 0x7FF] = v;
+    else if (a === 0xB800) this.sub.nmi();
+  }
+
+  subRead(a) {
+    if (a >= 0xE000 && a <= 0xE008) return this.toSub[a - 0xE000];
+    if (a >= 0xA000 && a < 0xB000) return 0xFF;
+    return super.subRead(a);
+  }
+
+  subWrite(a, v) {
+    if (a >= 0x8000 && a < 0x8800) this.subRam[a - 0x8000] = v;
+    else if (a >= 0xE000 && a <= 0xE008) {
+      this.toMain[a - 0xE000] = v;
+      if (a === 0xE008) this.waiting = false;
+    } else if (a >= 0xA000 && a < 0xB000 && (a & 0x3FF) === 0) this.sn[(a >> 10) & 3].write(v);
+  }
+
+  // Difficulty, demo sounds, no flip, EXTRA difficulty, upright, special given, lives.
+  applySwitches(v) { this.dsw = v.difficulty | 0x04 | 0x08 | v.extra | 0x40 | v.lives; }
+}
+DoRunRun.vertical = false;
+DoRunRun.id = 'dorunrun';
+DoRunRun.title = 'Do! Run Run';
+DoRunRun.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x80], ['5', 0x00]], default: 0x80 },
+  { id: 'difficulty', label: 'Difficulty', options: [['1', 0x03], ['2', 0x02], ['3', 0x01], ['4', 0x00]], default: 0x03 },
+  { id: 'extra', label: 'EXTRA', options: [['Easy', 0x10], ['Hard', 0x00]], default: 0x10 },
+];
+
+// Mr. Do's Wild Ride (1984): the Do! Run Run board. Its switch 2 is a rack
+// test (kept off) where Do! Run Run has demo sounds.
+export class DoWildRide extends DoRunRun {}
+DoWildRide.vertical = false;
+DoWildRide.id = 'dowild';
+DoWildRide.title = "Mr. Do's Wild Ride";
+DoWildRide.switches = DoRunRun.switches;

@@ -27,24 +27,31 @@ import { Scramble, Amidar, SuperCobra } from './scramble.js';
 import { DigDug } from './digdug.js';
 import { TimePilot, Pooyan } from './timeplt.js';
 import { MrDo } from './mrdo.js';
-import { SatansHollow, Tron, Tapper, Kick } from './mcr.js';
+import { SatansHollow, Tron, Tapper, Kick, DominoMan } from './mcr.js';
 import { Bosconian, Xevious, SuperXevious } from './bosco.js';
 import { Berzerk, Frenzy } from './berzerk.js';
-import { RallyX } from './rallyx.js';
+import { RallyX, NewRallyX } from './rallyx.js';
 import { WarpWarp } from './warpwarp.js';
-import { Mappy } from './mappy.js';
+import { Mappy, DigDug2, Motos, Druaga } from './mappy.js';
 import { Centipede } from './centiped.js';
 import { Phoenix } from './phoenix.js';
 import { SpaceInvaders } from './invaders.js';
 import { LadyBug } from './ladybug.js';
 import { C1942 } from './c1942.js';
-import { DoCastle } from './docastle.js';
+import { DoCastle, DoRunRun, DoWildRide } from './docastle.js';
 import { Popeye } from './popeye.js';
 import { Pengo } from './pengo.js';
 import { BombJack } from './bombjack.js';
 import { MarioBros } from './mario.js';
 import { MoonPatrol } from './mpatrol.js';
-import { Robotron, Joust, Bubbles, Splat, Stargate, Defender } from './williams.js';
+import { Zaxxon } from './zaxxon.js';
+import { GhostsNGoblins } from './gng.js';
+import { Asteroids } from './asteroids.js';
+import { Tempest } from './tempest.js';
+import { Battlezone } from './bzone.js';
+import { StarWars } from './starwars.js';
+import { TailGunner } from './tailg.js';
+import { Robotron, Joust, Bubbles, Splat, Stargate, Defender, Sinistar } from './williams.js';
 
 const BOARDS = [
   {
@@ -247,6 +254,41 @@ const BOARDS = [
     }),
   },
   {
+    Board: DoRunRun,
+    chips: [
+      ['p1', 0x2000, [/^2764\.p1$/]],
+      ['l1', 0x2000, [/^2764\.l1$/]],
+      ['k1', 0x2000, [/^2764\.k1$/]],
+      ['n1', 0x2000, [/^2764\.n1$/]],
+      ['sub', 0x4000, [/^27128\.p7$/]],
+      ['chars', 0x4000, [/^27128\.a3$/]],
+      ['m4', 0x2000, [/^2764\.m4$/]],
+      ['l4', 0x2000, [/^2764\.l4$/]],
+      ['j4', 0x2000, [/^2764\.j4$/]],
+      ['h4', 0x2000, [/^2764\.h4$/]],
+      ['palette', 0x100, [/^dorunrun\.clr$/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0xA000);         // 0000-1FFF and 4000-9FFF
+      main.set(c.p1, 0); main.set(c.l1, 0x4000); main.set(c.k1, 0x6000); main.set(c.n1, 0x8000);
+      return { main, sub: c.sub, chars: c.chars, sprites: cat(c.m4, c.l4, c.j4, c.h4), palette: c.palette };
+    },
+  },
+  {
+    Board: DoWildRide,
+    chips: [
+      ...['w1', 'w3', 'w4', 'w2', 'w6', 'w7', 'w8', 'w9'].map((n) => [n, 0x2000, [new RegExp(`^${n}$`)]]),
+      ['sub', 0x4000, [/^w10$/]],
+      ['chars', 0x4000, [/^w5$/]],
+      ['palette', 0x100, [/^dowild\.clr$/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0xA000);         // 0000-1FFF and 4000-9FFF
+      main.set(c.w1, 0); main.set(c.w3, 0x4000); main.set(c.w4, 0x6000); main.set(c.w2, 0x8000);
+      return { main, sub: c.sub, chars: c.chars, sprites: cat(c.w6, c.w7, c.w8, c.w9), palette: c.palette };
+    },
+  },
+  {
     Board: Popeye,
     chips: [
       ['a', 0x2000, [/^c-7a$/]],
@@ -426,6 +468,58 @@ const BOARDS = [
       const banked = new Uint8Array(0x9000).fill(0xFF);
       [[9, 0], [12, 0x800], [8, 0x1000], [11, 0x1800], [7, 0x2000], [10, 0x2800], [6, 0x6000]].forEach(([n, o]) => banked.set(c[`d${n}`], o));
       return { main: cat(c.d1, c.d4, c.d2, c.d3), sound: cat(c.sound, c.sound), banked };
+    },
+  },
+  {
+    Board: Sinistar,
+    chips: [
+      ['top10', 0x1000, [/^sinistar\.10$/]],
+      ['top11', 0x1000, [/^sinistar\.11$/]],
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`bank${n}`, 0x1000, [new RegExp(`^sinistar\\.0${n}$`)]]),
+      ['ic7', 0x1000, [/^speech\.ic7$/]],
+      ['ic5', 0x1000, [/^speech\.ic5$/]],
+      ['ic6', 0x1000, [/^speech\.ic6$/]],
+      ['ic4', 0x1000, [/^speech\.ic4$/]],
+      ['snd', 0x1000, [/^sinistar\.snd$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(new Uint8Array(0x1000), c.top10, c.top11),
+      banked: cat(...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => c[`bank${n}`])),
+      sound: cat(c.ic7, c.ic5, c.ic6, c.ic4, c.snd),          // B000-FFFF
+    }),
+  },
+  {
+    Board: Zaxxon,
+    chips: [
+      ...[[3, 0x2000], [2, 0x2000], [1, 0x1000], [14, 0x800], [15, 0x800], [6, 0x2000], [5, 0x2000], [4, 0x2000],
+        [11, 0x2000], [12, 0x2000], [13, 0x2000], [8, 0x2000], [7, 0x2000], [10, 0x2000], [9, 0x2000]]
+        .map(([n, size]) => [`z${n}`, size, [new RegExp(`^zaxxon\\.${n}$`), new RegExp(`^zaxxon${n}\\.u`)]]),
+      ['palette', 0x100, [/^zaxxon\.u98$/]],
+      ['colors', 0x100, [/^zaxxon\.u72$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.z3, c.z2, c.z1), chars: cat(c.z14, c.z15), tiles: cat(c.z6, c.z5, c.z4),
+      sprites: cat(c.z11, c.z12, c.z13), map: cat(c.z8, c.z7, c.z10, c.z9), palette: c.palette, colors: c.colors,
+    }),
+  },
+  {
+    Board: GhostsNGoblins,
+    chips: [
+      ['gg4', 0x4000, [/^gg4\.bin$/]],
+      ['gg3', 0x8000, [/^gg3\.bin$/]],
+      ['gg5', 0x8000, [/^gg5\.bin$/]],
+      ['sound', 0x8000, [/^gg2\.bin$/]],
+      ['chars', 0x4000, [/^gg1\.bin$/]],
+      ...[11, 10, 9, 8, 7, 6, 17, 16, 15, 14, 13, 12].map((n) => [`gg${n}`, 0x4000, [new RegExp(`^gg${n}\\.bin$`)]]),
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x18000);
+      main.set(c.gg4, 0x4000); main.set(c.gg3, 0x8000); main.set(c.gg5, 0x10000);
+      const ff = new Uint8Array(0x4000).fill(0xFF);
+      return {
+        main, sound: c.sound, chars: c.chars, tiles: cat(c.gg11, c.gg10, c.gg9, c.gg8, c.gg7, c.gg6),
+        sprites: cat(c.gg17, c.gg16, c.gg15, ff, c.gg14, c.gg13, c.gg12, ff),
+      };
     },
   },
   {
@@ -822,6 +916,21 @@ const BOARDS = [
     assemble: (c) => ({ main: cat(c.main0, c.main1, c.main2, c.main3), gfx: c.gfx, dots: c.dots, palette: c.palette, lut: c.lut, wave: c.wave }),
   },
   {
+    Board: NewRallyX,
+    chips: [
+      ['main0', 0x1000, [/^nrallyx\.1b$/, /^nrx_prg1\.1d$/]],
+      ['main1', 0x1000, [/^nrallyx\.1e$/]],
+      ['main2', 0x1000, [/^nrallyx\.1h$/]],
+      ['main3', 0x1000, [/^nrallyx\.1k$/]],
+      ['gfx', 0x1000, [/^nrallyx\.8e$/]],
+      ['dots', 0x100, [/^im5623\.8m$/, /^rx1-6\.8m$/]],
+      ['palette', 0x20, [/^nrallyx\.pr1$/, /^nrx1-1\.11n$/]],
+      ['lut', 0x100, [/^nrallyx\.pr2$/, /^nrx1-7\.8p$/]],
+      ['wave', 0x100, [/^nrallyx\.spr$/, /^rx1-5\.3p$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.main0, c.main1, c.main2, c.main3), gfx: c.gfx, dots: c.dots, palette: c.palette, lut: c.lut, wave: c.wave }),
+  },
+  {
     Board: WarpWarp,
     chips: [
       ['r0', 0x1000, [/^g-n9601n\.2r$/, /^g-09601\.2r$/]],
@@ -849,6 +958,63 @@ const BOARDS = [
     ],
     assemble: (c) => ({
       main: cat(c.m3, c.m2, c.m1), sub: c.sub, chars: c.chars, sprites: cat(c.s0, c.s1),
+      palette: c.palette, charLut: c.charLut, spriteLut: c.spriteLut, wave: c.wave,
+    }),
+  },
+  {
+    Board: DigDug2,
+    chips: [
+      ['m3', 0x4000, [/^d23_3\.1d$/]],
+      ['m1', 0x4000, [/^d23_1\.1b$/]],
+      ['sub', 0x2000, [/^d21_4\.1k$/]],
+      ['chars', 0x1000, [/^d21_5\.3b$/]],
+      ['s0', null, [/^d21_6\.3m$/]],
+      ['s1', null, [/^d21_7\.3n$/]],
+      ['palette', 0x20, [/^d21-5\.5b$/]],
+      ['charLut', 0x100, [/^d21-6\.4c$/]],
+      ['spriteLut', 0x100, [/^d21-7\.5k$/]],
+      ['wave', 0x100, [/^d21-3\.3m$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.m3, c.m1), sub: c.sub, chars: c.chars, sprites: cat(c.s0, c.s1),
+      palette: c.palette, charLut: c.charLut, spriteLut: c.spriteLut, wave: c.wave,
+    }),
+  },
+  {
+    Board: Motos,
+    chips: [
+      ['m3', 0x4000, [/^mo1_3\.1d$/]],
+      ['m1', 0x4000, [/^mo1_1\.1b$/]],
+      ['sub', 0x2000, [/^mo1_4\.1k$/]],
+      ['chars', 0x1000, [/^mo1_5\.3b$/]],
+      ['s0', null, [/^mo1_6\.3m$/]],
+      ['s1', null, [/^mo1_7\.3n$/]],
+      ['palette', 0x20, [/^mo1-5\.5b$/]],
+      ['charLut', 0x100, [/^mo1-6\.4c$/]],
+      ['spriteLut', 0x100, [/^mo1-7\.5k$/]],
+      ['wave', 0x100, [/^mo1-3\.3m$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.m3, c.m1), sub: c.sub, chars: c.chars, sprites: cat(c.s0, c.s1),
+      palette: c.palette, charLut: c.charLut, spriteLut: c.spriteLut, wave: c.wave,
+    }),
+  },
+  {
+    Board: Druaga,
+    chips: [
+      ['m3', 0x4000, [/^td2_3\.1d$/]],
+      ['m1', 0x4000, [/^td2_1\.1b$/]],
+      ['sub', 0x2000, [/^td1_4\.1k$/]],
+      ['chars', 0x1000, [/^td1_5\.3b$/]],
+      ['s0', null, [/^td1_6\.3m$/]],
+      ['s1', null, [/^td1_7\.3n$/]],
+      ['palette', 0x20, [/^td1-5\.5b$/]],
+      ['charLut', 0x100, [/^td1-6\.4c$/]],
+      ['spriteLut', 0x400, [/^td1-7\.5k$/]],
+      ['wave', 0x100, [/^td1-3\.3m$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.m3, c.m1), sub: c.sub, chars: c.chars, sprites: cat(c.s0, c.s1),
       palette: c.palette, charLut: c.charLut, spriteLut: c.spriteLut, wave: c.wave,
     }),
   },
@@ -954,6 +1120,21 @@ const BOARDS = [
     }),
   },
   {
+    Board: DominoMan,
+    chips: [
+      ...[0, 1, 2, 3].map((n) => [`main${n}`, 0x2000, [new RegExp(`^dmanpg${n}\\.bin$`)]]),
+      ...[7, 8, 9, 10].map((n) => [`sound${n}`, 0x1000, [new RegExp(`^dm-a${n}\\.snd$`)]]),
+      ['bg0', 0x2000, [/^dmanbg0\.bin$/]],
+      ['bg1', 0x2000, [/^dmanbg1\.bin$/]],
+      ...[0, 1, 2, 3].map((n) => [`fg${n}`, 0x2000, [new RegExp(`^dmanfg${n}\\.bin$`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound7, c.sound8, c.sound9, c.sound10),
+      bg: cat(c.bg0, c.bg1), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3), prom: c.prom,
+    }),
+  },
+  {
     Board: Tapper,
     chips: [
       ['main0', 0x4000, [/^tappg0/]],
@@ -975,7 +1156,59 @@ const BOARDS = [
       bg: cat(c.bg1, c.bg0), fg: cat(c.fg1, c.fg0, c.fg3, c.fg2, c.fg5, c.fg4, c.fg7, c.fg6), prom: c.prom,
     }),
   },
+  {
+    Board: Asteroids,
+    chips: [
+      ['p0', 0x800, [/^035145\.02$/]],
+      ['p1', 0x800, [/^035144\.02$/]],
+      ['p2', 0x800, [/^035143\.02$/]],
+      ['vector', 0x800, [/^035127\.02$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2), vector: c.vector }),
+  },
+  {
+    Board: Tempest,
+    chips: [
+      ...['113', '114', '115', '316', '217', '118', '119', '120', '121', '222', '123', '124']
+        .map((n) => [`t${n}`, 0x800, [new RegExp(`^136002[.-]${n}`)]]),
+    ],
+    assemble: (c) => ({
+      main: cat(...['113', '114', '115', '316', '217', '118', '119', '120', '121', '222'].map((n) => c[`t${n}`])),
+      vector: cat(c.t123, c.t124),
+    }),
+  },
+  {
+    Board: Battlezone,
+    chips: ['414', '413', '412', '411', '410', '409', '422', '421']
+      .map((n) => [`b${n}`, 0x800, [new RegExp(`^036${n}[.-]01`)]]),
+    assemble: (c) => ({
+      main: cat(...['414', '413', '412', '411', '410', '409'].map((n) => c[`b${n}`])),
+      vector: cat(c.b422, c.b421),
+    }),
+  },
+  {
+    Board: StarWars,
+    chips: [['105', 0x1000], ['214', 0x4000], ['102', 0x2000], ['203', 0x2000], ['104', 0x2000], ['206', 0x2000],
+      ['107', 0x2000], ['208', 0x2000], ['110', 0x400], ['111', 0x400], ['112', 0x400], ['113', 0x400]]
+      .map(([n, size]) => [`s${n}`, size, [new RegExp(`^136021[.-]${n}`)]]),
+    assemble: (c) => ({
+      main: cat(c.s102, c.s203, c.s104, c.s206), banked: c.s214, vector: c.s105,
+      sound: cat(c.s107, c.s208), prom: cat(c.s110, c.s111, c.s112, c.s113),
+    }),
+  },
+  {
+    Board: TailGunner,
+    chips: ['t70', 'p70', 't71', 'p71'].map((n) => [n, 0x800, [new RegExp(`^tgunner\\.${n}$`)]]),
+    // Each 4K bank: the T ROM on even bytes, the P ROM on odd.
+    assemble: (c) => ({ main: cat(interleave(c.t70, c.p70), interleave(c.t71, c.p71)) }),
+  },
 ];
+
+function interleave(even, odd) {
+  const out = new Uint8Array(even.length * 2);
+  for (let i = 0; i < even.length; i++) { out[i * 2] = even[i]; out[i * 2 + 1] = odd[i]; }
+  return out;
+}
 
 function swap01(rom) {
   return rom.map((v) => (v & 0xFC) | ((v & 1) << 1) | ((v >> 1) & 1));
@@ -995,7 +1228,7 @@ export function identify(files) {
   for (const { Board, chips, assemble } of BOARDS) {
     const found = {};
     for (const [role, size, patterns] of chips) {
-      const name = names.find((n) => files[n].length === size && patterns.some((p) => p.test(n)));
+      const name = names.find((n) => (size === null || files[n].length === size) && patterns.some((p) => p.test(n)));
       if (!name) break;
       found[role] = files[name];
     }

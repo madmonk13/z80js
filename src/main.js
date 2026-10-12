@@ -2,6 +2,7 @@ import { identify, SUPPORTED, ROM_FILES } from './emu/boards.js';
 import { extractAll } from './unzip.js';
 import { encode, decode } from './emu/state.js';
 import { Screen2D } from './render/screen2d.js';
+import { ScreenVector } from './render/vector.js';
 import { Input } from './input.js';
 import { AudioOut } from './audio-out.js';
 import { store, readRomFile, withLoading, toast } from './shared.js';
@@ -142,9 +143,12 @@ async function loadSet(bytes, name, id) {
   board.applySwitches(switchValues(Board));
   board.reset();
   audio.setSource(board.sound);
-  if (!screen2d || screen2d.canvas.width !== board.width || screen2d.canvas.height !== board.height) {
+  // Raster boards draw native pixels; vector boards a display list at screen resolution.
+  if (board.vector) screen2d = new ScreenVector($('screen2d'), board.width, board.height);
+  else if (!screen2d || screen2d.kind === 'vector' || screen2d.canvas.width !== board.width || screen2d.canvas.height !== board.height) {
     screen2d = new Screen2D($('screen2d'), board.width, board.height);
   }
+  document.body.classList.toggle('vector', !!board.vector);
   // Two-way games (left/right only) get the narrow pad; the rest a 4- or 8-way d-pad.
   const twoWay = board.controls === 'two-way';
   touch.twoWay = twoWay;
@@ -153,6 +157,7 @@ async function loadSet(bytes, name, id) {
   touch.stickOnly = board.buttons === 0 && !touch.twinStick;
   touch.twoButtons = board.buttons === 2;
   touch.dial = !!board.dialControl;
+  touch.stickDial = !!board.spinner;
   document.body.classList.toggle('two-way', twoWay);
   document.body.classList.toggle('stick-only', touch.stickOnly);
   document.body.classList.toggle('two-buttons', touch.twoButtons);
@@ -164,7 +169,7 @@ async function loadSet(bytes, name, id) {
     : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
   // The control-zone outlines' labels.
   $('stickZoneTitle').textContent = 'Move';
-  $('stickZoneText').textContent = twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
+  $('stickZoneText').textContent = board.spinner ? 'Spinner · drag' : board.analogStick ? 'Analog stick' : twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
   $('fireZoneTitle').textContent = touch.twinStick ? 'Fire' : touch.dial ? dialTitle : 'Fire';
   $('fireZoneText').textContent = touch.twinStick ? 'Drag to aim' : touch.dial ? 'Hold · drag sideways' : 'Tap';
   if (touch.twinStick) {
@@ -256,7 +261,6 @@ function closeMenu() {
 // the veil over the game, or P on a keyboard. The game is saved for resume.
 function setPaused(paused) {
   state.paused = paused;
-  store.set('paused', paused);           // kept across reloads
   document.body.classList.toggle('paused', paused);
   $('paused').hidden = !paused;
   $('pauseBtn').setAttribute('aria-pressed', String(paused));
@@ -434,6 +438,7 @@ function layout2D() {
   const top = portrait ? barH + 4 : st + (availH - h) / 2;
   c.style.width = `${w}px`;
   c.style.height = `${h}px`;
+  if (screen2d && screen2d.resize) screen2d.resize(w, h);
   c.style.left = `${sl + pad + (availW - w) / 2}px`;
   c.style.top = `${top}px`;
   const left = sl + pad + (availW - w) / 2;
@@ -514,7 +519,7 @@ function tick(now) {
     }
     if (ran === 4) acc = 0;
     audio.flush();
-    if (ran) screen2d.draw(board.frame);
+    if (ran) screen2d.draw(board.frame, board);
     if (now - lastSave > RESUME_EVERY_MS) { lastSave = now; saveResume(); }
   } else {
     acc = 0;
@@ -542,7 +547,13 @@ function tick(now) {
     $('loading').classList.remove('show');
   }
   if (!board) openSheet('cartsMenu');   // first run: ask for a ROM set
-  else if (store.get('paused')) setPaused(true);   // it was paused when the page closed
+  else {
+    // A reload resumes paused, so play starts when the player is ready; one
+    // frame shows where the game was left.
+    setPaused(true);
+    board.runFrame();
+    screen2d.draw(board.frame, board);
+  }
   layout2D();
   flashHints(0);
   requestAnimationFrame(tick);

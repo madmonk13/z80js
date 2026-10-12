@@ -29,7 +29,22 @@ for (let i = 0; i < frames; i++) {
 const ms = performance.now() - t0;
 console.log(`${Board.title}: ${frames} frames, ${(ms / frames).toFixed(2)} ms/frame, sound buffered ${board.sound.available()} samples`);
 
-const S = 2, W = board.width * S, H = board.height * S;
+// Vector boards: rasterize the display list into a frame buffer.
+if (board.vector) {
+  board.frame = new Uint32Array(board.width * board.height);
+  const d = board.vectors.data;
+  for (let i = 0; i < board.vectors.count; i++) {
+    const o = i * 7, [x0, y0, x1, y1] = [d[o], d[o + 1], d[o + 2], d[o + 3]];
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+    const c = 0xFF000000 | (Math.round(d[o + 6] * 255) << 16) | (Math.round(d[o + 5] * 255) << 8) | Math.round(d[o + 4] * 255);
+    for (let k = 0; k <= n; k++) {
+      const x = Math.round(x0 + ((x1 - x0) * k) / n), y = Math.round(y0 + ((y1 - y0) * k) / n);
+      if (x >= 0 && y >= 0 && x < board.width && y < board.height) board.frame[y * board.width + x] = c;
+    }
+    if (n === 1 && x0 === x1 && y0 === y1) { const x = Math.round(x0), y = Math.round(y0); if (x >= 0 && y >= 0 && x < board.width && y < board.height) board.frame[y * board.width + x] = c; }
+  }
+}
+const S = board.vector ? 1 : 2, W = board.width * S, H = board.height * S;
 const raw = Buffer.alloc((W * 3 + 1) * H);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   const p = board.frame[((y / S) | 0) * board.width + ((x / S) | 0)], o = y * (W * 3 + 1) + 1 + x * 3;

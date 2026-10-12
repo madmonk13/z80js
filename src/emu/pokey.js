@@ -5,7 +5,8 @@
 //
 // Registers (write): 0/2/4/6 AUDF1-4 divider, 1/3/5/7 AUDC1-4 (bits 7-5
 // distortion, bit 4 volume-only, bits 3-0 volume), 8 AUDCTL, 9 STIMER, F SKCTL.
-// Read: A RANDOM (the 17- or 9-bit polynomial counter), others idle.
+// Read: A RANDOM (the 17- or 9-bit polynomial counter), 0-7 POT, 8 ALLPOT
+// (from readPots, when the board wires switches to the pot lines), others idle.
 //
 // AUDCTL: 01 15 kHz base clock (else 64 kHz), 02/04 high-pass channel 2/1
 // (by 4/3), 08 join 3+4, 10 join 1+2, 20 channel 3 at the full clock,
@@ -35,6 +36,8 @@ export class Pokey {
     this.gain = gain;
     this.buffer = new Float32Array(1 << 15);
     this.rate = RATE;
+    this.readPots = null;     // optional () -> ALLPOT byte (a set bit: that pot finished counting, i.e. its switch is closed to the line)
+    this.level = 0;           // the latest sample before filtering, for mixing several chips
     this.reset();
   }
   saveState() { return capture(this, STATE); }
@@ -63,6 +66,8 @@ export class Pokey {
       for (let i = 0; i < 8; i++) v |= p[(this.clock + i) % p.length] << i;
       return v;
     }
+    if ((r & 15) === 8 && this.readPots) return this.readPots();      // ALLPOT
+    if ((r & 15) < 8 && this.readPots) return (this.readPots() >> (r & 7)) & 1 ? 0 : 228;   // POT0-7 (a high line reads as a finished count)
     return 0xFF;
   }
 
@@ -121,6 +126,7 @@ export class Pokey {
       s += bit * vol;
     }
     s = (s / 60) * this.gain;
+    this.level = s;
     const out = s - this.dcIn + 0.995 * this.dcOut;
     this.dcIn = s; this.dcOut = out;
     const mask = this.buffer.length - 1;
@@ -143,4 +149,13 @@ export class Pokey {
     }
     this.frac = pos; this.last = last;
   }
+}
+
+// A POKEY as one voice of a SoundMix (several POKEYs on one board).
+export class PokeyVoice {
+  constructor(pokey) { this.pokey = pokey; this.out = 0; }
+  reset() { this.pokey.reset(); }
+  saveState() { return this.pokey.saveState(); }
+  loadState(s) { this.pokey.loadState(s); }
+  sample() { this.pokey.sample(); this.out = this.pokey.level; }
 }

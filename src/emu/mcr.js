@@ -442,3 +442,25 @@ Kick.title = 'Kick';
 Kick.switches = [
   { id: 'music', label: 'Music', options: [['On', 0x00], ['Off', 0x01]], default: 0x00 },
 ];
+
+export class DominoMan extends MCR {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 1;
+  }
+  // IP0: coin, starts, drop a domino. IP1: left, right, up, down.
+  setInputs(s) {
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0) | (s.fire ? 0x10 : 0));
+    this.ip[1] = 0xFF & ~((s.left ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.up ? 0x04 : 0) | (s.down ? 0x08 : 0));
+  }
+  // Music, skin color, upright, two coin meters.
+  applySwitches(v) { this.ip[3] = 0x3C | v.music | v.skin; }
+}
+DominoMan.config = { board: 90010, clock: 19968000 / 8, romEnd: 0x8000, rotate: false };
+DominoMan.id = 'domino';
+DominoMan.title = 'Domino Man';
+DominoMan.switches = [
+  { id: 'music', label: 'Music', options: [['On', 0x00], ['Off', 0x01]], default: 0x00 },
+  { id: 'skin', label: 'Skin color', options: [['Light', 0x02], ['Dark', 0x00]], default: 0x02 },
+];

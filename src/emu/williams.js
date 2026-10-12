@@ -18,7 +18,8 @@ import { M6809 } from './m6809.js';
 import { M6803 } from './m6803.js';
 import { PIA6821 } from './pia6821.js';
 import { SoundMix } from './mixer.js';
-import { rgba } from './video.js';
+import { rgba, rotate270 } from './video.js';
+import { HC55516 } from './hc55516.js';
 import { capture, apply } from './state.js';
 
 const W = 292, H = 240, LEFT = 6, TOP = 7;
@@ -97,6 +98,7 @@ export class Williams {
       // Sound board: DAC out, command in.
       new PIA6821({
         outA: (v) => { this.dac.value = v; }, inB: () => this.command,
+        ca2: (v) => { if (this.speech) this.speech.digit(v); }, cb2: (v) => { if (this.speech) this.speech.clock(v); },
         irqA: (on) => line(2, on), irqB: (on) => line(3, on),
       }),
     ];
@@ -174,6 +176,8 @@ export class Williams {
     }
     let pix = pix0 & mask;
     pix |= (flags & 0x10 ? solid : src) & ~mask;
+    // Sinistar's clipping window keeps the blitter below 7400 when enabled.
+    if (this.clipWindow && dest >= 0x7400 && dest < 0xC000) return;
     this.write(dest, pix & 0xFF);
   }
 
@@ -230,7 +234,7 @@ export class Williams {
   soundRead(a) {
     if (a < 0x100) return this.soundRam[a];
     if ((a & 0x7FFC) === 0x0400) return this.pia[2].read(a & 3);
-    if (a >= 0xB000) return this.roms.sound[a & 0xFFF];
+    if (a >= 0xB000) return this.roms.sound.length > 0x1000 ? this.roms.sound[a - 0xB000] ?? 0xFF : this.roms.sound[a & 0xFFF];
     return 0xFF;
   }
   soundWrite(a, v) {
@@ -263,6 +267,7 @@ export class Williams {
       // objects just behind the beam, so a whole-frame snapshot catches some
       // of them half-drawn.
       if (line >= TOP && line < TOP + H) this.renderLine(line - TOP);
+      if (line === LINES - 1 && this.native) rotate270(this.native, W, H, this.frame);
       this.sampleCarry += SAMPLES_PER_LINE;
       while (this.sampleCarry >= 1) {
         this.sampleCarry -= 1;
@@ -278,7 +283,7 @@ export class Williams {
   // ---------------------------------------------------------------- video
 
   renderLine(y) {
-    const out = this.frame, vram = this.vram, pal = this.palette, sy = y + TOP;
+    const out = this.native || this.frame, vram = this.vram, pal = this.palette, sy = y + TOP;
     let o = y * W;
     for (let x = 0; x < W; x++) {
       const sx = x + LEFT, byte = vram[(sx >> 1) * 256 + sy];
@@ -447,3 +452,46 @@ export class Defender extends DefenderControls(Williams) {
 Defender.id = 'defender';
 Defender.title = 'Defender';
 Defender.switches = [];
+
+// ---------------------------------------------------------------- Sinistar
+
+// Sinistar: the same board on its side, with a clipping window for the
+// blitter (C900 bit 2), RAM in the D000 slot, a 49-position joystick (7
+// positions per axis), and the HC-55516 speech chip on the sound board's
+// PIA ("Beware, I live!").
+const AXIS7 = [0x0, 0x4, 0x6, 0x7, 0xB, 0x9, 0x8];   // full, 2/3, 1/3, center, 1/3, 2/3, full
+export class Sinistar extends Williams {
+  constructor(roms) {
+    super(roms);
+    this.width = H; this.height = W;
+    this.native = new Uint32Array(W * H);
+    this.frame = new Uint32Array(W * H);
+    this.controls = 'eight-way';
+    this.buttons = 2;
+    this.button2 = 'Sinibomb';
+    this.dRam = new Uint8Array(0x1000);
+    this.speech = new HC55516(1.2);
+    this.sound = new SoundMix([this.dac, this.speech], 0.5);
+    this.clipWindow = 0;
+  }
+  reset() { super.reset(); if (this.dRam) this.dRam.fill(0); this.clipWindow = 0; if (this.speech) this.speech.reset(); }
+  saveState() { return { ...super.saveState(), dRam: this.dRam.slice(), clip: this.clipWindow }; }
+  loadState(s) { super.loadState(s); this.dRam.set(s.dRam); this.clipWindow = s.clip; }
+
+  read(a) { return a >= 0xD000 && a < 0xE000 ? this.dRam[a - 0xD000] : super.read(a); }
+  write(a, v) {
+    if (a >= 0xD000 && a < 0xE000) { this.dRam[a - 0xD000] = v; return; }
+    if (a >= 0xC900 && a < 0xCA00) this.clipWindow = v & 4;
+    super.write(a, v);
+  }
+  // PIA 0 A: the stick, 4 bits per axis (X high). B: fire, sinibomb, starts.
+  setInputs(s) {
+    const x = s.left ? 0 : s.right ? 6 : 3, y = s.down ? 0 : s.up ? 6 : 3;   // the Y axis reads up as high
+    this.in0 = (AXIS7[x] << 4) | AXIS7[y];
+    this.in1 = (s.fire ? 0x01 : 0) | (s.fire2 ? 0x02 : 0) | (s.start1 ? 0x10 : 0) | (s.start2 ? 0x20 : 0);
+    this.in2 = s.coin ? 0x10 : 0;
+  }
+}
+Sinistar.id = 'sinistar';
+Sinistar.title = 'Sinistar';
+Sinistar.switches = [];

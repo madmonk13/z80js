@@ -8,7 +8,8 @@
 // MIN_PRESS so a quick tap is never shorter than a frame the game polls.
 // Two-button games split it: the upper half of the fire side's zone is the
 // second button (the zones keep mostly clear of the picture; see main.js layoutZones). Dial games
-// (Tron) also turn the dial by the finger's sideways movement while it's down.
+// (Tron) also turn the dial by the finger's sideways movement while it's down;
+// spinner games (Tempest) turn it from the stick half instead.
 // Twin-stick games (Robotron) make the fire half a second stick that aims.
 
 const UP = 0x10, DOWN = 0x20, LEFT = 0x40, RIGHT = 0x80;
@@ -36,6 +37,7 @@ export class TouchControls {
     this.stickOnly = false;   // no fire button (e.g. Pac-Man): the whole surface is the stick
     this.twoButtons = false;  // top of the fire half is a second button (e.g. Satan's Hollow's shield)
     this.dial = false;        // dragging on the fire half turns a dial (Tron)
+    this.stickDial = false;   // the stick half is a spinner: sideways drags turn the dial (Tempest)
     this.fire2Area = null;    // { left, right, top, bottom } in client px, set by the page layout
     this.size = 140;
     this.haptics = true;
@@ -62,6 +64,8 @@ export class TouchControls {
   // Input source interface (see Input.sources).
   dir() { return this.joy ? this.joy.dir : 0; }
   aim() { return this.aimJoy ? this.aimJoy.dir : 0; }
+  // The stick's offset as a position (-1..1 at the rim), for analog games.
+  analog() { return this.joy ? { x: this.joy.ax || 0, y: this.joy.ay || 0 } : null; }
   fire() { return this.fireIds.size > 0 || performance.now() < this.fireUntil; }
   fire2() { return this.fire2Ids.size > 0 || performance.now() < this.fire2Until; }
   spin() {
@@ -113,6 +117,7 @@ export class TouchControls {
     if (this.onTouch) this.onTouch(e);
     try { this.surface.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
     if (this.isJoystickSide(e.clientX)) {
+      if (this.stickDial) { this.dialX.set(e.pointerId, e.clientX); this.ripple(e.clientX, e.clientY); return; }
       if (this.joy) return; // one finger drives the stick; extra fingers are ignored
       this.joy = this.grab(e, this.dpad, this.knob);
     } else if (this.twinStick && this.aimPad) {
@@ -171,6 +176,8 @@ export class TouchControls {
     }
     const dist = Math.hypot(dx, dy);
     j.dir = dist < r * DEADZONE ? 0 : this.direction(dx, dy, eightWay);
+    const m = Math.min(1, r / Math.max(dist, 1e-6));
+    j.ax = (dx * m) / r; j.ay = (dy * m) / r;
     // Past the rim the direction still follows the finger's angle; the knob pins to the edge.
     const k = Math.min(1, r / dist);
     knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;

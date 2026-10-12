@@ -108,8 +108,8 @@ export class RallyX {
     this.in1 = 0xFF & ~(s.start2 ? 0x40 : 0);
   }
 
-  // 1 coin 1 credit, cars and difficulty, bonus, service switch off.
-  applySwitches(v) { this.dsw = 0xC0 | v.cars | v.bonus | 0x01; }
+  // 1 coin 1 credit, cars and difficulty, bonus. Bit 0 stays low: high silences the game.
+  applySwitches(v) { this.dsw = 0xC0 | v.cars | v.bonus; }
 
   // ---------------------------------------------------------------- frame
 
@@ -189,3 +189,9 @@ RallyX.switches = [
   { id: 'cars', label: 'Cars', options: [['3, easy', 0x08], ['3, medium', 0x20], ['3, hard', 0x38], ['2, easy', 0x00], ['2, medium', 0x18], ['1, medium', 0x10]], default: 0x08 },
   { id: 'bonus', label: 'Bonus', options: [['Low', 0x02], ['Medium', 0x04], ['High', 0x06], ['None', 0x00]], default: 0x02 },
 ];
+
+// New Rally-X (1981): the same board with reworked game code, graphics and colors.
+export class NewRallyX extends RallyX {}
+NewRallyX.id = 'nrallyx';
+NewRallyX.title = 'New Rally-X';
+NewRallyX.switches = RallyX.switches;

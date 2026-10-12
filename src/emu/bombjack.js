@@ -175,8 +175,8 @@ export class BombJack {
       }
     }
 
-    // Sprites, last to first: size/code, flips/color, y, x.
-    for (let offs = 0x185C; offs >= 0x1820; offs -= 4) {
+    // 24 sprites at 9820-987F, last to first: size/code, flips/color, y, x.
+    for (let offs = 0x187C; offs >= 0x1820; offs -= 4) {
       const b0 = ram[offs], b1 = ram[offs + 1], big = b0 & 0x80, size = big ? 32 : 16;
       const pix = big ? this.bigPix : this.spritePix, src = (b0 & 0x7F) * size * size, color = (b1 & 15) * 8;
       const flipX = b1 & 0x40, flipY = b1 & 0x80;

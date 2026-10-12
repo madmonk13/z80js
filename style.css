@@ -43,6 +43,8 @@ html, body {
   box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0, 0, 0, 0.55);
   background: #000;
 }
+/* Vector games draw at the screen's own resolution: smooth scaling. */
+body.vector #screen2d { image-rendering: auto; }
 
 /* ---------------------------------------------------------------- touch */
 

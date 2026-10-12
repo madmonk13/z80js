@@ -83,6 +83,7 @@ export class Mappy {
     this.controls = 'two-way';
     this.buttons = 1;                            // open/close doors
     this.roms = roms;
+    this.romBase = 0x10000 - roms.main.length;   // Mappy A000-FFFF; the later games 8000-FFFF
     this.vram = new Uint8Array(0x1000);
     this.ram = new Uint8Array(0x1800);          // 1000-27FF, sprites inside
     this.shared = new Uint8Array(0x400);
@@ -102,6 +103,7 @@ export class Mappy {
     this.palette = promPalette(roms.palette, 32);
     this.charLut = Uint8Array.from(roms.charLut, (v) => (v & 15) + 16);
     this.spriteLut = Uint8Array.from(roms.spriteLut, (v) => v & 15);
+    this.spriteColors = roms.spriteLut.length / 16 - 1;   // 16 color sets (64 in Druaga)
     this.native = new Uint32Array(W * H);
     this.frame = new Uint32Array(W * H);
     this.front = new Uint8Array(W * H);
@@ -129,7 +131,7 @@ export class Mappy {
     if (a < 0x2800) return this.ram[a - 0x1000];
     if (a >= 0x4000 && a < 0x4400) return this.shared[a & 0x3FF];
     if (a >= 0x4800 && a < 0x4C00) return 0xF0 | this.ioRam[a & 0x1F];
-    if (a >= 0xA000) return this.roms.main[a - 0xA000];
+    if (a >= this.romBase) return this.roms.main[a - this.romBase];
     return 0xFF;
   }
 
@@ -177,13 +179,14 @@ export class Mappy {
   }
 
   runIo(chip) {
+    if (this.constructor.ioChips[chip] === '56xx') { this.run56xx(chip); return; }
     const ram = this.ioRam, base = chip * 16, io = this.io[chip];
     const rd = (n) => ram[base + n] & 15, wr = (n, v) => { ram[base + n] = v & 15; };
     let p = this.ports(chip);
     switch (rd(8)) {
       case 1: for (let i = 0; i < 4; i++) wr(4 + i, ~p[i]); break;                   // read switches
       case 2: io.coinsPerCred = [rd(9), rd(11)]; io.credsPerCoin = [rd(10), rd(12)]; break;   // coinage
-      case 3: this.handleCoins(chip, p); break;                                         // coins, credits and controls
+      case 3: this.handleCoins(chip, p, 2); break;                                      // coins, credits and controls
       case 4:                                                                            // switches, both mux halves
         io.mux = 0; p = this.ports(chip);
         for (let i = 0; i < 4; i++) wr(i * 2, ~p[i]);
@@ -197,9 +200,38 @@ export class Mappy {
     }
   }
 
-  // Mode 3: count coins into BCD credits (start buttons spend them), and
-  // report the controls with "pressed" and "just pressed" bits for buttons.
-  handleCoins(chip, p) {
+  // The 56xx (Super Pac-Man era): its own command numbers, and the coin
+  // report with the credit and coin-count nibbles swapped from the 58xx's.
+  run56xx(chip) {
+    const ram = this.ioRam, base = chip * 16, io = this.io[chip];
+    const rd = (n) => ram[base + n] & 15, wr = (n, v) => { ram[base + n] = v & 15; };
+    let p = this.ports(chip);
+    switch (rd(8)) {
+      case 1:                                                                            // read switches; nibble 9 drives the mux
+        for (let i = 0; i < 4; i++) wr(i, ~p[i]);
+        if (chip === 1) io.mux = rd(9) & 1;
+        break;
+      case 2: io.coinsPerCred = [rd(9), rd(11)]; io.credsPerCoin = [rd(10), rd(12)]; break;
+      case 4: this.handleCoins(chip, p, 0); break;
+      case 8: {                                                                          // power-on check: the sum of nibbles 9-15
+        let sum = 0;
+        for (let i = 9; i < 16; i++) sum += rd(i);
+        wr(0, sum >> 4); wr(1, sum);
+        break;
+      }
+      case 9:                                                                            // switches, both mux halves
+        io.mux = 0; p = this.ports(chip);
+        for (let i = 0; i < 4; i++) wr(i * 2, ~p[i]);
+        io.mux = 1; p = this.ports(chip);
+        for (let i = 0; i < 4; i++) wr(i * 2 + 1, ~p[i]);
+        break;
+    }
+  }
+
+  // Count coins into BCD credits (start buttons spend them), and report the
+  // controls with "pressed" and "just pressed" bits for buttons. `swap` moves
+  // the first four nibbles (credits, then coins added and credits spent).
+  handleCoins(chip, p, swap) {
     const ram = this.ioRam, base = chip * 16, io = this.io[chip];
     const wr = (n, v) => { ram[base + n] = v & 15; };
     let val = ~p[0] & 15, toggled = val ^ io.lastCoins, add = 0, sub = 0;
@@ -219,7 +251,7 @@ export class Mappy {
       else if (val & toggled & 8) { if (io.credits >= 2) sub = 2; }
     }
     io.credits += add - sub;
-    wr(2, io.credits / 10 | 0); wr(3, io.credits % 10); wr(0, add); wr(1, sub);
+    wr(0 ^ swap, io.credits / 10 | 0); wr(1 ^ swap, io.credits % 10); wr(2 ^ swap, add); wr(3 ^ swap, sub);
     wr(4, ~p[1]);
     wr(5, ((val & 5) << 1) | (val & toggled & 5));
     wr(6, ~p[2]);
@@ -283,7 +315,7 @@ export class Mappy {
       if (ram[r3 + offs + 1] & 2) continue;
       const flags = ram[r3 + offs];
       const flipX = flags & 1, flipY = (flags >> 1) & 1, sizeX = (flags >> 2) & 1, sizeY = (flags >> 3) & 1;
-      const code = ram[r1 + offs] & ~sizeX & ~(sizeY << 1), color = (ram[r1 + offs + 1] & 15) * 16;
+      const code = ram[r1 + offs] & ~sizeX & ~(sizeY << 1), color = (ram[r1 + offs + 1] & this.spriteColors) * 16;
       const sx = ram[r2 + offs + 1] + 0x100 * (ram[r3 + offs + 1] & 1) - 40;
       const sy = ((256 - ram[r2 + offs] + 1 - 16 * sizeY) & 0xFF) - 32;
       for (let ty = 0; ty <= sizeY; ty++) for (let tx = 0; tx <= sizeX; tx++) {
@@ -303,13 +335,14 @@ export class Mappy {
       for (let x = 0; x < 16; x++) {
         const px = sx + x;
         if (px < 0 || px >= W) continue;
-        const v = this.spriteLut[(color + this.spritePix[src + (flipX ? 15 - x : x)]) & 0xFF];
+        const v = this.spriteLut[color + this.spritePix[src + (flipX ? 15 - x : x)]];
         if (v !== 15 && !this.front[py * W + px]) out[py * W + px] = this.palette[v];
       }
     }
   }
 }
 
+Mappy.ioChips = ['58xx', '58xx'];
 Mappy.id = 'mappy';
 Mappy.title = 'Mappy';
 Mappy.switches = [
@@ -317,3 +350,46 @@ Mappy.switches = [
   { id: 'difficulty', label: 'Difficulty', options: [['A (easiest)', 0x07], ['B', 0x06], ['C', 0x05], ['D', 0x04]], default: 0x07 },
   { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x20], ['Off', 0x00]], default: 0x20 },
 ];
+
+// The later games on the board: 32K of program at 8000, a 58xx or 56xx for
+// the controls and a 56xx for the switches. IN0 is a full stick (up, right,
+// down, left); the second button, where there is one, is on the switch
+// chip's port (DSW0 bit 0). All their switches default to off (high).
+class MappyLater extends Mappy {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'four-way';
+    this.buttons = 1;
+  }
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.up ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.down ? 0x04 : 0) | (s.left ? 0x08 : 0));
+    this.in1 = 0xFF & ~((s.fire ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0) | (s.coin ? 0x10 : 0));
+    this.dsw0 = 0x0F & ~(this.buttons > 1 && s.fire2 ? 0x01 : 0);
+  }
+  applySwitches(v) { this.dsw0 = 0x0F; this.dsw1 = 0xFF & ~this.constructor.livesMask | v.lives; this.dsw2 = 0xFF; }
+}
+
+export class DigDug2 extends MappyLater {
+  constructor(roms) { super(roms); this.buttons = 2; this.button2 = 'Drill'; }
+}
+DigDug2.ioChips = ['58xx', '56xx'];
+DigDug2.livesMask = 0x02;
+DigDug2.id = 'digdug2';
+DigDug2.title = 'Dig Dug II';
+DigDug2.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0x02], ['5', 0x00]], default: 0x02 }];
+
+export class Motos extends MappyLater {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; this.buttons = 2; this.button2 = 'Jump'; }
+}
+Motos.ioChips = ['56xx', '56xx'];
+Motos.livesMask = 0x08;
+Motos.id = 'motos';
+Motos.title = 'Motos';
+Motos.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0x08], ['5', 0x00]], default: 0x08 }];
+
+export class Druaga extends MappyLater {}
+Druaga.ioChips = ['58xx', '56xx'];
+Druaga.livesMask = 0x03;
+Druaga.id = 'todruaga';
+Druaga.title = 'The Tower of Druaga';
+Druaga.switches = [{ id: 'lives', label: 'Lives', options: [['1', 0x01], ['2', 0x02], ['3', 0x03], ['5', 0x00]], default: 0x03 }];

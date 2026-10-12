@@ -4,3 +4,5 @@ out/
 # ROM sets are copyrighted: never commit them.
 *.zip
 roms/
+# Audio samples recorded for listening checks.
+*-sample.wav

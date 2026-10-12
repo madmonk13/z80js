@@ -32,7 +32,7 @@ export class Input {
     // Extra sources (touch controls): objects with dir() -> 0x10 up / 0x20 down
     // / 0x40 left / 0x80 right bits, fire() and fire2() -> bool, spin() ->
     // dial counts turned since the last call, and optionally aim() -> the
-    // second stick's direction bits.
+    // second stick's direction bits and analog() -> { x, y } (-1..1) or null.
     this.sources = [];
     window.addEventListener('keydown', (e) => {
       if (!GAME_KEYS.has(e.code) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -61,6 +61,7 @@ export class Input {
     let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = any(START2);
     const aim = { up: any(AIM_UP), down: any(AIM_DOWN), left: any(AIM_LEFT), right: any(AIM_RIGHT) };
     let hyper = any(HYPER), inviso = any(INVISO);
+    let analog = null;          // { x, y } in -1..1 when a source has a real stick position
 
     for (const src of this.sources) {
       const d = src.dir();
@@ -73,6 +74,8 @@ export class Input {
       spin += src.spin();
       const a = src.aim ? src.aim() : 0;
       aim.up ||= !!(a & 0x10); aim.down ||= !!(a & 0x20); aim.left ||= !!(a & 0x40); aim.right ||= !!(a & 0x80);
+      const an = src.analog ? src.analog() : null;
+      if (an) analog = an;
     }
 
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -83,6 +86,7 @@ export class Input {
       const pl = ax < -0.5 || b(14), pr = ax > 0.5 || b(15), pu = ay < -0.5 || b(12), pd = ay > 0.5 || b(13);
       const pf = b(0) || b(2), pf2 = b(1) || b(3);
       left ||= pl; right ||= pr; up ||= pu; down ||= pd; fire ||= pf; fire2 ||= pf2;
+      if (!analog && Math.hypot(ax, ay) > 0.15) analog = { x: ax, y: ay };
       // The right stick aims in twin-stick games.
       const rx = pad.axes[2] || 0, ry = pad.axes[3] || 0;
       aim.left ||= rx < -0.5; aim.right ||= rx > 0.5; aim.up ||= ry < -0.5; aim.down ||= ry > 0.5;
@@ -95,6 +99,6 @@ export class Input {
       break;                      // one player
     }
 
-    return { left, right, up, down, fire, fire2, spin, coin, start1, start2, aim, hyper, inviso };
+    return { left, right, up, down, fire, fire2, spin, coin, start1, start2, aim, hyper, inviso, analog };
   }
 }
