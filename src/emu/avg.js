@@ -39,7 +39,8 @@ export class AVG {
   }
 
   // Run the list from the start; returns segments as [x0, y0, x1, y1, color,
-  // brightness 0-255] (color: a palette index for the board to look up).
+  // brightness 0-255] (color: a palette index for the board to look up;
+  // brightness after the monitor's response, see brightness()).
   run() {
     const out = [], stack = [0, 0, 0, 0], v = this.variant;
     let pc = 0, sp = 0, x = 0, y = 0, linear = 0, bin = 0, color = 0, statInt = 0;
@@ -51,7 +52,7 @@ export class AVG {
       let b;
       if (v === 'starwars') b = (z * statInt) >> 3;
       else b = (z === 1 ? statInt : z & 6) << 4;
-      if (b) this.segment(out, clip, x, y, nx, ny, color, Math.min(255, b));
+      if (b) this.segment(out, clip, x, y, nx, ny, color, AVG.brightness(Math.min(255, b)));
       x = nx; y = ny;
     };
     for (let steps = 0; steps < 30000; steps++) {
@@ -111,4 +112,8 @@ export class AVG {
     }
     out.push(x0, y0, x1, y1, color, b);
   }
+
+  // A vector monitor's phosphor isn't linear: middling beam levels (where the
+  // games draw most lines) look far brighter than their share of full scale.
+  static brightness(level) { return Math.min(255, Math.sqrt(level / 255) * 1.25 * 255); }
 }

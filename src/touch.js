@@ -7,15 +7,15 @@
 // Fire half: every touch presses fire. Each press is held for at least
 // MIN_PRESS so a quick tap is never shorter than a frame the game polls.
 // Two-button games split it: the upper half of the fire side's zone is the
-// second button (the zones keep mostly clear of the picture; see main.js layoutZones). Dial games
-// (Tron) also turn the dial by the finger's sideways movement while it's down;
-// spinner games (Tempest) turn it from the stick half instead.
+// second button (the zones keep mostly clear of the picture; see main.js layoutZones).
+// Dial games turn their dial with a left/right pad, like 6502js's paddles: how
+// far the finger is pushed sets how fast it turns. Tron's and Kick's pad is
+// on the fire half (holding it also fires); Tempest's spinner is the stick half.
 // Twin-stick games (Robotron) make the fire half a second stick that aims.
 
 const UP = 0x10, DOWN = 0x20, LEFT = 0x40, RIGHT = 0x80;
 const MIN_PRESS = 70;     // ms
 const DEADZONE = 0.22;    // fraction of the d-pad radius
-const DIAL_PX = 4;        // finger movement (px) per dial count
 
 // Sector index (0 = right, counting clockwise in screen space) → SWCHA bits.
 const DIR8 = [RIGHT, RIGHT | DOWN, DOWN, DOWN | LEFT, LEFT, LEFT | UP, UP, UP | RIGHT];
@@ -36,8 +36,9 @@ export class TouchControls {
     this.twoWay = false;      // left/right only (e.g. Galaga's fighter)
     this.stickOnly = false;   // no fire button (e.g. Pac-Man): the whole surface is the stick
     this.twoButtons = false;  // top of the fire half is a second button (e.g. Satan's Hollow's shield)
-    this.dial = false;        // dragging on the fire half turns a dial (Tron)
-    this.stickDial = false;   // the stick half is a spinner: sideways drags turn the dial (Tempest)
+    this.dial = false;        // the fire half is also a dial pad (Tron, Kick)
+    this.stickDial = false;   // the stick half is a dial pad (Tempest's spinner)
+    this.dialSpeed = 4;       // dial counts per frame with the pad pushed to its rim
     this.fire2Area = null;    // { left, right, top, bottom } in client px, set by the page layout
     this.size = 140;
     this.haptics = true;
@@ -49,8 +50,7 @@ export class TouchControls {
     this.fireUntil = 0;
     this.fire2Ids = new Set();
     this.fire2Until = 0;
-    this.dialX = new Map();   // pointerId → last x, for dial touches
-    this.spinAcc = 0;
+    this.spinAcc = 0;         // fractional dial counts carried between frames
     this.forwarded = new Map(); // pointerId → button it was handed to
 
     surface.addEventListener('pointerdown', (e) => this.down(e));
@@ -62,15 +62,19 @@ export class TouchControls {
   }
 
   // Input source interface (see Input.sources).
-  dir() { return this.joy ? this.joy.dir : 0; }
-  aim() { return this.aimJoy ? this.aimJoy.dir : 0; }
+  dir() { return this.joy && !this.joy.dial ? this.joy.dir : 0; }
+  aim() { return this.aimJoy && !this.aimJoy.dial ? this.aimJoy.dir : 0; }
   // The stick's offset as a position (-1..1 at the rim), for analog games.
   analog() { return this.joy ? { x: this.joy.ax || 0, y: this.joy.ay || 0 } : null; }
   fire() { return this.fireIds.size > 0 || performance.now() < this.fireUntil; }
   fire2() { return this.fire2Ids.size > 0 || performance.now() < this.fire2Until; }
+  // Dial counts this frame (called once a frame): the dial pads' push, at
+  // dialSpeed counts a frame for a pad pushed to its rim.
   spin() {
-    const n = Math.trunc(this.spinAcc / DIAL_PX);
-    this.spinAcc -= n * DIAL_PX;
+    const rate = (this.joy && this.joy.dial ? this.joy.vel : 0) + (this.aimJoy && this.aimJoy.dial ? this.aimJoy.vel : 0);
+    this.spinAcc += rate * this.dialSpeed;
+    const n = Math.trunc(this.spinAcc);
+    this.spinAcc -= n;
     return n;
   }
 
@@ -117,9 +121,8 @@ export class TouchControls {
     if (this.onTouch) this.onTouch(e);
     try { this.surface.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
     if (this.isJoystickSide(e.clientX)) {
-      if (this.stickDial) { this.dialX.set(e.pointerId, e.clientX); this.ripple(e.clientX, e.clientY); return; }
       if (this.joy) return; // one finger drives the stick; extra fingers are ignored
-      this.joy = this.grab(e, this.dpad, this.knob);
+      this.joy = this.grab(e, this.dpad, this.knob, this.stickDial);
     } else if (this.twinStick && this.aimPad) {
       if (!this.aimJoy) this.aimJoy = this.grab(e, this.aimPad, this.aimKnob);
     } else if (this.twoButtons && this.inFire2(e.clientX, e.clientY)) {
@@ -130,37 +133,44 @@ export class TouchControls {
     } else {
       this.fireIds.add(e.pointerId);
       this.fireUntil = performance.now() + MIN_PRESS;
-      if (this.dial) this.dialX.set(e.pointerId, e.clientX);
+      if (this.dial && this.aimPad && !this.aimJoy) this.aimJoy = this.grab(e, this.aimPad, this.aimKnob, true);
       this.ripple(e.clientX, e.clientY);
       if (this.haptics && navigator.vibrate) navigator.vibrate(8);
     }
   }
 
   move(e) {
-    if (this.dialX.has(e.pointerId)) {
-      e.preventDefault();
-      this.spinAcc += e.clientX - this.dialX.get(e.pointerId);
-      this.dialX.set(e.pointerId, e.clientX);
-      return;
-    }
     if (this.aimJoy && e.pointerId === this.aimJoy.id) {
       e.preventDefault();
-      this.steer(this.aimJoy, e, this.aimPad, this.aimKnob, false, true);   // aiming is always 8-way
+      if (this.aimJoy.dial) this.steerDial(this.aimJoy, e, this.aimPad, this.aimKnob);
+      else this.steer(this.aimJoy, e, this.aimPad, this.aimKnob, false, true);   // aiming is always 8-way
       return;
     }
     const j = this.joy;
     if (!j || e.pointerId !== j.id) return;
     e.preventDefault();
-    this.steer(j, e, this.dpad, this.knob, this.twoWay, this.eightWay);
+    if (j.dial) this.steerDial(j, e, this.dpad, this.knob);
+    else this.steer(j, e, this.dpad, this.knob, this.twoWay, this.eightWay);
+  }
+
+  // A dial pad: only the horizontal offset counts, scaled from the edge of the
+  // dead zone (0) to the rim (full speed).
+  steerDial(j, e, pad, knob) {
+    const r = this.size / 2, dz = r * DEADZONE;
+    const x = Math.max(-r, Math.min(r, e.clientX - j.ox));
+    j.vel = Math.abs(x) < dz ? 0 : (Math.sign(x) * (Math.abs(x) - dz)) / (r - dz);
+    knob.style.transform = `translate(calc(-50% + ${x}px), -50%)`;
+    this.showDir(j.vel < 0 ? LEFT : j.vel > 0 ? RIGHT : 0, pad, true);
   }
 
   // A stick appears where the finger lands.
-  grab(e, pad, knob) {
+  // dial: a left/right dial pad (see steerDial) rather than a stick.
+  grab(e, pad, knob, dial = false) {
     pad.style.left = `${e.clientX}px`;
     pad.style.top = `${e.clientY}px`;
     knob.style.transform = 'translate(-50%, -50%)';
-    pad.className = 'dpad show';
-    return { id: e.pointerId, ox: e.clientX, oy: e.clientY, dir: 0 };
+    pad.className = dial ? 'dpad show dial' : 'dpad show';
+    return { id: e.pointerId, ox: e.clientX, oy: e.clientY, dir: 0, dial, vel: 0 };
   }
 
   steer(j, e, pad, knob, twoWay, eightWay) {
@@ -202,7 +212,6 @@ export class TouchControls {
     }
     this.fireIds.delete(e.pointerId);
     this.fire2Ids.delete(e.pointerId);
-    this.dialX.delete(e.pointerId);
   }
 
   direction(dx, dy, eightWay = this.eightWay) {
@@ -211,8 +220,8 @@ export class TouchControls {
     return DIR8[((Math.round(a / (Math.PI / 2)) + 4) % 4) * 2];
   }
 
-  showDir(d, pad = this.dpad) {
-    let c = 'dpad show';
+  showDir(d, pad = this.dpad, dial = false) {
+    let c = dial ? 'dpad show dial' : 'dpad show';
     if (d & UP) c += ' up';
     if (d & DOWN) c += ' down';
     if (d & LEFT) c += ' left';
@@ -237,7 +246,6 @@ export class TouchControls {
     this.fireUntil = 0;
     this.fire2Ids.clear();
     this.fire2Until = 0;
-    this.dialX.clear();
     this.spinAcc = 0;
     this.aimJoy = null;
     this.dpad.className = 'dpad';

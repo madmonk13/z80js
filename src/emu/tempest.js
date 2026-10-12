@@ -31,6 +31,7 @@ export class Tempest {
     this.refresh = 60;
     this.controls = 'two-way';
     this.spinner = true;
+    this.dialSpeed = 3;                        // dial counts a frame at full push: about 15 lanes a second
     this.buttons = 2;
     this.button2 = 'Zap';
     this.roms = roms;
@@ -44,8 +45,10 @@ export class Tempest {
     this.pokeys = [new Pokey(CPU_CLOCK, 3), new Pokey(CPU_CLOCK, 3)];
     // Pot lines: POKEY 1 the spinner (bits 0-3) and cabinet switch; POKEY 2 the
     // difficulty and rating switches, the two buttons and the start buttons.
-    this.pokeys[0].readPots = () => (this.knob & 0x0F) | 0x10 | 0xE0;
-    this.pokeys[1].readPots = () => this.dsw0 | (~this.pressed & 0x78) | 0x80;
+    // A line held high reads as a pot that finishes counting at once, which
+    // clears its ALLPOT bit: the game sees each line inverted.
+    this.pokeys[0].readPots = () => ~((this.knob & 0x0F) | 0x10 | 0xE0) & 0xFF;
+    this.pokeys[1].readPots = () => ~(this.dsw0 | (~this.pressed & 0x78) | 0x80) & 0xFF;
     this.sound = new SoundMix(this.pokeys.map((p) => new PokeyVoice(p)), 1);
     this.vectors = { data: new Float32Array(7 * 6000), count: 0 };
     this.in0 = 0xFF; this.pressed = 0; this.knob = 0;
@@ -129,7 +132,7 @@ export class Tempest {
   // stick also turns the spinner. Starts on bits 5 and 6.
   setInputs(s) {
     const spin = (s.spin || 0) + (s.right ? 2 : 0) - (s.left ? 2 : 0);
-    if (spin) this.knob = (this.knob + Math.round(spin)) & 0xFF;
+    if (spin) this.knob = (this.knob + Math.round(spin)) & 0xFF;      // positive turns the claw clockwise
     this.pressed = (s.fire2 || s.up ? 0x08 : 0) | (s.fire ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0);
     this.in0 = 0xFF & ~(s.coin ? 0x04 : 0);
   }

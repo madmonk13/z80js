@@ -158,20 +158,21 @@ async function loadSet(bytes, name, id) {
   touch.twoButtons = board.buttons === 2;
   touch.dial = !!board.dialControl;
   touch.stickDial = !!board.spinner;
+  touch.dialSpeed = board.dialSpeed ?? 4;     // dial counts a frame at full push
   document.body.classList.toggle('two-way', twoWay);
   document.body.classList.toggle('stick-only', touch.stickOnly);
   document.body.classList.toggle('two-buttons', touch.twoButtons);
   $('joyHintText').textContent = twoWay ? 'Drag left or right on this side'
     : touch.stickOnly ? 'Touch & drag anywhere' : 'Touch & drag on this side';
-  const [dialTitle, dialText] = board.dialHint ?? ['Fire & aim', 'Hold to fire, drag sideways to aim'];
+  const [dialTitle, dialText] = board.dialHint ?? ['Fire & aim', 'Hold to fire; push left or right to aim'];
   $('fireHintTitle').textContent = touch.dial ? dialTitle : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
   $('fireHintText').textContent = touch.dial ? dialText
     : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
   // The control-zone outlines' labels.
   $('stickZoneTitle').textContent = 'Move';
-  $('stickZoneText').textContent = board.spinner ? 'Spinner · drag' : board.analogStick ? 'Analog stick' : twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
+  $('stickZoneText').textContent = board.spinner ? 'Spinner · push' : board.analogStick ? 'Analog stick' : twoWay ? 'Left / right' : touch.eightWay ? '8-way' : '4-way';
   $('fireZoneTitle').textContent = touch.twinStick ? 'Fire' : touch.dial ? dialTitle : 'Fire';
-  $('fireZoneText').textContent = touch.twinStick ? 'Drag to aim' : touch.dial ? 'Hold · drag sideways' : 'Tap';
+  $('fireZoneText').textContent = touch.twinStick ? 'Drag to aim' : touch.dial ? 'Hold · push sideways' : 'Tap';
   if (touch.twinStick) {
     $('fireHintTitle').textContent = 'Fire';
     $('fireHintText').textContent = 'Drag on this side to shoot that way';

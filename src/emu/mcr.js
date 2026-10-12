@@ -425,7 +425,7 @@ export class Kick extends MCR {
     this.controls = 'two-way';
     this.buttons = 1;
     this.dialControl = true;
-    this.dialHint = ['Kick & move', 'Tap to kick, drag sideways to move'];
+    this.dialHint = ['Kick & move', 'Tap to kick; push left or right to move'];
   }
   // IP0: coin, starts, kick. IP1: the dial (its low four bits); the stick also turns it.
   setInputs(s) {

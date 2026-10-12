@@ -209,7 +209,7 @@ export class StarWars {
     const segs = this.avg.run(), d = this.vectors.data;
     let n = 0;
     for (let i = 0; i < segs.length && n < 8000; i += 6) {
-      const o = n * 7, c = segs[i + 4], b = Math.min(1, (segs[i + 5] / 255) * 1.3);
+      const o = n * 7, c = segs[i + 4], b = segs[i + 5] / 255;
       d[o] = HALF_W + segs[i] * SX; d[o + 1] = HALF_H - segs[i + 1] * SY;
       d[o + 2] = HALF_W + segs[i + 2] * SX; d[o + 3] = HALF_H - segs[i + 3] * SY;
       d[o + 4] = (c >> 2) & 1 ? b : 0; d[o + 5] = (c >> 1) & 1 ? b : 0; d[o + 6] = c & 1 ? b : 0;

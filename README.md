@@ -106,8 +106,9 @@ The touch layout follows the game:
 - **Centipede:** the stick rolls the trackball at a steady speed (Q/E or the mouse wheel
   also roll it sideways); fire on the right. **Phoenix:** left/right; the bottom of the right half
   fires and the top raises the shield.
-- **Kick:** drag sideways on the right half (or use left/right, Q/E or the mouse wheel) to
-  move the clown, as the cabinet's dial did; tapping kicks.
+- **Kick:** the right half is a left/right dial pad: tapping kicks, and pushing left or right
+  moves the clown (further from where you touched turns the dial faster), as the cabinet's
+  dial did. Left/right, Q/E or the mouse wheel also work.
 - **Dig Dug:** the left half is a 4-way joystick, the right half is the pump.
 - **Time Pilot:** the left half is an 8-way joystick, the right half is fire.
 - **Mr. Do!, Tapper:** the left half is a 4-way joystick, the right half is fire (Mr. Do!'s
@@ -119,8 +120,8 @@ The touch layout follows the game:
 - **Satan's Hollow:** the left half is a left/right pad; on the right half, the bottom
   fires and the top raises the shield.
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
-  aiming dial: touching fires, and dragging sideways turns the dial (it's relative, like the
-  cabinet's spinner).
+  aiming dial: holding fires, and pushing left or right turns the dial, faster the further
+  you push (like 6502js's paddles).
 - **Robotron: 2084, Splat!:** twin sticks. The left half moves; the right half is a second stick
   that fires in the direction you drag (keyboard: I/J/K/L; gamepad: the right stick).
 - **Defender, Stargate:** an 8-way stick flies the ship: up/down as on the cabinet, and
@@ -133,8 +134,9 @@ The touch layout follows the game:
 - **Ghosts'n Goblins:** an 8-way stick; the bottom of the right half throws, the top jumps.
 - **Asteroids:** left/right rotate; the bottom of the right half fires, the top thrusts.
   Hyperspace is H on a keyboard or a gamepad trigger (not yet on touch).
-- **Tempest:** drag left/right on the left half to turn the spinner (a stick or Q/E also
-  turns it); the bottom of the right half fires, the top is the Superzapper.
+- **Tempest:** the left half is a left/right pad that turns the spinner, faster the further
+  you push (Q/E or the mouse wheel also turn it); the bottom of the right half fires, the
+  top is the Superzapper.
 - **Battlezone:** one stick drives both treads: up/down move, left/right turn on the spot,
   diagonals turn with one tread. Tap the right half to fire.
 - **Star Wars** and **Tail Gunner:** the stick is analog: on touch, how far the finger is

@@ -146,15 +146,16 @@ body.stick-only .zone.fire { display: none; }
   z-index: 4;
 }
 .dpad.show { opacity: 1; transform: scale(1); }
-/* Two-way mode: a left/right pad, half as tall as the d-pad. */
-body.two-way #dpad {
+/* Two-way mode, and dial pads: a left/right pad, half as tall as the d-pad. */
+body.two-way #dpad, .dpad.dial {
   height: calc(var(--size) / 2);
   margin-top: calc(var(--size) / -4);
   border-radius: 999px;
 }
-body.two-way #dpad .arrow { height: 44%; }
-body.two-way #dpad .arrow.up, body.two-way #dpad .arrow.down { display: none; }
-body.two-way #dpad .knob { height: 76%; }
+body.two-way #dpad .arrow, .dpad.dial .arrow { height: 44%; }
+body.two-way #dpad .arrow.up, body.two-way #dpad .arrow.down,
+.dpad.dial .arrow.up, .dpad.dial .arrow.down { display: none; }
+body.two-way #dpad .knob, .dpad.dial .knob { height: 76%; }
 .dpad .arrow {
   position: absolute; left: 50%; top: 50%;
   width: 22%; height: 22%;
