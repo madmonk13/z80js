@@ -132,7 +132,7 @@ export class Tempest {
   // stick also turns the spinner. Starts on bits 5 and 6.
   setInputs(s) {
     const spin = (s.spin || 0) + (s.right ? 2 : 0) - (s.left ? 2 : 0);
-    if (spin) this.knob = (this.knob + Math.round(spin)) & 0xFF;      // positive turns the claw clockwise
+    if (spin) this.knob = (this.knob - Math.round(spin)) & 0xFF;      // positive (right) turns the claw counter-clockwise
     this.pressed = (s.fire2 || s.up ? 0x08 : 0) | (s.fire ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0);
     this.in0 = 0xFF & ~(s.coin ? 0x04 : 0);
   }
