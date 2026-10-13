@@ -36,10 +36,12 @@ export class TouchControls {
     this.twoWay = false;      // left/right only (e.g. Galaga's fighter)
     this.stickOnly = false;   // no fire button (e.g. Pac-Man): the whole surface is the stick
     this.twoButtons = false;  // top of the fire half is a second button (e.g. Satan's Hollow's shield)
+    this.threeButtons = false; // the fire half in thirds: fire, second button, third (Metal Slug)
     this.dial = false;        // the fire half is also a dial pad (Tron, Kick)
     this.stickDial = false;   // the stick half is a dial pad (Tempest's spinner)
     this.dialSpeed = 4;       // dial counts per frame with the pad pushed to its rim
     this.fire2Area = null;    // { left, right, top, bottom } in client px, set by the page layout
+    this.fire3Area = null;
     this.size = 140;
     this.haptics = true;
     this.onTouch = null;      // called on every touch start (audio unlock, hints)
@@ -50,6 +52,8 @@ export class TouchControls {
     this.fireUntil = 0;
     this.fire2Ids = new Set();
     this.fire2Until = 0;
+    this.fire3Ids = new Set();
+    this.fire3Until = 0;
     this.spinAcc = 0;         // fractional dial counts carried between frames
     this.forwarded = new Map(); // pointerId → button it was handed to
 
@@ -68,6 +72,7 @@ export class TouchControls {
   analog() { return this.joy ? { x: this.joy.ax || 0, y: this.joy.ay || 0 } : null; }
   fire() { return this.fireIds.size > 0 || performance.now() < this.fireUntil; }
   fire2() { return this.fire2Ids.size > 0 || performance.now() < this.fire2Until; }
+  fire3() { return this.fire3Ids.size > 0 || performance.now() < this.fire3Until; }
   // Dial counts this frame (called once a frame): the dial pads' push, at
   // dialSpeed counts a frame for a pad pushed to its rim.
   spin() {
@@ -91,6 +96,8 @@ export class TouchControls {
     const r = this.surface.getBoundingClientRect();
     return y < r.top + r.height / 2;
   }
+
+  inArea(a, x, y) { return !!a && x >= a.left && x < a.right && y >= a.top && y < a.bottom; }
 
   isJoystickSide(x) {
     if (this.stickOnly) return true;
@@ -125,6 +132,11 @@ export class TouchControls {
       this.joy = this.grab(e, this.dpad, this.knob, this.stickDial);
     } else if (this.twinStick && this.aimPad) {
       if (!this.aimJoy) this.aimJoy = this.grab(e, this.aimPad, this.aimKnob);
+    } else if (this.threeButtons && this.inArea(this.fire3Area, e.clientX, e.clientY)) {
+      this.fire3Ids.add(e.pointerId);
+      this.fire3Until = performance.now() + MIN_PRESS;
+      this.ripple(e.clientX, e.clientY);
+      if (this.haptics && navigator.vibrate) navigator.vibrate(8);
     } else if (this.twoButtons && this.inFire2(e.clientX, e.clientY)) {
       this.fire2Ids.add(e.pointerId);
       this.fire2Until = performance.now() + MIN_PRESS;
@@ -212,6 +224,7 @@ export class TouchControls {
     }
     this.fireIds.delete(e.pointerId);
     this.fire2Ids.delete(e.pointerId);
+    this.fire3Ids.delete(e.pointerId);
   }
 
   direction(dx, dy, eightWay = this.eightWay) {
@@ -246,6 +259,8 @@ export class TouchControls {
     this.fireUntil = 0;
     this.fire2Ids.clear();
     this.fire2Until = 0;
+    this.fire3Ids.clear();
+    this.fire3Until = 0;
     this.spinAcc = 0;
     this.aimJoy = null;
     this.dpad.className = 'dpad';

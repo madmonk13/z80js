@@ -82,6 +82,27 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Do! Run Run (1984) | Universal: the Mr. Do's Castle board, horizontal, memory rearranged | `dorunrun` (set 1) | **Tested:** boots, attract mode, coin, start and play |
 | Mr. Do's Wild Ride (1984) | Universal: the Do! Run Run board | `dowild` | **Tested:** boots, attract mode, coin, start and play |
 | Domino Man (1982) | Bally Midway MCR2: the Satan's Hollow / Tron board | `domino` | **Tested:** boots, attract mode, coin, start and play |
+| Rush'n Attack / Green Beret (1985) | Konami: Z80, SN76489, a row-scrolled tile playfield with priority tiles, 48 double-buffered sprites | `rushatck` (US), `gberet` | **Tested:** boots, attract mode, coin, start and play |
+| Mr. Goemon (1986) | Konami: the Green Beret board at 60 Hz, with banked ROM | `mrgoemon` (Japan) | **Tested:** boots, attract mode, coin, start and play |
+| Sea Wolf II (1978) | Midway Astrocade: Z80, the Astrocade custom video chips; the discrete sound board is approximated | `seawolf2` | **Tested:** boots, attract mode, coin and start |
+| Extra Bases (1980) | Midway Astrocade, trackball (moved with the stick) | `ebases` | **Tested:** boots, attract mode, coin, start and play |
+| Space Zap (1980) | Midway Astrocade with the pattern board (blitter) | `spacezap` | **Tested:** boots, attract mode, coin, start and play |
+| Wizard of Wor (1980) | Midway Astrocade: pattern board, two sound chips, sparkle and stars, Votrax speech (approximated) | `wow` | **Tested:** boots, attract mode with speech, coin, start and play |
+| Gorf (1981) | Midway Astrocade like Wizard of Wor, on a vertical monitor | `gorf` | **Tested:** boots, attract mode with speech, coin, start and play |
+| Robby Roto (1981) | Midway Astrocade like Wizard of Wor (no speech) | `robby` | **Tested:** boots, attract mode, coin, start and play |
+| Forgotten Worlds (1988) | Capcom CPS-1: 68000, Z80, YM2151, OKI MSM6295; three tile layers, block sprites, starfield; rotary gun | `forgottn` (US) | **Tested:** boots, attract mode, coin, start and play |
+| Ghouls'n Ghosts (1988) | Capcom CPS-1 (no OKI samples) | `ghouls` (World) | **Tested:** boots (its long self-test), attract mode, coin, start and play |
+| Strider (1989) | Capcom CPS-1 with the starfield | `strider` (US) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Final Fight (1989) | Capcom CPS-1 | `ffight` (World) | **Tested:** boots, attract mode, coin, start and play |
+| 1941: Counter Attack (1990) | Capcom CPS-1, vertical monitor | `1941` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Mercs (1990) | Capcom CPS-1, vertical monitor | `mercs` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Street Fighter II (1991) | Capcom CPS-1 at 12 MHz | `sf2` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Captain Commando (1991) | Capcom CPS-1 with the CPS-B-21's multiply protection | `captcomm` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Knights of the Round (1991) | Capcom CPS-1 with the CPS-B-21 | `knights` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Metal Slug (1996) | SNK Neo Geo MVS: 68000, Z80, YM2610 (FM, SSG, ADPCM-A/B), the LSPC's shrinking sprite strips and fix layer; boots through the MVS BIOS | `mslug` (a merged set: the zip must include the BIOS files, sp-s2.sp1, sfix.sfx and 000-lo.lo) | **Tested:** boots through the BIOS, attract mode, coin and start |
+| Metal Slug 2 (1998) | SNK Neo Geo MVS (relies on the watchdog reset as a protection check) | `mslug2` | **Tested:** boots, title, coin and start |
+| Metal Slug X (1999) | SNK Neo Geo MVS with its protection checks patched out | `mslugx` | **Tested:** boots, attract mode, coin and start |
+| Yie Ar Kung-Fu (1985) | Konami: 6809, SN76489, VLM5030 speech, a fixed tile map and 24 sprites | `yiear` | **Tested:** boots, attract mode with speech, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -117,6 +138,17 @@ The touch layout follows the game:
 - **Motos:** an 8-way stick; the bottom of the right half pushes, the top jumps.
 - **The Tower of Druaga**, **Do! Run Run**, **Mr. Do's Wild Ride:** a 4-way stick and one button.
 - **Domino Man:** an 8-way stick; the button sets down a domino.
+- **Rush'n Attack / Green Beret:** an 8-way stick; the bottom of the right half stabs, the top fires
+  the weapon you've picked up. **Mr. Goemon:** the bottom attacks, the top jumps.
+- **Sea Wolf II:** push left or right to swing the periscope; tap to fire.
+- **Extra Bases:** the stick moves the trackball (pitching and fielding); the button swings.
+- **CPS-1 games:** an 8-way stick with attack (bottom) and jump (top); Mercs' top button is the
+  mega crash bomb, 1941's the loop. **Street Fighter II** has six buttons on the cabinet; here the
+  bottom is a medium punch and the top a medium kick (special moves work at any strength).
+  **Forgotten Worlds:** hold to fire, push left or right on the fire side to turn the gun.
+- **Metal Slug games:** the fire side is split in three: the bottom shoots, the middle jumps, the
+  top throws a grenade (keyboard Z / X / F; gamepad A / B / Y).
+- **Yie Ar Kung-Fu:** an 8-way stick; the bottom of the right half punches, the top kicks.
 - **Satan's Hollow:** the left half is a left/right pad; on the right half, the bottom
   fires and the top raises the shield.
 - **Tron:** the left half is an 8-way joystick. The right half is the trigger *and* the
@@ -152,7 +184,7 @@ The touch layout follows the game:
   **Super Cobra:** as Scramble.
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
-  for a second button (fire in one-button games), Q/E or the mouse wheel (or the
+  for a second button (fire in one-button games), F for a third, Q/E or the mouse wheel (or the
   gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
   (2 for two players).
 - **Left-handed** mode in settings swaps the halves.
@@ -164,6 +196,8 @@ The touch layout follows the game:
   share of its height), in from the side margins in landscape (a share of the way to its
   middle). 0% keeps them off the picture entirely; 100% covers the whole screen. Touches
   outside the zones still count by side (stick on one, plain fire on the other).
+- **Three-button games** (Metal Slug) split the fire side's zone in thirds: fire at the bottom, the
+  second button in the middle, the third on top. The move side is unchanged.
 - **Two-button games:** the second button is the upper half of the fire side's zone, Fire
   the lower half. In portrait the picture is a little smaller to leave room for both.
 - **Pause** (the ⏸ button in the top bar, or P on a keyboard): stops the game and its sound; tap
@@ -174,7 +208,8 @@ The touch layout follows the game:
 
 - **Games:** every supported game, in alphabetical order. Games you haven't added a ROM
   set for are greyed out and name the zip they expect ("Upload invaders.zip to enable"); tap one, or **Add ROM set…**, to add
-  its zip. Sets are kept whole in `localStorage`; the last game played starts on launch.
+  its zip. Sets are kept whole in the browser's IndexedDB (large sets like Metal Slug X run to
+  30 MB; the app asks for persistent storage so the browser keeps them), and the last game played starts on launch.
 - **Controls, Sound and volume**, as in 6502js.
 - **Resume where I left off** (on by default): the game in progress is saved when the
   page is hidden or closed, and every few seconds while playing, so a refresh or relaunch
@@ -273,7 +308,7 @@ right, up, down, fire) then holds a control.
 - `src/emu/tempest.js`: Tempest. `src/emu/bzone.js`: Battlezone. `src/emu/avg.js` is Atari's
   Analog Vector Generator (per instruction), `src/emu/mathbox.js` the math box for both.
 - `src/emu/starwars.js`: Star Wars (including the matrix processor, which runs the
-  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip.
+  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
 - `src/emu/tailg.js`: Tail Gunner; `src/emu/ccpu.js` is the Cinematronics CPU.
   `src/render/vector.js` draws vector games' display lists at the screen's own resolution,
   with a soft phosphor glow.

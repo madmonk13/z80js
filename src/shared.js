@@ -13,6 +13,10 @@ export const store = {
     try { localStorage.setItem(STORE + key, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch { return false; }
   },
   getRaw(key) { try { return localStorage.getItem(STORE + key); } catch { return null; } },
+  // Keys under this app's prefix (without it).
+  keys() {
+    try { return Object.keys(localStorage).filter((k) => k.startsWith(STORE)).map((k) => k.slice(STORE.length)); } catch { return []; }
+  },
 };
 
 // Read a user-picked ROM set. Arcade sets are zips of the board's chips and are

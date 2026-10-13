@@ -1,20 +1,14 @@
-// Local game collection, kept in localStorage.
-//
-// Layout: one index entry list under `library`, and each ROM set's zip (base64)
-// under `rom:<id>`. The id is a content hash, so adding the same set twice
-// doesn't duplicate it.
+// Local game collection. The index (a small list of entries) lives in
+// localStorage under `library`; the ROM sets themselves, which run to tens of
+// megabytes for the later boards, live in IndexedDB, keyed by a content hash
+// (so adding the same set twice doesn't duplicate it). Sets saved by earlier
+// versions as base64 in localStorage (`rom:<id>`) move over when next loaded.
 
 import { store } from './shared.js';
 
 const INDEX = 'library';
 const ROM = 'rom:';
 const LAST = 'lastRomId';
-
-function toBase64(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
 
 function fromBase64(s) {
   const bin = atob(s);
@@ -30,6 +24,43 @@ export function romId(bytes) {
   return (h >>> 0).toString(16).padStart(8, '0') + bytes.length.toString(16);
 }
 
+// ---------------------------------------------------------------- IndexedDB
+
+const DB_NAME = 'z80js', DB_STORE = 'roms';
+let dbPromise = null;
+function db() {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }).catch(() => null);
+  }
+  return dbPromise;
+}
+async function dbDo(mode, fn) {
+  const d = await db();
+  if (!d) throw new Error('storage unavailable');
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(DB_STORE, mode);
+    const req = fn(tx.objectStore(DB_STORE));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = tx.onabort = () => reject(tx.error || new Error('storage error'));
+  });
+}
+const dbGet = (id) => dbDo('readonly', (s) => s.get(id));
+const dbPut = (id, bytes) => dbDo('readwrite', (s) => s.put(bytes, id));
+const dbDelete = (id) => dbDo('readwrite', (s) => s.delete(id));
+
+// Ask once for storage the browser won't clear under pressure.
+let persistAsked = false;
+function askPersist() {
+  if (persistAsked) return;
+  persistAsked = true;
+  try { navigator.storage?.persist?.(); } catch { /* not supported */ }
+}
+
 function readIndex() { return store.get(INDEX) || []; }
 function writeIndex(list) { return store.trySet(INDEX, list); }
 
@@ -41,15 +72,23 @@ export const library = {
 
   entry(id) { return readIndex().find((e) => e.id === id) || null; },
 
-  get(id) {
+  async get(id) {
+    try {
+      const v = await dbGet(id);
+      if (v) return new Uint8Array(v);
+    } catch { /* fall through to an older copy */ }
+    // Saved by an earlier version: move it into IndexedDB.
     const data = store.getRaw(ROM + id);
     if (!data) return null;
-    try { return fromBase64(data); } catch { return null; }
+    let bytes;
+    try { bytes = fromBase64(data); } catch { return null; }
+    try { await dbPut(id, bytes); store.remove(ROM + id); } catch { /* keep the old copy */ }
+    return bytes;
   },
 
   // Add (or refresh) a game. Returns { id, stored, isNew }; stored is false
   // when the browser refused the write (storage full or blocked).
-  add(name, bytes, mapper) {
+  async add(name, bytes, mapper) {
     const id = romId(bytes);
     const list = readIndex();
     const now = Date.now();
@@ -60,10 +99,11 @@ export const library = {
       writeIndex(list);
       return { id, stored: true, isNew: false };
     }
-    if (!store.trySet(ROM + id, toBase64(bytes))) return { id, stored: false, isNew: true };
+    askPersist();
+    try { await dbPut(id, bytes); } catch { return { id, stored: false, isNew: true }; }
     list.push({ id, name, size: bytes.length, mapper, added: now, lastPlayed: now });
     if (!writeIndex(list)) {
-      store.remove(ROM + id);
+      dbDelete(id).catch(() => {});
       return { id, stored: false, isNew: true };
     }
     return { id, stored: true, isNew: true };
@@ -77,6 +117,7 @@ export const library = {
 
   remove(id) {
     store.remove(ROM + id);
+    dbDelete(id).catch(() => {});
     writeIndex(readIndex().filter((e) => e.id !== id));
     if (this.lastId() === id) store.remove(LAST);
   },
@@ -84,8 +125,8 @@ export const library = {
   lastId() { return store.get(LAST); },
   setLast(id) { store.set(LAST, id); },
 
-  // Approximate bytes used by stored ROMs (base64 is ~4/3 of the raw size).
-  usage() { return readIndex().reduce((n, e) => n + Math.ceil(e.size / 3) * 4, 0); },
+  // Bytes used by stored ROM sets.
+  usage() { return readIndex().reduce((n, e) => n + (e.size || 0), 0); },
 };
 
 function ago(t) {

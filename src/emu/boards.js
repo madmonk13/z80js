@@ -6,15 +6,16 @@
 //
 // Every board class exposes the same interface:
 //   width, height        picture size as displayed (rotated for vertical monitors)
+//   aspect               (optional) display width / height, for pixels that aren't square
 //   frame                Uint32Array of RGBA pixels, updated each frame
 //   refresh              frames per second
 //   controls             'two-way' (left/right), 'four-way' or 'eight-way'
-//   buttons              number of fire buttons (0-2; button2 names the second)
+//   buttons              number of fire buttons (0-3; button2 and button3 name the second and third)
 //   dialControl          true if the game has a spinner (read as `spin`); dialHint
 //                        optionally names it for the touch hint [title, text]
 //   sound                sample source: buffer/readPos/writePos/available()/pull(), rate
 //   runFrame(), reset()
-//   setInputs({ left, right, up, down, fire, fire2, spin, coin, start1, start2 })
+//   setInputs({ left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2 })
 //   applySwitches({ id: value }) with the options listed in Board.switches
 //   Board.stateVersion   (optional) bumped when older saved states no longer restore correctly
 
@@ -51,6 +52,11 @@ import { Tempest } from './tempest.js';
 import { Battlezone } from './bzone.js';
 import { StarWars } from './starwars.js';
 import { TailGunner } from './tailg.js';
+import { RushNAttack, GreenBeretJ, MrGoemon } from './gberet.js';
+import { YieArKungFu } from './yiear.js';
+import { MetalSlug, MetalSlug2, MetalSlugX } from './neogeo.js';
+import { Strider, Mercs, FinalFight, StreetFighter2, GhoulsNGhosts, ForgottenWorlds, Game1941, Knights, CaptainCommando } from './cps1.js';
+import { Gorf, WizardOfWor, RobbyRoto, SpaceZap, ExtraBases, SeaWolf2 } from './astrocade.js';
 import { Robotron, Joust, Bubbles, Splat, Stargate, Defender, Sinistar } from './williams.js';
 
 const BOARDS = [
@@ -1202,6 +1208,120 @@ const BOARDS = [
     // Each 4K bank: the T ROM on even bytes, the P ROM on odd.
     assemble: (c) => ({ main: cat(interleave(c.t70, c.p70), interleave(c.t71, c.p71)) }),
   },
+  {
+    Board: RushNAttack,
+    chips: [['h03', 0x4000], ['h02', 0x4000], ['h01', 0x4000], ['h07', 0x4000], ['l06', 0x4000], ['h05', 0x4000],
+      ['l08', 0x4000], ['l04', 0x4000], ['h09', 0x20], ['h10', 0x100], ['h11', 0x100]]
+      .map(([n, size]) => [n, size, [new RegExp(`^577${n}`)]]),
+    assemble: (c) => ({
+      main: cat(c.h03, c.h02, c.h01), chars: c.h07, sprites: cat(c.l06, c.h05, c.l08, c.l04),
+      palette: c.h09, sprLut: c.h10, charLut: c.h11,
+    }),
+  },
+  {
+    Board: GreenBeretJ,
+    chips: [['l03', 0x4000], ['l02', 0x4000], ['l01', 0x4000], ['l07', 0x4000], ['l06', 0x4000], ['l05', 0x4000],
+      ['l08', 0x4000], ['l04', 0x4000], ['h09', 0x20], ['h10', 0x100], ['h11', 0x100]]
+      .map(([n, size]) => [n, size, [new RegExp(`^577${n}`)]]),
+    assemble: (c) => ({
+      main: cat(c.l03, c.l02, c.l01), chars: c.l07, sprites: cat(c.l06, c.l05, c.l08, c.l04),
+      palette: c.h09, sprLut: c.h10, charLut: c.h11,
+    }),
+  },
+  {
+    Board: MrGoemon,
+    chips: [['d01', 0x8000], ['d02', 0x8000], ['a05', 0x4000], ['d03', 0x8000], ['d04', 0x8000], ['a06', 0x20], ['a07', 0x100], ['a08', 0x100]]
+      .map(([n, size]) => [n, size, [new RegExp(`^621${n}`)]]),
+    assemble: (c) => {
+      // 0000-BFFF, then the banked 16K at 10000 (the second program ROM's upper half).
+      const main = new Uint8Array(0x14000);
+      main.set(c.d01, 0); main.set(c.d02.subarray(0, 0x4000), 0x8000); main.set(c.d02.subarray(0x4000), 0x10000);
+      return { main, chars: c.a05, sprites: cat(c.d03, c.d04), palette: c.a06, sprLut: c.a07, charLut: c.a08 };
+    },
+  },
+  {
+    Board: YieArKungFu,
+    chips: [['i08', 0x4000, [/^i08/]], ['i07', 0x4000, [/^i07/]], ['g16', 0x2000, [/^g16_1/]], ['g15', 0x2000, [/^g15_2/]],
+      ['g04', 0x4000, [/^g04_5/]], ['g03', 0x4000, [/^g03_6/]], ['g06', 0x4000, [/^g06_3/]], ['g05', 0x4000, [/^g05_4/]],
+      ['clr', 0x20, [/^yiear\.clr/]], ['speech', 0x2000, [/^a12_9/]]],
+    assemble: (c) => ({
+      main: cat(c.i08, c.i07), chars: cat(c.g16, c.g15), sprites: cat(c.g04, c.g03, c.g06, c.g05), palette: c.clr, speech: c.speech,
+    }),
+  },
+  {
+    Board: Gorf,
+    chips: 'abcdefgh'.split('').map((l) => [l, 0x1000, [new RegExp(`^gorf-${l}`)]]),
+    assemble: (c) => ({ main: place([[c.a, 0], [c.b, 0x1000], [c.c, 0x2000], [c.d, 0x3000], [c.e, 0x8000], [c.f, 0x9000], [c.g, 0xA000], [c.h, 0xB000]]) }),
+  },
+  {
+    Board: WizardOfWor,
+    chips: [1, 2, 3, 4, 5, 6, 7].map((n) => [`x${n}`, 0x1000, [new RegExp(`^wow\\.x${n}$`)]]),
+    assemble: (c) => ({ main: place([[c.x1, 0], [c.x2, 0x1000], [c.x3, 0x2000], [c.x4, 0x3000], [c.x5, 0x8000], [c.x6, 0x9000], [c.x7, 0xA000]]) }),
+  },
+  {
+    Board: RobbyRoto,
+    chips: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [`x${n}`, 0x1000, [new RegExp(`^rotox${n}\\.`)]]),
+    assemble: (c) => ({
+      main: place([[c.x1, 0], [c.x2, 0x1000], [c.x3, 0x2000], [c.x4, 0x3000], [c.x5, 0x8000], [c.x6, 0x9000], [c.x7, 0xA000], [c.x8, 0xB000], [c.x9, 0xC000], [c.x10, 0xD000]]),
+    }),
+  },
+  {
+    Board: SpaceZap,
+    chips: [['a', 0x1000, [/^0662/]], ['b', 0x1000, [/^0663/]], ['c', 0x1000, [/^0664/]], ['d', 0x1000, [/^0665/]]],
+    assemble: (c) => ({ main: place([[c.a, 0], [c.b, 0x1000], [c.c, 0x2000], [c.d, 0x3000]]) }),
+  },
+  {
+    Board: ExtraBases,
+    chips: 'abcd'.split('').map((l) => [l, 0x1000, [new RegExp(`^m761${l}`)]]),
+    assemble: (c) => ({ main: place([[c.a, 0], [c.b, 0x1000], [c.c, 0x2000], [c.d, 0x3000]]) }),
+  },
+  {
+    Board: SeaWolf2,
+    chips: [1, 2, 3, 4].map((n) => [`x${n}`, 0x800, [new RegExp(`^sw2x${n}`)]]),
+    assemble: (c) => ({ main: place([[c.x1, 0], [c.x2, 0x800], [c.x3, 0x1000], [c.x4, 0x1800]]) }),
+  },
+  ...[
+    // CPS-1. prog: [file, offset, kind] with kind 'even'/'odd' (byte-interleaved), 'swap' (byte-swapped
+    // words) or 'word'; gfx: [file, offset, step] with step 2 (word groups) or 1 (single bytes) every 8.
+    [Strider, ['strider.30', 0, 'even'], ['strider.35', 0, 'odd'], ['strider.31', 0x40000, 'even'], ['strider.36', 0x40000, 'odd'], ['strider.32', 0x80000, 'swap'],
+      { size: 0x400000, files: [['strider.06', 0, 2], ['strider.08', 2, 2], ['strider.02', 4, 2], ['strider.04', 6, 2], ['strider.05', 0x200000, 2], ['strider.07', 0x200002, 2], ['strider.01', 0x200004, 2], ['strider.03', 0x200006, 2]] },
+      'strider.09', ['strider.18', 'strider.19']],
+    [Mercs, ['so2_30e', 0, 'even'], ['so2_35e', 0, 'odd'], ['so2_31e', 0x40000, 'even'], ['so2_36e', 0x40000, 'odd'], ['so2_32', 0x80000, 'swap'],
+      { size: 0x300000, files: [['so2_gfx6', 0, 2], ['so2_gfx8', 2, 2], ['so2_gfx2', 4, 2], ['so2_gfx4', 6, 2],
+        ['so2_24', 0x200000, 1], ['so2_14', 0x200001, 1], ['so2_26', 0x200002, 1], ['so2_16', 0x200003, 1], ['so2_20', 0x200004, 1], ['so2_10', 0x200005, 1], ['so2_22', 0x200006, 1], ['so2_12', 0x200007, 1]] },
+      'so2_09', ['so2_18', 'so2_19']],
+    [FinalFight, ['ff30-36', 0, 'even'], ['ff35-42', 0, 'odd'], ['ff31-37', 0x40000, 'even'], ['ff36-43', 0x40000, 'odd'], ['ff32-32m', 0x80000, 'swap'],
+      { size: 0x200000, files: [['ff05-05m', 0, 2], ['ff07-07m', 2, 2], ['ff01-01m', 4, 2], ['ff03-03m', 6, 2]] },
+      'ff09-09', ['ff18-18', 'ff19-19']],
+    [StreetFighter2, ['sf2e.30g', 0, 'even'], ['sf2e.37g', 0, 'odd'], ['sf2e.31g', 0x40000, 'even'], ['sf2e.38g', 0x40000, 'odd'],
+      ['sf2e.28g', 0x80000, 'even'], ['sf2e.35g', 0x80000, 'odd'], ['sf2_29a', 0xC0000, 'even'], ['sf2_36a', 0xC0000, 'odd'],
+      { size: 0x600000, files: [['sf2_06', 0, 2], ['sf2_08', 2, 2], ['sf2_05', 4, 2], ['sf2_07', 6, 2], ['sf2_15', 0x200000, 2], ['sf2_17', 0x200002, 2],
+        ['sf2_14', 0x200004, 2], ['sf2_16', 0x200006, 2], ['sf2_25', 0x400000, 2], ['sf2_27', 0x400002, 2], ['sf2_24', 0x400004, 2], ['sf2_26', 0x400006, 2]] },
+      'sf2_09', ['sf2_18', 'sf2_19']],
+    [GhoulsNGhosts, ['ghl29', 0, 'even'], ['ghl30', 0, 'odd'], ['ghl27', 0x40000, 'even'], ['ghl28', 0x40000, 'odd'], ['ghl17', 0x80000, 'word'],
+      { size: 0x300000, files: [['ghl5', 0, 2], ['ghl7', 2, 2], ['ghl6', 4, 2], ['ghl8', 6, 2],
+        ['ghl09', 0x200000, 1], ['ghl18', 0x200001, 1], ['ghl13', 0x200002, 1], ['ghl22', 0x200003, 1], ['ghl11', 0x200004, 1], ['ghl20', 0x200005, 1], ['ghl15', 0x200006, 1], ['ghl24', 0x200007, 1],
+        ['ghl10', 0x280000, 1], ['ghl19', 0x280001, 1], ['ghl14', 0x280002, 1], ['ghl23', 0x280003, 1], ['ghl12', 0x280004, 1], ['ghl21', 0x280005, 1], ['ghl16', 0x280006, 1], ['ghl25', 0x280007, 1]] },
+      'ghl26', null],
+    [ForgottenWorlds, ['lwu11a', 0, 'even'], ['lwu15a', 0, 'odd'], ['lwu10a', 0x40000, 'even'], ['lwu14a', 0x40000, 'odd'], ['lw-07', 0x80000, 'swap'],
+      { size: 0x400000, files: [['lw-02', 0, 2], ['lw-09', 2, 2], ['lw-06', 4, 2], ['lw-13', 6, 2], ['lw-01', 0x200000, 2], ['lw-08', 0x200002, 2], ['lw-05', 0x200004, 2], ['lw-12', 0x200006, 2]] },
+      'lwu00', ['lw-03u', 'lw-04u']],
+    [Game1941, ['41e_30', 0, 'even'], ['41e_35', 0, 'odd'], ['41e_31', 0x40000, 'even'], ['41e_36', 0x40000, 'odd'], ['41_32', 0x80000, 'swap'],
+      { size: 0x200000, files: [['41_gfx5', 0, 2], ['41_gfx7', 2, 2], ['41_gfx1', 4, 2], ['41_gfx3', 6, 2]] },
+      '41_09', ['41_18', '41_19']],
+    [Knights, ['kr_23e', 0, 'swap'], ['kr_22', 0x80000, 'swap'],
+      { size: 0x400000, files: [['kr_gfx1', 0, 2], ['kr_gfx3', 2, 2], ['kr_gfx2', 4, 2], ['kr_gfx4', 6, 2], ['kr_gfx5', 0x200000, 2], ['kr_gfx7', 0x200002, 2], ['kr_gfx6', 0x200004, 2], ['kr_gfx8', 0x200006, 2]] },
+      'kr_09', ['kr_18', 'kr_19']],
+    [CaptainCommando, ['cce_23d', 0, 'swap'], ['cc_22d', 0x80000, 'swap'], ['cc_24d', 0x100000, 'even'], ['cc_28d', 0x100000, 'odd'],
+      { size: 0x400000, files: [['gfx_01', 0, 2], ['gfx_03', 2, 2], ['gfx_02', 4, 2], ['gfx_04', 6, 2], ['gfx_05', 0x200000, 2], ['gfx_07', 0x200002, 2], ['gfx_06', 0x200004, 2], ['gfx_08', 0x200006, 2]] },
+      'cc_09', ['cc_18', 'cc_19']],
+  ].map(cpsEntry),
+  ...[
+    // Neo Geo: [Board, game number, P ROMs as [name, size, swap halves?], V ROM count, C ROM count]
+    [MetalSlug, '201', [['201-p1', 0x200000, true]], 2, 4, 0xD00BD152],   // some sets store its C ROMs with halves swapped
+    [MetalSlug2, '241', [['241-p1', 0x100000], ['241-p2', 0x200000]], 2, 4],
+    [MetalSlugX, '250', [['250-p1', 0x100000], ['250-p2', 0x400000]], 3, 6],
+  ].map(neoEntry),
 ];
 
 function interleave(even, odd) {
@@ -1212,6 +1332,87 @@ function interleave(even, odd) {
 
 function swap01(rom) {
   return rom.map((v) => (v & 0xFC) | ((v & 1) << 1) | ((v >> 1) & 1));
+}
+
+// A CPS-1 registry entry from its ROM list (see the table above).
+function cpsEntry([Board, ...rest]) {
+  const prog = rest.filter((r) => Array.isArray(r) && typeof r[2] === 'string');
+  const gfx = rest.find((r) => r && r.files), [sound, samples] = rest.slice(-2);
+  const names = [...prog.map((p) => p[0]), ...gfx.files.map((f) => f[0]), sound, ...(samples || [])];
+  const esc = (n) => n.replace(/[.]/g, '\\.');
+  return {
+    Board,
+    chips: names.map((n) => [n, null, [new RegExp(`^${esc(n)}(\\.(bin|rom))?$`)]]),
+    assemble: (c) => {
+      const main = new Uint8Array(0x200000).fill(0xFF);
+      for (const [n, at, kind] of prog) {
+        const r = c[n];
+        if (kind === 'even' || kind === 'odd') for (let i = 0; i < r.length; i++) main[at + i * 2 + (kind === 'odd' ? 1 : 0)] = r[i];
+        else if (kind === 'swap') for (let i = 0; i < r.length; i += 2) { main[at + i] = r[i + 1]; main[at + i + 1] = r[i]; }
+        else main.set(r, at);
+      }
+      const g = new Uint8Array(gfx.size);
+      for (const [n, at, step] of gfx.files) {
+        const r = c[n];
+        for (let i = 0; i < r.length; i += step) for (let k = 0; k < step; k++) g[at + (i / step) * 8 + k] = r[i + k];
+      }
+      // Sound program: the first 32K at 0, the rest banked in from 10000.
+      const z = new Uint8Array(0x18000), sr = c[sound];
+      z.set(sr.subarray(0, 0x8000), 0); z.set(sr.subarray(0x8000, 0x10000), 0x10000);
+      return { main, gfx: g, sound: z, samples: samples ? cat(c[samples[0]], c[samples[1]]) : null };
+    },
+  };
+}
+
+// A Neo Geo registry entry. The system BIOS, fix-layer font and shrink table
+// come in the same zip (merged sets) or a separate neogeo.zip.
+function neoEntry([Board, num, prog, nv, nc, swappedCrc]) {
+  const name = (n) => new RegExp(`^${n}\\.(bin|rom)$`);
+  const chips = [
+    ['bios', 0x20000, [/^sp-s2\.sp1$/]], ['sfix', 0x20000, [/^sfix\.sfx$/]], ['zoom', 0x10000, [/^000-lo\.lo$/, /^mamelo\.lo$/]],
+    ...prog.map(([n, size]) => [n, size, [name(n)]]),
+    [`${num}-s1`, null, [name(`${num}-s1`)]], [`${num}-m1`, null, [name(`${num}-m1`)]],
+    ...Array.from({ length: nv }, (_, i) => [`v${i + 1}`, null, [name(`${num}-v${i + 1}`)]]),
+    ...Array.from({ length: nc }, (_, i) => [`c${i + 1}`, null, [name(`${num}-c${i + 1}`)]]),
+  ];
+  return {
+    Board,
+    chips,
+    assemble: (c) => {
+      const swapWords = (r) => { const o = new Uint8Array(r.length); for (let i = 0; i < r.length; i += 2) { o[i] = r[i + 1]; o[i + 1] = r[i]; } return o; };
+      const parts = prog.map(([n, , halves]) => {
+        const r = swapWords(c[n]);
+        return halves ? cat(r.subarray(r.length / 2), r.subarray(0, r.length / 2)) : r;
+      });
+      // Sprite tiles: each C ROM pair interleaved byte by byte.
+      const c0 = c.c1.length, spr = new Uint8Array(c0 * nc);
+      const swap = swappedCrc && crc32(c.c1) === swappedCrc;
+      const half = (r) => (swap ? cat(r.subarray(r.length / 2), r.subarray(0, r.length / 2)) : r);
+      for (let k = 0; k < nc; k += 2) {
+        const a = half(c[`c${k + 1}`]), b = half(c[`c${k + 2}`]), at = k * c0;
+        for (let i = 0; i < c0; i++) { spr[at + i * 2] = a[i]; spr[at + i * 2 + 1] = b[i]; }
+      }
+      return {
+        bios: swapWords(c.bios), sfix: c.sfix, zoom: c.zoom, p: cat(...parts),
+        s: c[`${num}-s1`], m: c[`${num}-m1`], v: cat(...Array.from({ length: nv }, (_, i) => c[`v${i + 1}`])), c: spr,
+      };
+    },
+  };
+}
+
+let CRC_TABLE = null;
+function crc32(data) {
+  if (!CRC_TABLE) CRC_TABLE = Int32Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c; });
+  let crc = -1;
+  for (let i = 0; i < data.length; i++) crc = CRC_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ -1) >>> 0;
+}
+
+// A 64K address space image: ROMs at their addresses, 0xFF elsewhere.
+function place(parts) {
+  const out = new Uint8Array(0x10000).fill(0xFF);
+  for (const [rom, at] of parts) out.set(rom, at);
+  return out;
 }
 
 function cat(...parts) {

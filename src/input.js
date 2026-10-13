@@ -2,7 +2,8 @@
 // down, fire, coin, start).
 //
 // Keys: arrows / WASD to move, Space / Z to fire, X / Shift for a second
-// button (also fire in one-button games), Q / E (or the mouse wheel) to turn
+// button (also fire in one-button games), F for a third (or the second's job in
+// two-button games), Q / E (or the mouse wheel) to turn
 // a dial, I / J / K / L to aim in twin-stick games (Robotron), H for
 // hyperspace and V for inviso (Defender, Stargate), 5 or C for a
 // coin, 1 or Return to start (2 for a two-player start).
@@ -13,6 +14,7 @@ const UP = new Set(['ArrowUp', 'KeyW']);
 const DOWN = new Set(['ArrowDown', 'KeyS']);
 const FIRE = new Set(['Space', 'KeyZ']);
 const FIRE2 = new Set(['KeyX', 'ShiftLeft', 'ShiftRight']);
+const FIRE3 = new Set(['KeyF']);                     // a third button, where a game has one
 const SPIN_LEFT = new Set(['KeyQ']);
 const SPIN_RIGHT = new Set(['KeyE']);
 const KEY_SPIN = 3;           // dial counts per frame while Q / E is held
@@ -21,7 +23,7 @@ const AIM_UP = new Set(['KeyI']), AIM_DOWN = new Set(['KeyK']), AIM_LEFT = new S
 const COIN = new Set(['Digit5', 'KeyC', 'Tab']);
 const START1 = new Set(['Digit1', 'Enter', 'NumpadEnter']);
 const START2 = new Set(['Digit2']);
-const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...HYPER, ...INVISO, ...COIN, ...START1, ...START2]);
+const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...FIRE3, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...HYPER, ...INVISO, ...COIN, ...START1, ...START2]);
 
 export class Input {
   constructor() {
@@ -55,7 +57,7 @@ export class Input {
   // Read everything into one control state for the board.
   read() {
     const k = this.keys, any = (set) => [...set].some((c) => k.has(c));
-    let left = any(LEFT), right = any(RIGHT), up = any(UP), down = any(DOWN), fire = any(FIRE), fire2 = any(FIRE2);
+    let left = any(LEFT), right = any(RIGHT), up = any(UP), down = any(DOWN), fire = any(FIRE), fire2 = any(FIRE2), fire3 = any(FIRE3);
     let spin = (any(SPIN_RIGHT) ? KEY_SPIN : 0) - (any(SPIN_LEFT) ? KEY_SPIN : 0) + this.wheel;
     this.wheel = 0;
     let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = any(START2);
@@ -71,6 +73,7 @@ export class Input {
       right ||= !!(d & 0x80);
       fire ||= src.fire();
       fire2 ||= src.fire2();
+      fire3 ||= src.fire3 ? src.fire3() : false;
       spin += src.spin();
       const a = src.aim ? src.aim() : 0;
       aim.up ||= !!(a & 0x10); aim.down ||= !!(a & 0x20); aim.left ||= !!(a & 0x40); aim.right ||= !!(a & 0x80);
@@ -84,8 +87,8 @@ export class Input {
       const b = (i) => pad.buttons[i] && pad.buttons[i].pressed;
       const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
       const pl = ax < -0.5 || b(14), pr = ax > 0.5 || b(15), pu = ay < -0.5 || b(12), pd = ay > 0.5 || b(13);
-      const pf = b(0) || b(2), pf2 = b(1) || b(3);
-      left ||= pl; right ||= pr; up ||= pu; down ||= pd; fire ||= pf; fire2 ||= pf2;
+      const pf = b(0) || b(2), pf2 = b(1), pf3 = b(3);
+      left ||= pl; right ||= pr; up ||= pu; down ||= pd; fire ||= pf; fire2 ||= pf2; fire3 ||= pf3;
       if (!analog && Math.hypot(ax, ay) > 0.15) analog = { x: ax, y: ay };
       // The right stick aims in twin-stick games.
       const rx = pad.axes[2] || 0, ry = pad.axes[3] || 0;
@@ -95,10 +98,10 @@ export class Input {
       if (b(5)) spin += KEY_SPIN;
       if (b(8)) coin = true;      // Back / Select
       if (b(9)) start1 = true;    // Start
-      if (this.onActivity && (pl || pr || pu || pd || pf || pf2 || b(8) || b(9))) this.onActivity();
+      if (this.onActivity && (pl || pr || pu || pd || pf || pf2 || pf3 || b(8) || b(9))) this.onActivity();
       break;                      // one player
     }
 
-    return { left, right, up, down, fire, fire2, spin, coin, start1, start2, aim, hyper, inviso, analog };
+    return { left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2, aim, hyper, inviso, analog };
   }
 }

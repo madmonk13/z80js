@@ -128,6 +128,14 @@ body.lefty .zone.joy .box { right: 10px; left: calc(10px + var(--right-inner, 0p
 body.lefty .zone.fire .box { left: 10px; right: calc(10px + var(--left-inner, 0px)); }
 body.show-zones.two-buttons.portrait .zone .box.fire2 { bottom: calc(100% - var(--split, 50%) + 5px); }
 body.two-buttons.portrait .zone .box.fire { top: calc(var(--split, 50%) + 5px); }
+/* Three-button games: the fire side in thirds, split at --split3 and --split
+   (set for both orientations by layoutZones). */
+body.show-zones .zone .box.fire3 { display: none; }
+body.show-zones.three-buttons .zone .box.fire3 { display: flex; bottom: calc(100% - var(--split3) + 5px); }
+body.show-zones.three-buttons .zone .box.fire2 { top: calc(var(--split3) + 5px); bottom: calc(100% - var(--split) + 5px); }
+body.three-buttons .zone .box.fire { top: calc(var(--split) + 5px); }
+body.show-zones.three-buttons.portrait .zone .box.fire2 { top: calc(var(--split3) + 5px); bottom: calc(100% - var(--split) + 5px); }
+body.three-buttons.portrait .zone .box.fire { top: calc(var(--split) + 5px); }
 .zone .hint { z-index: 1; }
 /* Games without a fire button: one stick zone across the whole surface. */
 body.stick-only .zone.fire { display: none; }

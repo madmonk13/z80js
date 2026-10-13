@@ -109,7 +109,13 @@ const RESUME_EVERY_MS = 5000;
 
 function saveResume() {
   if (!board || !settings.resume || !state.romId) return;
-  store.trySet(RESUME + state.romId, encode({ v: RESUME_VERSION, board: board.constructor.id, bv: board.constructor.stateVersion ?? 1, state: board.saveState() }));
+  const key = RESUME + state.romId;
+  const text = encode({ v: RESUME_VERSION, board: board.constructor.id, bv: board.constructor.stateVersion ?? 1, state: board.saveState() });
+  if (store.trySet(key, text)) return;
+  // Out of room (the later boards' states run to several hundred K): drop the
+  // other games' resume points and try again.
+  for (const k of store.keys()) if (k.startsWith(RESUME) && k !== key) store.remove(k);
+  store.trySet(key, text);
 }
 
 function restoreResume(id) {
@@ -155,18 +161,22 @@ async function loadSet(bytes, name, id) {
   touch.eightWay = board.controls === 'eight-way';
   touch.twinStick = !!board.twinStick;
   touch.stickOnly = board.buttons === 0 && !touch.twinStick;
-  touch.twoButtons = board.buttons === 2;
+  touch.twoButtons = board.buttons >= 2;
+  touch.threeButtons = board.buttons === 3;
   touch.dial = !!board.dialControl;
   touch.stickDial = !!board.spinner;
   touch.dialSpeed = board.dialSpeed ?? 4;     // dial counts a frame at full push
   document.body.classList.toggle('two-way', twoWay);
   document.body.classList.toggle('stick-only', touch.stickOnly);
   document.body.classList.toggle('two-buttons', touch.twoButtons);
+  document.body.classList.toggle('three-buttons', touch.threeButtons);
   $('joyHintText').textContent = twoWay ? 'Drag left or right on this side'
     : touch.stickOnly ? 'Touch & drag anywhere' : 'Touch & drag on this side';
   const [dialTitle, dialText] = board.dialHint ?? ['Fire & aim', 'Hold to fire; push left or right to aim'];
-  $('fireHintTitle').textContent = touch.dial ? dialTitle : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
+  $('fireHintTitle').textContent = touch.dial ? dialTitle : touch.threeButtons ? `Fire · ${board.button2} · ${board.button3}`
+    : touch.twoButtons ? `Fire · ${board.button2}` : 'Fire';
   $('fireHintText').textContent = touch.dial ? dialText
+    : touch.threeButtons ? `Bottom fires, middle is ${board.button2.toLowerCase()}, top is ${board.button3.toLowerCase()}`
     : touch.twoButtons ? `Bottom half fires, top half is ${board.button2.toLowerCase()}` : 'Tap on this side';
   // The control-zone outlines' labels.
   $('stickZoneTitle').textContent = 'Move';
@@ -178,9 +188,10 @@ async function loadSet(bytes, name, id) {
     $('fireHintText').textContent = 'Drag on this side to shoot that way';
   }
   $('fire2ZoneTitle').textContent = board.button2 || '';
+  $('fire3ZoneTitle').textContent = board.button3 || '';
   renderSwitches();
   layout2D();
-  const res = library.add(name, bytes, Board.title);
+  const res = await library.add(name, bytes, Board.title);
   if (!res.stored) toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.');
   state.romId = id || res.id;
   restoreResume(state.romId);
@@ -204,14 +215,14 @@ function refreshLibrary() {
   });
   const n = library.list().length;
   $('libraryInfo').textContent = n
-    ? `${n} saved · ${Math.ceil(library.usage() / 1024)} KB on this device`
+    ? `${n} saved · ${(library.usage() / 1048576).toFixed(1)} MB on this device`
     : 'Add a game\'s ROM set (the zip used by MAME) to enable it. Sets are kept on this device.';
 }
 
 async function playEntry(entry) {
   try {
     await withLoading(entry.name, async () => {
-      const bytes = library.get(entry.id);
+      const bytes = await library.get(entry.id);
       if (!bytes) throw new Error('its saved data is missing');
       await loadSet(bytes, entry.name, entry.id);
     });
@@ -424,15 +435,15 @@ function layout2D() {
   const st = parseFloat(ps.paddingTop) || 0, sb = parseFloat(ps.paddingBottom) || 0;
   const W = window.innerWidth, H = window.innerHeight;
   const pad = 10;
-  const aspect = board ? board.width / board.height : 3 / 4;
+  const aspect = board ? board.aspect ?? board.width / board.height : 3 / 4;   // boards with non-square pixels set aspect
   const barH = $('bar').offsetHeight;
   const availW = W - sl - sr - pad * 2;
   const portrait = H > W;
   // Portrait sits below the bar and keeps the lower part of the screen free for
   // thumbs. Landscape uses the full height, running up behind the bar.
-  // Two-button games give the picture a little less room in portrait, so the
-  // two stacked buttons below it are each a comfortable size.
-  const share = touch.twoButtons ? 0.65 : 0.7;
+  // Two- and three-button games give the picture a little less room in
+  // portrait, so the stacked buttons below it are each a comfortable size.
+  const share = touch.threeButtons ? 0.6 : touch.twoButtons ? 0.65 : 0.7;
   const availH = portrait ? (H - barH - sb) * share : H - st - sb;
   const w = Math.max(80, Math.min(availW, availH * aspect));
   const h = w / aspect;
@@ -463,6 +474,14 @@ function layoutZones(portrait, pic) {
     touch.fire2Area = { left: fireLeft, right: fireRight, top: band, bottom: split };
     style.setProperty('--band-top', `${band - sr.top}px`);
     style.setProperty('--split', `${split - sr.top}px`);
+    if (touch.threeButtons) {
+      // Thirds of the band: the third button on top, the second in the middle.
+      const t1 = band + (sr.bottom - band) / 3, t2 = band + (sr.bottom - band) * 2 / 3;
+      touch.fire3Area = { left: fireLeft, right: fireRight, top: band, bottom: t1 };
+      touch.fire2Area = { left: fireLeft, right: fireRight, top: t1, bottom: t2 };
+      style.setProperty('--split3', `${t1 - sr.top}px`);
+      style.setProperty('--split', `${t2 - sr.top}px`);
+    }
     style.setProperty('--left-inner', '0px');
     style.setProperty('--right-inner', '0px');
   } else {
@@ -473,6 +492,13 @@ function layoutZones(portrait, pic) {
     touch.fire2Area = settings.leftHanded
       ? { left: sr.left, right: mid - leftInner, top: sr.top, bottom: sr.top + sr.height / 2 }
       : { left: mid + rightInner, right: sr.right, top: sr.top, bottom: sr.top + sr.height / 2 };
+    if (touch.threeButtons) {
+      const l = touch.fire2Area.left, r = touch.fire2Area.right, t1 = sr.top + sr.height / 3, t2 = sr.top + sr.height * 2 / 3;
+      touch.fire3Area = { left: l, right: r, top: sr.top, bottom: t1 };
+      touch.fire2Area = { left: l, right: r, top: t1, bottom: t2 };
+      style.setProperty('--split3', `${sr.height / 3}px`);
+      style.setProperty('--split', `${sr.height * 2 / 3}px`);
+    }
     style.setProperty('--left-inner', `${leftInner}px`);
     style.setProperty('--right-inner', `${rightInner}px`);
   }
@@ -512,6 +538,7 @@ function tick(now) {
     const frameTime = 1 / board.refresh;
     while (acc >= frameTime && ran < 4) {
       const s = input.read();
+      if (board.buttons < 3) s.fire2 ||= s.fire3;   // a third button is the second's job here
       if (board.buttons < 2) s.fire ||= s.fire2;    // a second button is just fire here
       board.setInputs(s);
       board.runFrame();
@@ -537,7 +564,7 @@ function tick(now) {
   refreshLibrary();
   const lastId = library.lastId();
   const last = lastId ? library.entry(lastId) : null;
-  const bytes = last && library.get(last.id);
+  const bytes = last && await library.get(last.id);
   if (bytes) {
     try {
       await withLoading(last.name, () => loadSet(bytes, last.name, last.id));
