@@ -6,7 +6,7 @@
 
 import { Z80 } from './z80.js';
 import { GalaxianSound } from './galaxian-sound.js';
-import { decodeTiles, promPalette, rgba, rotate90, run } from './video.js';
+import { decodeTiles, promPalette, rgba, rotate90, rotate270, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
@@ -188,7 +188,7 @@ export class Galaxian {
     }
 
     // Crop to the visible lines and rotate for the vertical monitor.
-    rotate90(out.subarray(TOP * NATIVE_W, (TOP + NATIVE_H) * NATIVE_W), NATIVE_W, NATIVE_H, this.frame);
+    (this.constructor.rotation === 270 ? rotate270 : rotate90)(out.subarray(TOP * NATIVE_W, (TOP + NATIVE_H) * NATIVE_W), NATIVE_W, NATIVE_H, this.frame);
   }
 
   // Hooks for boards built on this one (Frogger, Scramble): the background
@@ -238,7 +238,7 @@ Galaxian.switches = [
 // flipped per byte), undone at load.
 export class MoonCresta extends Galaxian {
   constructor(roms) {
-    super({ ...roms, main: MoonCresta.decrypt(roms.main) });
+    super({ ...roms, main: new.target.plain ? roms.main : MoonCresta.decrypt(roms.main) });
     this.gfxBank = [0, 0, 0];
   }
 
@@ -299,3 +299,50 @@ MoonCresta.switches = [
   { id: 'bonus', label: 'Bonus life', options: [['30K', 0x00], ['50K', 0x40]], default: 0x00 },
   { id: 'language', label: 'Language', options: [['English', 0x80], ['Japanese', 0x00]], default: 0x80 },
 ];
+
+// Eagle (1980): Centuri's Moon Cresta with new graphics, unencrypted.
+export class Eagle extends MoonCresta {}
+Eagle.plain = true;
+Eagle.id = 'eagle';
+Eagle.title = 'Eagle';
+Eagle.switches = MoonCresta.switches;
+
+// ---------------------------------------------------------------- other games on the Galaxian board
+//
+// Clones and new games on unmodified Galaxian boards (1980-82). They differ
+// in their switches, a few in their controls (an 8-way stick), and Pisces / UniWar S in a graphics bank latch
+// (6002) that doubles the tiles and sprites.
+
+export class GalaxianBoardGame extends Galaxian {
+  constructor(roms) {
+    super(roms);
+    if (this.constructor.eightWay) this.controls = 'eight-way';
+    this.gfxBank = 0;
+  }
+  saveState() { return { ...super.saveState(), gfxBank: this.gfxBank }; }
+  loadState(s) { super.loadState(s); this.gfxBank = s.gfxBank ?? 0; }
+  reset() { super.reset(); this.gfxBank = 0; }
+  write(a, v) {
+    if (a === 0x6002 && this.constructor.gfxBanks) { this.gfxBank = v & 1; return; }
+    super.write(a, v);
+  }
+  charCode(c) { return c | (this.gfxBank << 8); }
+  spriteCode(c) { return c | (this.gfxBank << 6); }
+  setInputs(s) {
+    super.setInputs(s);
+    const k = this.constructor;
+    if (k.eightWay) this.in0 |= (s.up ? 0x80 : 0) | (s.down ? 0x40 : 0);
+    this.in0 |= k.in0 || 0;
+    this.in1 |= k.in1 || 0;
+  }
+  applySwitches() { this.dsw = this.constructor.dsw; }
+}
+
+const galaxianGame = (cls, id, title, extra) => { Object.assign(cls, { id, title, switches: [] }, extra); return cls; };
+export const UniWarS = galaxianGame(class UniWarS extends GalaxianBoardGame {}, 'uniwars', 'UniWar S', { gfxBanks: true, dsw: 0x01 });
+export const Pisces = galaxianGame(class Pisces extends GalaxianBoardGame {}, 'pisces', 'Pisces', { gfxBanks: true, dsw: 0x00 });
+export const BlackHole = galaxianGame(class BlackHole extends GalaxianBoardGame {}, 'blkhole', 'Black Hole', { dsw: 0x02 });
+export const Swarm = galaxianGame(class Swarm extends GalaxianBoardGame {}, 'swarm', 'Swarm', { dsw: 0x00 });
+export const RedUFO = galaxianGame(class RedUFO extends GalaxianBoardGame {}, 'redufo', 'Defend the Terra Attack on the Red UFO', { dsw: 0x01 });
+export const MoonAlien = galaxianGame(class MoonAlien extends GalaxianBoardGame {}, 'moonaln', 'Moon Alien', { dsw: 0x01 });
+export const WarOfTheBugs = galaxianGame(class WarOfTheBugs extends GalaxianBoardGame {}, 'warofbug', 'War of the Bugs', { eightWay: true, dsw: 0x0A });

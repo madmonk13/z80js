@@ -34,6 +34,8 @@ function makeOp() {
   return { dt: 0, mul: 1, tl: 0, ks: 0, ar: 0, dr: 0, sr: 0, sl: 0, rr: 0, phase: 0, att: 96, stage: OFF, out: 0 };
 }
 
+const FM_STATE = ['addr', 'ch', 'timerA', 'timerB', 'countA', 'countB', 'timerCtl', 'flags'];
+
 export class YM2203 {
   constructor(clock, gain = 1) {
     this.clock = clock;
@@ -42,23 +44,52 @@ export class YM2203 {
     this.reset();
   }
 
-  saveState() { return { fm: capture(this, ['addr', 'ch']), ssg: this.ssg.saveState() }; }
-  loadState(s) { apply(this, ['addr', 'ch'], s.fm); this.ssg.loadState(s.ssg); }
+  saveState() { return { fm: capture(this, FM_STATE), ssg: this.ssg.saveState() }; }
+  loadState(s) { apply(this, FM_STATE, s.fm); this.ssg.loadState(s.ssg); }
 
   reset() {
     this.addr = 0;
     this.ch = [0, 1, 2].map(() => ({ fnum: 0, block: 0, fb: 0, alg: 0, ops: [makeOp(), makeOp(), makeOp(), makeOp()], fb1: 0, fb2: 0 }));
+    this.timerA = 0; this.timerB = 0; this.countA = 0; this.countB = 0; this.timerCtl = 0; this.flags = 0;
     this.ssg.reset();
     this.out = 0;
   }
 
   select(v) { this.addr = v & 0xFF; }
-  status() { return 0; }                     // never busy, timers unused
+  status() { return this.flags; }            // timer A (bit 0) and B (bit 1) overflowed; never busy
+  get irq() { return (this.flags & 3) !== 0; }
+
+  // Timer A counts 72 clocks a step from its 10-bit value, B 1152 from its 8-bit one;
+  // the board calls this as time passes (only boards that use the timer interrupt need to).
+  periodA() { return (72 * (1024 - this.timerA)) / this.clock; }
+  periodB() { return (1152 * (256 - this.timerB)) / this.clock; }
+  timers(dt) {
+    if (this.timerCtl & 1) {
+      this.countA -= dt;
+      while (this.countA <= 0) { this.countA += this.periodA(); if (this.timerCtl & 4) this.flags |= 1; }
+    }
+    if (this.timerCtl & 2) {
+      this.countB -= dt;
+      while (this.countB <= 0) { this.countB += this.periodB(); if (this.timerCtl & 8) this.flags |= 2; }
+    }
+  }
   read() { return this.addr < 16 ? (this.ssg.select(this.addr), this.ssg.read()) : 0; }
 
   write(v) {
     const r = this.addr;
     if (r < 0x10) { this.ssg.select(r); this.ssg.write(v); return; }
+    switch (r) {
+      case 0x24: this.timerA = (this.timerA & 3) | (v << 2); return;
+      case 0x25: this.timerA = (this.timerA & 0x3FC) | (v & 3); return;
+      case 0x26: this.timerB = v; return;
+      case 0x27:
+        if ((v & 1) && !(this.timerCtl & 1)) this.countA = this.periodA();
+        if ((v & 2) && !(this.timerCtl & 2)) this.countB = this.periodB();
+        if (v & 0x10) this.flags &= ~1;
+        if (v & 0x20) this.flags &= ~2;
+        this.timerCtl = v & 0x0F;
+        return;
+    }
     if (r === 0x28) {                        // key on/off
       const c = this.ch[v & 3];
       if (!c) return;

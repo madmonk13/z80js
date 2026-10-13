@@ -5,7 +5,9 @@
 
 import { Z80 } from './z80.js';
 import { WSG } from './wsg.js';
-import { decodeTiles, promPalette, rotate90, run } from './video.js';
+import { AY8910 } from './ay8910.js';
+import { SoundMix, RATE } from './mixer.js';
+import { decodeTiles, promPalette, rotate90, rotate270, run } from './video.js';
 import { capture, apply } from './state.js';
 
 const NATIVE_W = 288, NATIVE_H = 224;
@@ -36,6 +38,7 @@ export class PacMan {
     this.in0 = 0xFF;
     this.in1 = 0xFF;
     this.applySwitches(defaultSwitches(this.constructor.switches));
+    if (this.constructor.rotation === 0) { this.width = NATIVE_W; this.height = NATIVE_H; }
     this.frame = new Uint32Array(this.width * this.height);
     this.native = new Uint32Array(NATIVE_W * NATIVE_H);
 
@@ -159,7 +162,15 @@ export class PacMan {
       this.drawSprite(code >> 2, color, code & 1, code & 2, sx, sy);
     }
 
-    rotate90(out, NATIVE_W, NATIVE_H, this.frame);
+    this.present();
+  }
+
+  // The monitor is mounted vertically (turned one way or the other) or, for a few games, upright.
+  present() {
+    const rot = this.constructor.rotation ?? 90;
+    if (rot === 90) rotate90(this.native, NATIVE_W, NATIVE_H, this.frame);
+    else if (rot === 270) rotate270(this.native, NATIVE_W, NATIVE_H, this.frame);
+    else this.frame.set(this.native);
   }
 
   drawSprite(code, color, flipX, flipY, sx, sy) {
@@ -499,3 +510,181 @@ export class PacManPlus extends PacMan {
 PacManPlus.id = 'pacplus';
 PacManPlus.title = 'Pac-Man Plus';
 PacManPlus.switches = PacMan.switches;
+
+// ---------------------------------------------------------------- other games on the board
+//
+// Many 1981-85 games ran on Pac-Man boards, some with a daughterboard adding
+// ROM at 8000-BFFF, some with their ROMs' data or address lines scrambled.
+// Each class below gives its decoding, its controls and its switches.
+
+const bitswap = (v, order) => order.reduce((r, b, i) => r | (((v >> b) & 1) << (7 - i)), 0);
+
+// Graphics with data lines 4/6 and address lines 0/2 swapped (Eyes, Mr. TNT, Woodpecker...).
+function eyesGfx(rom) {
+  const out = new Uint8Array(rom.length);
+  for (let i = 0; i < rom.length; i += 8) {
+    for (let j = 0; j < 8; j++) out[i + j] = bitswap(rom[i + ((j & ~7) | ((j >> 2) & 1) | (j & 2) | ((j & 1) << 2))], [7, 4, 5, 6, 3, 2, 1, 0]);
+  }
+  return out;
+}
+
+// Jump Shot's program encryption: like Pac-Man Plus's, with its own six keys.
+const JUMPSHOT_KEYS = [
+  [[7, 6, 5, 4, 3, 2, 1, 0], 0x00], [[7, 6, 3, 4, 5, 2, 1, 0], 0x20], [[5, 0, 4, 3, 7, 1, 2, 6], 0xA4],
+  [[5, 0, 4, 3, 7, 1, 2, 6], 0x8C], [[2, 3, 1, 7, 4, 6, 0, 5], 0x6E], [[2, 3, 4, 7, 1, 6, 0, 5], 0x4E],
+];
+const JUMPSHOT_PICK = [0, 2, 4, 4, 4, 2, 0, 2, 2, 0, 2, 4, 4, 2, 0, 2, 5, 3, 5, 1, 5, 3, 5, 3, 1, 5, 1, 5, 5, 3, 5, 3];
+function jumpshotDecrypt(addr, e) {
+  let k = JUMPSHOT_PICK[(addr & 1) | ((addr >> 1) & 2) | ((addr >> 3) & 4) | ((addr >> 4) & 8) | ((addr >> 5) & 16)];
+  if (addr & 0x800) k ^= 1;
+  const [order, xor] = JUMPSHOT_KEYS[k];
+  return bitswap(e, order) ^ xor;
+}
+
+// Ponpoko's graphics are stored with the 8-byte groups in another order.
+function ponpokoGfx(tiles, sprites) {
+  const t = tiles.slice(), sp = sprites.slice();
+  for (let i = 0; i < t.length; i += 0x10) for (let j = 0; j < 8; j++) { t[i + j] = tiles[i + j + 8]; t[i + j + 8] = tiles[i + j]; }
+  for (let i = 0; i < sp.length; i += 0x20) for (let j = 0; j < 8; j++) {
+    sp[i + j] = sprites[i + j + 0x08]; sp[i + j + 0x08] = sprites[i + j + 0x10]; sp[i + j + 0x10] = sprites[i + j + 0x18]; sp[i + j + 0x18] = sprites[i + j];
+  }
+  return [t, sp];
+}
+
+export class PacManBoardGame extends PacMan {
+  constructor(roms) {
+    const k = new.target, d = k.decode;
+    let { main, tiles, sprites } = roms;
+    if (d === 'eyes') main = main.map((v, a) => (a < 0x4000 ? bitswap(v, [7, 6, 3, 4, 5, 2, 1, 0]) : v));
+    if (d === 'jumpshot') main = main.map((v, a) => (a < 0x4000 ? jumpshotDecrypt(a, v) : v));
+    if (d === 'eyes' || d === 'woodpek') { tiles = eyesGfx(tiles); sprites = eyesGfx(sprites); }
+    if (d === 'ponpoko') [tiles, sprites] = ponpokoGfx(tiles, sprites);
+    super({ ...roms, main, tiles, sprites });
+    this.controls = k.controls || 'four-way';
+    this.buttons = k.buttons ?? 1;
+  }
+  // The daughterboard ROM at 8000-BFFF, where there is one (else A15 isn't decoded).
+  read(a) {
+    if (a >= 0x8000 && a < 0xC000 && this.roms.ext) return this.roms.ext[a - 0x8000];
+    if ((a & 0x7FFF) >= 0x5000 && (a & 0x7FFF) < 0x6000 && (a & 0xC0) === 0xC0) return this.dsw2 ?? 0xFF;
+    return super.read(a);
+  }
+  out(port, v) { super.out(port, this.constructor.vectorMap?.[v] ?? v); }
+  // IN0: stick, coin (active low). IN1: fire (10), starts (active low).
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.up ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.right ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.coin ? 0x20 : 0));
+    this.in1 = 0xFF & ~((s.fire ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0));
+  }
+  applySwitches(v) { [this.dsw1, this.dsw2] = this.constructor.dsw(v); }
+}
+
+const lives23 = (def) => ({ id: 'lives', label: 'Lives', options: [['2', 0x0C], ['3', 0x08], ['4', 0x04], ['5', 0x00]], default: def });
+
+export class Eyes extends PacManBoardGame {}
+Eyes.id = 'eyes'; Eyes.title = 'Eyes';
+Eyes.decode = 'eyes';
+Eyes.switches = [lives23(0x08)];
+Eyes.dsw = (v) => [0xF3 | v.lives, 0xFF];
+
+export class MrTNT extends PacManBoardGame {}
+MrTNT.id = 'mrtnt'; MrTNT.title = 'Mr. TNT';
+MrTNT.decode = 'eyes';
+MrTNT.switches = [lives23(0x08)];
+MrTNT.dsw = (v) => [0xF3 | v.lives, 0xFF];
+
+export class LizardWizard extends PacManBoardGame {}
+LizardWizard.id = 'lizwiz'; LizardWizard.title = 'Lizard Wizard';
+LizardWizard.controls = 'eight-way';
+LizardWizard.switches = [lives23(0x08)];
+LizardWizard.dsw = (v) => [0xF3 | v.lives, 0xFF];
+
+
+
+export class JumpShot extends PacManBoardGame {
+  // IN1: shoot is bit 5 here and the starts are on the shoot buttons (1 or 2 players).
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.up ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.right ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.coin ? 0x20 : 0));
+    this.in1 = 0xFF & ~((s.fire || s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0));
+  }
+}
+JumpShot.id = 'jumpshot'; JumpShot.title = 'Jump Shot';
+JumpShot.decode = 'jumpshot';
+JumpShot.controls = 'eight-way';
+JumpShot.switches = [{ id: 'time', label: 'Game time', options: [['2 minutes', 0x00], ['3 minutes', 0x01], ['4 minutes', 0x02], ['5 minutes', 0x03]], default: 0x01 }];
+JumpShot.dsw = (v) => [0xDC | v.time, 0xFF];
+
+// Ponpoko: an upright monitor, and its controls are active high.
+export class Ponpoko extends PacManBoardGame {
+  setInputs(s) {
+    this.in0 = ((s.up ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.right ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.fire ? 0x10 : 0)) | (s.coin ? 0 : 0x20) | 0xC0;
+    this.in1 = (s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0);
+  }
+}
+Ponpoko.id = 'ponpoko'; Ponpoko.title = 'Ponpoko';
+Ponpoko.decode = 'ponpoko';
+Ponpoko.rotation = 0;
+Ponpoko.controls = 'eight-way';
+Ponpoko.switches = [{ id: 'lives', label: 'Lives', options: [['2', 0x00], ['3', 0x10], ['4', 0x20], ['5', 0x30]], default: 0x20 }];
+Ponpoko.dsw = (v) => [0xC1 | v.lives, 0xB1];
+
+// Make Trax and Magic Brush: Crush Roller's board and protection.
+export class MakeTrax extends CrushRoller {}
+MakeTrax.id = 'maketrax'; MakeTrax.title = 'Make Trax';
+MakeTrax.switches = CrushRoller.switches;
+
+export class MagicBrush extends CrushRoller {}
+MagicBrush.id = 'mbrush'; MagicBrush.title = 'Magic Brush';
+MagicBrush.switches = CrushRoller.switches;
+
+// Dream Shopper (Sanritsu, 1982): the Pac-Man board with an AY-3-8910 on
+// I/O ports 6 (data) and 7 (register) in place of the waveform chip, a
+// vblank NMI (not gated by 5000) in place of the IRQ, and more program at
+// 8000-AFFF.
+export class DreamShopper extends PacManBoardGame {
+  constructor(roms) {
+    super(roms);
+    this.ay = new AY8910(14318000 / 8, () => 0xFF, 1);
+    this.sound = new SoundMix([this.ay], 1);
+    this.sampleCarry = 0;
+  }
+  saveState() { return { ...super.saveState(), ay: this.sound.saveState(), sampleCarry: this.sampleCarry }; }
+  loadState(s) { super.loadState(s); this.sound.loadState(s.ay); this.sampleCarry = s.sampleCarry; }
+  reset() { super.reset(); this.sound?.reset(); this.sampleCarry = 0; }
+  // IN0: stick, fire (10), coin; IN1: starts.
+  setInputs(s) {
+    super.setInputs(s);
+    this.in0 &= ~(s.fire ? 0x10 : 0);
+    this.in1 |= 0x10;
+  }
+  // RAM fills 4800-4BFF too (unconnected on Pac-Man).
+  read(a) {
+    const m = a & 0x5FFF;
+    if ((a & 0x4000) && m >= 0x4800 && m < 0x4C00) return this.ram[m - 0x4000];
+    return super.read(a);
+  }
+  write(a, v) {
+    const m = a & 0x5FFF;
+    if ((a & 0x4000) && m >= 0x4800 && m < 0x4C00) { this.ram[m - 0x4000] = v; return; }
+    super.write(a, v);
+  }
+  out(port, v) {
+    if ((port & 0xFF) === 6) this.ay.write(v);
+    else if ((port & 0xFF) === 7) this.ay.select(v);
+  }
+  runFrame() {
+    const cpu = this.cpu, perLine = RATE / this.refresh / 264;
+    for (let line = 0; line < 264; line++) {
+      if (line === 224) { cpu.nmi(); this.render(); }
+      cpu.run(192);
+      this.sampleCarry += perLine;
+      while (this.sampleCarry >= 1) { this.sampleCarry -= 1; this.sound.sample(); }
+    }
+  }
+}
+DreamShopper.id = 'dremshpr'; DreamShopper.title = 'Dream Shopper';
+DreamShopper.rotation = 270;
+DreamShopper.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x30], ['4', 0x20], ['5', 0x10], ['6', 0x00]], default: 0x30 },
+  { id: 'bonus', label: 'Bonus', options: [['30000', 0x08], ['50000', 0x04], ['70000', 0x00], ['None', 0x0C]], default: 0x0C },
+];
+DreamShopper.dsw = (v) => [0xC3 | v.lives | v.bonus, 0xFF];

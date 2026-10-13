@@ -27,8 +27,10 @@ export class LadyBug {
 
   // roms: { main 24K, chars 8K, sprites 8K, palette 32, spriteLut 32 }
   constructor(roms) {
-    this.width = NATIVE_H;
-    this.height = NATIVE_W;
+    // Lady Bug's monitor is vertical; Universal's other games on the board are upright.
+    this.upright = !!this.constructor.upright;
+    this.width = this.upright ? NATIVE_W : NATIVE_H;
+    this.height = this.upright ? NATIVE_H : NATIVE_W;
     this.refresh = 60;
     this.controls = 'four-way';
     this.buttons = 0;
@@ -86,7 +88,7 @@ export class LadyBug {
       case 0x9001: return 0x3F | (this.line >= VBLANK_LINE ? 0x80 : 0x40);   // two vblank bits, opposite senses
       case 0x9002: return this.dsw0;
       case 0x9003: return this.dsw1;
-      case 0xE000: return 0xFF;
+      case 0xE000: return this.in2 ?? 0xFF;
     }
     return a >= 0x8000 && a < 0x9000 ? 0 : 0xFF;
   }
@@ -179,7 +181,7 @@ export class LadyBug {
       }
     }
 
-    rotate270(out, NATIVE_W, NATIVE_H, this.frame);
+    if (this.upright) this.frame.set(out); else rotate270(out, NATIVE_W, NATIVE_H, this.frame);
   }
 }
 
@@ -189,3 +191,27 @@ LadyBug.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x80], ['5', 0x00]], default: 0x80 },
   { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x03], ['Med', 0x02], ['Hard', 0x01], ['Hardest', 0x00]], default: 0x03 },
 ];
+
+// Cosmic Avenger (1981) and Snap Jack (1982): Universal's other games on the
+// Lady Bug board, on upright monitors. Cosmic Avenger fires (IN0 bit 4) and
+// drops bombs (the second button, read at E000).
+export class CosmicAvenger extends LadyBug {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; this.buttons = 2; this.button2 = 'Bomb'; }
+  setInputs(s) {
+    super.setInputs(s);
+    if (s.fire) this.in0 &= ~0x10;
+    this.in2 = 0xFF & ~(s.fire2 ? 0x01 : 0);
+  }
+  applySwitches(v) { this.dsw0 = 0x07 | v.lives; this.dsw1 = 0xFF; }
+}
+CosmicAvenger.id = 'cavenger'; CosmicAvenger.title = 'Cosmic Avenger';
+CosmicAvenger.upright = true;
+CosmicAvenger.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0xC0], ['4', 0x80], ['5', 0x40], ['2', 0x00]], default: 0xC0 }];
+
+export class SnapJack extends LadyBug {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; }
+  applySwitches(v) { this.dsw0 = 0x07 | v.lives; this.dsw1 = 0xFF; }
+}
+SnapJack.id = 'snapjack'; SnapJack.title = 'Snap Jack';
+SnapJack.upright = true;
+SnapJack.switches = CosmicAvenger.switches;

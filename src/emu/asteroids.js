@@ -7,7 +7,8 @@
 
 import { CPU6502 } from './m6502.js';
 import { DVG } from './dvg.js';
-import { RATE } from './mixer.js';
+import { RATE, SoundMix } from './mixer.js';
+import { Pokey, PokeyVoice } from './pokey.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
@@ -39,6 +40,17 @@ class AsteroidsSound {
   }
   setExplode(v) { this.explode = v; if (v & 0x3C) this.env[2] = ((v >> 2) & 15) / 15; }
   sample() {
+    const v = this.compute();
+    const out = v - this.dcIn + 0.995 * this.dcOut;
+    this.dcIn = v; this.dcOut = out;
+    const mask = this.buffer.length - 1;
+    this.buffer[this.writePos] = out;
+    this.writePos = (this.writePos + 1) & mask;
+    if (this.writePos === this.readPos) this.readPos = (this.readPos + 1) & mask;
+  }
+
+  // One sample of the analog circuits (Asteroids Deluxe uses only thrust and explosions).
+  compute() {
     const dt = 1 / RATE, ph = this.phase, env = this.env, r = this.reg;
     for (let i = 0; i < 2; i++) this.noise = (this.noise >> 1) | ((((this.noise) ^ (this.noise >> 3)) & 1) << 16);
     const white = (this.noise & 1) * 2 - 1;
@@ -57,12 +69,7 @@ class AsteroidsSound {
     if (env[2] > 0.001) { this.lp[1] += (white - this.lp[1]) * (0.05 + 0.05 * (3 - (this.explode >> 6))); s += env[2] * this.lp[1] * 1.2; env[2] *= Math.exp(-dt / 0.35); }
     // Extra life: a beeping tone while held.
     if (r[5] & 0x80) { ph[2] = (ph[2] + 3000 * dt) % 1; s += ph[2] < 0.5 ? 0.08 : -0.08; }
-    const out = s * 0.6 - this.dcIn + 0.995 * this.dcOut;
-    this.dcIn = s * 0.6; this.dcOut = out;
-    const mask = this.buffer.length - 1;
-    this.buffer[this.writePos] = out;
-    this.writePos = (this.writePos + 1) & mask;
-    if (this.writePos === this.readPos) this.readPos = (this.readPos + 1) & mask;
+    return s * 0.6;
   }
   available() { return (this.writePos - this.readPos) & (this.buffer.length - 1); }
   pull(out, outRate) {
@@ -89,8 +96,9 @@ export class Asteroids {
   // roms: { main (6800-7FFF) 6K, vector 2K }
   constructor(roms) {
     this.vector = true;
-    this.width = WIN.x1 - WIN.x0;
-    this.height = WIN.y1 - WIN.y0;
+    this.win = this.constructor.window || WIN;
+    this.width = this.win.x1 - this.win.x0;
+    this.height = this.win.y1 - this.win.y0;
     this.refresh = 60;
     this.controls = 'two-way';
     this.buttons = 2;
@@ -157,7 +165,7 @@ export class Asteroids {
   }
 
   runDvg() {
-    const lines = this.dvg.run(), v = this.vectors, d = v.data;
+    const lines = this.dvg.run(), v = this.vectors, d = v.data, WIN = this.win;
     let n = 0;
     for (let i = 0; i < lines.length && n < 4096; i += 5) {
       const o = n * 7, z = lines[i + 4] / 15;
@@ -200,4 +208,160 @@ Asteroids.id = 'asteroid';
 Asteroids.title = 'Asteroids';
 Asteroids.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x04], ['4', 0x00]], default: 0x04 },
+];
+
+// ---------------------------------------------------------------- Asteroids Deluxe (1980)
+//
+// The same board with a POKEY for most sounds (the analog circuits keep the
+// thrust and explosions), shields instead of hyperspace, and an EAROM that
+// keeps the high scores (`nvram`). The vector ROM grows to 4800-57FF and the
+// program to 6000-7FFF.
+
+class AnalogVoice {
+  constructor(sound) { this.snd = sound; this.out = 0; }
+  reset() { this.snd.reset(); }
+  saveState() { return this.snd.saveState(); }
+  loadState(s) { this.snd.loadState(s); }
+  sample() { this.out = this.snd.compute(); }
+}
+
+export class AsteroidsDeluxe extends Asteroids {
+  constructor(roms) {
+    super(roms);
+    this.button2 = 'Thrust';
+    this.analog = new AsteroidsSound();
+    this.pokey = new Pokey(CPU_CLOCK, 1);
+    this.pokey.readPots = () => this.dsw2;
+    this.sound = new SoundMix([new PokeyVoice(this.pokey), new AnalogVoice(this.analog)], 1);
+    this.earom = new Uint8Array(64);
+    this.nvram = this.earom;
+    this.reset();
+  }
+  saveState() { return { ...super.saveState(), earomState: [this.earomOffset, this.earomData] }; }
+  loadState(s) { super.loadState(s); [this.earomOffset, this.earomData] = s.earomState || [0, 0]; }
+
+  reset() { super.reset(); this.earomOffset = 0; this.earomData = 0; }
+
+  read(a) {
+    a &= 0x7FFF;
+    if (a >= 0x6000 && a < 0x8000) return this.roms.main[a - 0x6000];
+    if (a >= 0x4800 && a < 0x5800) return this.roms.vector[a - 0x4800];
+    if (a >= 0x2C00 && a < 0x2C10) return this.pokey.read(a & 15);
+    if (a >= 0x2C40 && a < 0x2C80) return this.earomData;
+    return super.read(a);
+  }
+
+  write(a, v) {
+    a &= 0x7FFF;
+    if (a < 0x400 || (a >= 0x4000 && a < 0x4800)) { super.write(a, v); return; }
+    if (a >= 0x2C00 && a < 0x2C10) { this.pokey.write(a & 15, v); return; }
+    if (a >= 0x3200 && a < 0x3240) { this.earomOffset = a & 0x3F; this.earomData = v; return; }
+    switch (a) {
+      case 0x3000: this.runDvg(); return;
+      case 0x3600: this.analog.setExplode(v); return;
+      case 0x3A00:                                   // EAROM control: clock in a read, or write
+        if (v & 1) this.earomData = this.earom[this.earomOffset];
+        if ((v & 0x0C) === 0x0C) this.earom[this.earomOffset] = this.earomData;
+        return;
+      case 0x3C03: this.analog.write(3, v); return; // thrust
+      case 0x3C04: this.bankSwap = v & 0x80; return;
+    }
+  }
+
+  applySwitches(v) { this.dsw = v.lives | v.difficulty; this.dsw2 = 0x9D; }
+}
+AsteroidsDeluxe.id = 'astdelux';
+AsteroidsDeluxe.title = 'Asteroids Deluxe';
+AsteroidsDeluxe.switches = [
+  { id: 'lives', label: 'Lives', options: [['2-4', 0x00], ['3-5', 0x04], ['4-6', 0x08], ['5-7', 0x0C]], default: 0x04 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Hard', 0x00], ['Easy', 0x20]], default: 0x00 },
+];
+
+// ---------------------------------------------------------------- Lunar Lander (1979)
+//
+// The Asteroids board's first use: 256 bytes of RAM, a 40 Hz picture, a
+// thrust lever (an 8-bit pot; up / down move it here) and its own analog
+// sounds: thrust noise at one of 8 volumes, 3 and 6 kHz beeps, an explosion.
+
+class LanderSound {
+  constructor() { this.reset(); }
+  reset() { this.reg = 0; this.noise = 1; this.lp = 0; this.ph3 = 0; this.ph6 = 0; this.env = 0; this.out = 0; }
+  saveState() { return capture(this, ['reg', 'noise', 'lp', 'ph3', 'ph6', 'env']); }
+  loadState(s) { apply(this, ['reg', 'noise', 'lp', 'ph3', 'ph6', 'env'], s); }
+  write(v) { if ((v & 8) && !(this.reg & 8)) this.env = 1; this.reg = v; }
+  sample() {
+    const dt = 1 / RATE, r = this.reg;
+    this.noise = (this.noise >> 1) | ((((this.noise) ^ (this.noise >> 3)) & 1) << 16);
+    const white = (this.noise & 1) * 2 - 1;
+    this.lp += (white - this.lp) * 0.08;
+    let s = this.lp * (r & 7) / 7 * 0.8;                       // thrust
+    if (this.env > 0.001) { s += this.lp * this.env * 1.2; this.env *= Math.exp(-dt / 0.6); }   // explosion
+    if (r & 0x10) { this.ph3 = (this.ph3 + 3000 * dt) % 1; s += this.ph3 < 0.5 ? 0.12 : -0.12; }
+    if (r & 0x20) { this.ph6 = (this.ph6 + 6000 * dt) % 1; s += this.ph6 < 0.5 ? 0.12 : -0.12; }
+    this.out = s * 0.6;
+  }
+}
+
+export class LunarLander extends Asteroids {
+  constructor(roms) {
+    super(roms);
+    this.refresh = 40;
+    this.controls = 'four-way';
+    this.buttons = 1;
+    this.lander = new LanderSound();
+    this.sound = new SoundMix([this.lander], 1);
+    this.thrust = 0;
+    this.reset();
+  }
+  saveState() { return { ...super.saveState(), thrust: this.thrust }; }
+  loadState(s) { super.loadState(s); this.thrust = s.thrust ?? 0; }
+
+  read(a) {
+    a &= 0x7FFF;
+    if (a < 0x2000) return this.ram[a & 0xFF];
+    if (a >= 0x6000 && a < 0x8000) return this.roms.main[a - 0x6000];
+    if (a >= 0x4800 && a < 0x6000) return this.roms.vector[a - 0x4800] ?? 0;
+    if (a >= 0x4000 && a < 0x4800) return this.vram[a - 0x4000];
+    if (a === 0x2000) return 0xFF;                  // vector generator done, no service or tilt, 3 kHz clock
+    if (a >= 0x2400 && a < 0x2408) return this.in1 & (1 << (a & 7)) ? 0x80 : 0x7F;
+    if (a >= 0x2800 && a < 0x2804) return 0xFC | ((this.dsw >> (2 * (3 - (a & 3)))) & 3);
+    if (a === 0x2C00) return this.thrust;
+    return 0xFF;
+  }
+
+  write(a, v) {
+    a &= 0x7FFF;
+    if (a < 0x2000) { this.ram[a & 0xFF] = v; return; }
+    if (a >= 0x4000 && a < 0x4800) { this.vram[a - 0x4000] = v; return; }
+    if (a === 0x3000) this.runDvg();
+    else if (a === 0x3C00) this.lander.write(v);
+  }
+
+  // IN1: start (01), coin (02, active low), select game (10), abort (20), right (40), left (80).
+  // Up and down move the thrust lever, which stays where it's left.
+  setInputs(s) {
+    this.in1 = (s.start1 ? 0x01 : 0) | (s.coin ? 0 : 0x02) | 0x08 | (s.start2 ? 0x10 : 0) | (s.fire ? 0x20 : 0)
+      | (s.right ? 0x40 : 0) | (s.left ? 0x80 : 0);
+    if (s.up) this.thrust = Math.min(254, this.thrust + 8);
+    if (s.down) this.thrust = Math.max(0, this.thrust - 8);
+  }
+  applySwitches(v) { this.dsw = 0x01 | v.fuel; }
+
+  runFrame() {
+    const slices = 16, frame = CPU_CLOCK / 40, samples = RATE / 40;
+    for (let k = 0; k < slices; k++) {
+      this.nmiCarry += NMI_RATE / 40 / slices;
+      while (this.nmiCarry >= 1) { this.nmiCarry -= 1; this.cpu.nmi(); }
+      this.cycleCarry += frame / slices;
+      this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
+      this.sampleCarry += samples / slices;
+      while (this.sampleCarry >= 1) { this.sampleCarry -= 1; this.sound.sample(); }
+    }
+  }
+}
+LunarLander.window = { x0: 0, y0: 0, x1: 1024, y1: 1024 };
+LunarLander.id = 'llander';
+LunarLander.title = 'Lunar Lander';
+LunarLander.switches = [
+  { id: 'fuel', label: 'Fuel per coin', options: [['450', 0x00], ['600', 0x40], ['750', 0x80], ['900', 0xC0], ['1100', 0x10], ['1300', 0x50], ['1550', 0x90], ['1800', 0xD0]], default: 0x80 },
 ];

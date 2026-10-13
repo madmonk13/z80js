@@ -87,7 +87,7 @@ export class YM2151 {
           break;
         case 0x18: this.lfoRate = v; break;
         case 0x19: if (v & 0x80) this.pmd = v & 0x7F; else this.amd = v & 0x7F; break;
-        case 0x1B: this.wave = v & 3; break;
+        case 0x1B: this.wave = v & 3; if (this.onPort) this.onPort(v >> 6); break;   // bits 6-7: the CT1/CT2 output pins
       }
       return;
     }

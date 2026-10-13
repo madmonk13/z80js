@@ -8,12 +8,15 @@
 // external bus and portIn(n) / portOut(n, v) for ports 1 and 2; it raises
 // the IRQ line by setting `irq` (see holdIrq below) and pulses NMI
 // with nmi().
+//
+// hd63701: true adds the Hitachi HD63701's extra instructions (XGDX, SLP,
+// and AIM/OIM/EIM/TIM, which work on memory with an immediate mask).
 
 import { capture, apply } from './state.js';
 
 const C = 1, V = 2, Z = 4, N = 8, I = 16, H = 32;
-const STATE = ['a', 'b', 'x', 'sp', 'pc', 'cc', 'cycles', 'irq', 'nmiPending', 'waiting', 'ram',
-  'ddr1', 'ddr2', 'port1', 'port2', 'tcsr', 'counter', 'ocr', 'timerCarry'];
+const STATE = ['a', 'b', 'x', 'sp', 'pc', 'cc', 'cycles', 'irq', 'nmiPending', 'waiting', 'sleeping', 'ram',
+  'ddr1', 'ddr2', 'port1', 'port2', 'tcsr', 'counter', 'ocr', 'timerCarry', 'ramcr'];
 
 // Base cycle counts (6801 timings) for each opcode; 0 marks an illegal one.
 const CYCLES = new Uint8Array([
@@ -35,6 +38,26 @@ const CYCLES = new Uint8Array([
   4, 4, 4, 6, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5,
 ]);
 
+// The HD63701 runs most instructions in fewer cycles (Hitachi's timings).
+const CYCLES_63701 = new Uint8Array([
+  0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 0, 0, 0, 0, 1, 1, 2, 2, 4, 1, 0, 0, 0, 0,
+  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+  1, 1, 3, 3, 1, 1, 4, 4, 4, 5, 1, 10, 5, 7, 9, 12,
+  1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1,
+  1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1,
+  6, 7, 7, 6, 6, 7, 6, 6, 6, 6, 6, 5, 6, 4, 3, 5,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 6, 4, 3, 5,
+  2, 2, 2, 3, 2, 2, 2, 0, 2, 2, 2, 2, 3, 5, 3, 0,
+  3, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3, 4, 5, 4, 4,
+  4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5,
+  4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 5, 5,
+  2, 2, 2, 3, 2, 2, 2, 0, 2, 2, 2, 2, 3, 0, 3, 0,
+  3, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4,
+  4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5,
+  4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5,
+]);
+
 export class M6803 {
   saveState() { return capture(this, STATE); }
   loadState(s) { apply(this, STATE, s); }
@@ -42,9 +65,11 @@ export class M6803 {
   // internal: false makes it a plain 6800/6808 (no on-chip RAM, ports or
   // timer). holdIrq: true clears `irq` when the CPU takes it (a held line);
   // false leaves it to the host (a level, e.g. from a PIA).
-  constructor({ read, write, portIn = () => 0xFF, portOut = () => {}, internal = true, holdIrq = true }) {
+  constructor({ read, write, portIn = () => 0xFF, portOut = () => {}, internal = true, holdIrq = true, hd63701 = false }) {
     this.internal = internal;
     this.holdIrq = holdIrq;
+    this.hd63701 = hd63701;
+    this.timing = hd63701 ? CYCLES_63701 : CYCLES;
     this.readBus = read;
     this.writeBus = write;
     this.portIn = portIn;
@@ -57,9 +82,10 @@ export class M6803 {
     this.a = 0; this.b = 0; this.x = 0; this.sp = 0;
     this.cc = I | 0xC0;
     this.cycles = 0;
-    this.irq = false; this.nmiPending = false; this.waiting = false;
+    this.irq = false; this.nmiPending = false; this.waiting = false; this.sleeping = false;
     this.ddr1 = 0; this.ddr2 = 0; this.port1 = 0xFF; this.port2 = 0xFF;
     this.tcsr = 0; this.counter = 0; this.ocr = 0xFFFF; this.timerCarry = 0;
+    this.ramcr = 0x40;                       // RAM control (register $14): bit 6 RAM enable, bit 7 standby flag
     this.pc = this.read16(0xFFFE);
   }
 
@@ -99,6 +125,7 @@ export class M6803 {
       case 0x0A: return this.counter & 0xFF;
       case 0x0B: return this.ocr >> 8;
       case 0x0C: return this.ocr & 0xFF;
+      case 0x14: return this.ramcr;
     }
     return 0;
   }
@@ -112,6 +139,7 @@ export class M6803 {
       case 0x09: this.counter = 0xFFF8; break;                 // a write presets the counter
       case 0x0B: this.ocr = (v << 8) | (this.ocr & 0xFF); this.tcsr &= ~0x40; break;
       case 0x0C: this.ocr = (this.ocr & 0xFF00) | v; this.tcsr &= ~0x40; break;
+      case 0x14: this.ramcr = v; break;    // (programs set the standby bit to tell a warm restart from power-on)
     }
   }
 
@@ -194,7 +222,7 @@ export class M6803 {
     if (!this.waiting) { this.push16(this.pc); this.push16(this.x); this.push(this.a); this.push(this.b); this.push(this.cc); }
     this.cc |= I;
     this.pc = this.read16(vector);
-    this.waiting = false;
+    this.waiting = false; this.sleeping = false;
   }
 
   // ---------------------------------------------------------------- run
@@ -230,10 +258,10 @@ export class M6803 {
       if ((this.tcsr & 0x48) === 0x48) { this.interrupt(0xFFF4); this.cycles += 12; return; }   // output compare
       if ((this.tcsr & 0x24) === 0x24) { this.interrupt(0xFFF2); this.cycles += 12; return; }   // overflow
     }
-    if (this.waiting) { this.cycles += 4; return; }
+    if (this.waiting || this.sleeping) { this.cycles += 4; return; }
 
     const op = this.fetch();
-    this.cycles += CYCLES[op] || 2;
+    this.cycles += this.timing[op] || 2;
     const hi = op >> 4, lo = op & 15;
 
     if (hi === 0x2) {                       // branches
@@ -248,6 +276,14 @@ export class M6803 {
       return;
     }
     if (hi === 0x6 || hi === 0x7) {         // memory RMW, JMP
+      if (this.hd63701 && (lo === 0x1 || lo === 0x2 || lo === 0x5 || lo === 0xB)) {   // AIM / OIM / EIM / TIM
+        const m = this.fetch();
+        const ea = hi === 0x6 ? (this.x + this.fetch()) & 0xFFFF : this.fetch();
+        const v = this.read(ea), r = lo === 0x1 ? v & m : lo === 0x2 ? v | m : lo === 0x5 ? v ^ m : v & m;
+        this.cc &= ~V; this.setNZ8(r);
+        if (lo !== 0xB) this.write(ea, r);
+        return;
+      }
       const ea = hi === 0x6 ? (this.x + this.fetch()) & 0xFFFF : this.fetch16();
       if (lo === 0xE) { this.pc = ea; return; }
       if (lo === 0xD) { this.rmw(lo, this.read(ea)); return; }
@@ -334,6 +370,8 @@ export class M6803 {
         return;
       }
       case 0x1B: this.a = this.add8(this.a, this.b, 0); return;                  // ABA
+      case 0x18: if (this.hd63701) { const t = this.x; this.x = this.d; this.d = t; } return;   // XGDX
+      case 0x1A: if (this.hd63701) this.sleeping = true; return;                // SLP
       case 0x30: this.x = (this.sp + 1) & 0xFFFF; return;                        // TSX
       case 0x31: this.sp = (this.sp + 1) & 0xFFFF; return;                       // INS
       case 0x32: this.a = this.pull(); return;

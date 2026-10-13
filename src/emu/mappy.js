@@ -29,8 +29,8 @@ class Namco15xx {
     this.rate = RATE;
     this.reset();
   }
-  saveState() { return { counter: this.counter.slice(), enabled: this.enabled }; }
-  loadState(s) { this.counter.set(s.counter); this.enabled = s.enabled; }
+  saveState() { return { counter: this.counter.slice(), enabled: this.enabled, dac: this.dac || 0 }; }
+  loadState(s) { this.counter.set(s.counter); this.enabled = s.enabled; this.dac = s.dac || 0; }
   reset() { this.counter = new Uint32Array(8); this.enabled = false; this.writePos = this.readPos = 0; }
 
   sample() {
@@ -46,7 +46,7 @@ class Namco15xx {
       }
     }
     const mask = this.buffer.length - 1;
-    this.buffer[this.writePos] = s / (8 * 15 * 8) * 1.6;
+    this.buffer[this.writePos] = s / (8 * 15 * 8) * 1.6 + (this.dac || 0);
     this.writePos = (this.writePos + 1) & mask;
     if (this.writePos === this.readPos) this.readPos = (this.readPos + 1) & mask;
   }
@@ -180,6 +180,11 @@ export class Mappy {
 
   runIo(chip) {
     if (this.constructor.ioChips[chip] === '56xx') { this.run56xx(chip); return; }
+    if (this.constructor.ioChips[chip] === '59xx') {                                    // Pac & Pal's switch chip: one mode
+      const ram = this.ioRam, base = chip * 16, p = this.ports(chip);
+      if ((ram[base + 8] & 15) === 3) [0, 2, 1, 3].forEach((n, i) => { ram[base + 4 + i] = ~p[n] & 15; });
+      return;
+    }
     const ram = this.ioRam, base = chip * 16, io = this.io[chip];
     const rd = (n) => ram[base + n] & 15, wr = (n, v) => { ram[base + n] = v & 15; };
     let p = this.ports(chip);
@@ -393,3 +398,102 @@ Druaga.livesMask = 0x03;
 Druaga.id = 'todruaga';
 Druaga.title = 'The Tower of Druaga';
 Druaga.switches = [{ id: 'lives', label: 'Lives', options: [['1', 0x01], ['2', 0x02], ['3', 0x03], ['5', 0x00]], default: 0x03 }];
+
+// ---------------------------------------------------------------- Super Pac-Man board
+//
+// The first of the family (Super Pac-Man, Pac & Pal, Grobda): the same CPUs,
+// 15xx sound and I/O chips, but a fixed 36x28 tile map (2K of video RAM),
+// work RAM at 0800-1FFF with the sprite registers in it, 2-bit sprites, and
+// a screen-flip register at 2000 (set at power-on; the games clear it or,
+// Pac & Pal, set it again by reading it). Grobda adds a 4-bit DAC for its
+// voice, written by the sound CPU.
+
+export class SuperPacMan extends MappyLater {
+  constructor(roms) {
+    super(roms);
+    this.spritePix = decodeTiles(roms.sprites, {
+      count: roms.sprites.length / 64, width: 16, height: 16, planes: [0, 4],
+      xs: [...run(0, 4), ...run(64, 4), ...run(128, 4), ...run(192, 4)], ys: [...run(0, 8, 8), ...run(256, 8, 8)], size: 512,
+    });
+    this.charPix = decodeTiles(roms.chars, { count: 256, width: 8, height: 8, planes: [0, 4], xs: [64, 65, 66, 67, 0, 1, 2, 3], ys: run(0, 8, 8), size: 128 });
+    this.charLut = Uint8Array.from(roms.charLut, (v) => ((v & 15) ^ 15) + 16);
+    this.spriteLut = Uint8Array.from(roms.spriteLut, (v) => v & 15);
+  }
+  saveState() { return { ...super.saveState(), flip: this.flip }; }
+  loadState(s) { super.loadState(s); this.flip = s.flip ?? 1; }
+  reset() { super.reset(); this.flip = 1; }
+
+  mainRead(a) {
+    if (a < 0x800) return this.vram[a];
+    if (a < 0x2000) return this.ram[a - 0x800];
+    if (a === 0x2000) { this.flip = 1; return 0xFF; }
+    return super.mainRead(a);
+  }
+  mainWrite(a, v) {
+    if (a < 0x800) { this.vram[a] = v; return; }
+    if (a < 0x2000) { this.ram[a - 0x800] = v; return; }
+    if (a === 0x2000) { this.flip = v & 1; return; }
+    if (a >= 0x3800 && a < 0x4000) return;          // (no scroll register on this board)
+    super.mainWrite(a, v);
+  }
+  subWrite(a, v) {
+    if (this.constructor.dac && a === 0x0002) this.sound.dac = ((((v & 15) << 4) | (v & 15)) - 0x80) / 128 * 0.35;
+    super.subWrite(a, v);
+  }
+
+  render() {
+    const out = this.native, front = this.front, vram = this.vram, pal = this.palette, lut = this.charLut, f = this.flip;
+    front.fill(0);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const sx = f ? W - 1 - x : x, sy = f ? H - 1 - y : y;
+        const row = (sy >> 3) + 2, col = (sx >> 3) - 2;
+        const offs = col & 0x20 ? row + ((col & 0x1F) << 5) : col + (row << 5);
+        const attr = vram[offs + 0x400];
+        const c = lut[(attr & 0x3F) * 4 + this.charPix[vram[offs] * 64 + (sy & 7) * 8 + (sx & 7)]];
+        const o = y * W + x;
+        out[o] = pal[c];
+        if ((attr & 0x40) && c !== 31) front[o] = 1;
+      }
+    }
+    // Sprites: registers at 0F80, 1780 and 1F80 (RAM offsets 0780, 0F80, 1780).
+    const r1 = 0x780, r2 = 0xF80, r3 = 0x1780, ram = this.ram;
+    for (let offs = 0; offs < 0x80; offs += 2) {
+      if (ram[r3 + offs + 1] & 2) continue;
+      const flags = ram[r3 + offs];
+      let flipX = flags & 1, flipY = (flags >> 1) & 1;
+      const sizeX = (flags >> 2) & 1, sizeY = (flags >> 3) & 1;
+      if (f) { flipX ^= 1; flipY ^= 1; }
+      const code = ram[r1 + offs] & ~sizeX & ~(sizeY << 1), color = (ram[r1 + offs + 1] & 0x3F) * 4;
+      const sx = ram[r2 + offs + 1] + 0x100 * (ram[r3 + offs + 1] & 1) - 40;
+      const sy = ((256 - ram[r2 + offs] + 1 - 16 * sizeY) & 0xFF) - 32;
+      for (let ty = 0; ty <= sizeY; ty++) for (let tx = 0; tx <= sizeX; tx++) {
+        const tile = code + [[0, 1], [2, 3]][ty ^ (sizeY * flipY)][tx ^ (sizeX * flipX)];
+        this.drawSprite(tile, color, flipX, flipY, sx + 16 * tx, sy + 16 * ty);
+      }
+    }
+    rotate90(out, W, H, this.frame);
+  }
+}
+SuperPacMan.ioChips = ['56xx', '56xx'];
+SuperPacMan.id = 'superpac';
+SuperPacMan.title = 'Super Pac-Man';
+SuperPacMan.switches = [{ id: 'lives', label: 'Lives', options: [['1', 0x80], ['2', 0x40], ['3', 0xC0], ['5', 0x00]], default: 0xC0 }];
+SuperPacMan.prototype.applySwitches = function (v) { this.dsw0 = 0x0F; this.dsw1 = 0xFF; this.dsw2 = 0x3F | v.lives; };
+
+export class PacAndPal extends SuperPacMan {}
+PacAndPal.ioChips = ['56xx', '59xx'];
+PacAndPal.id = 'pacnpal';
+PacAndPal.title = 'Pac & Pal';
+PacAndPal.switches = [{ id: 'lives', label: 'Lives', options: [['1', 0xC0], ['2', 0x80], ['3', 0x40], ['5', 0x00]], default: 0x40 }];
+PacAndPal.prototype.applySwitches = function (v) { this.dsw0 = 0x0F; this.dsw1 = 0x37 | v.lives; this.dsw2 = 0xFF; };
+
+export class Grobda extends SuperPacMan {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; this.buttons = 2; this.button2 = 'Shield'; }
+}
+Grobda.ioChips = ['58xx', '56xx'];
+Grobda.dac = true;
+Grobda.id = 'grobda';
+Grobda.title = 'Grobda';
+Grobda.switches = [{ id: 'lives', label: 'Lives', options: [['1', 0x02], ['2', 0x01], ['3', 0x03], ['5', 0x00]], default: 0x03 }];
+Grobda.prototype.applySwitches = function (v) { this.dsw0 = 0x0F; this.dsw1 = 0xC9; this.dsw2 = 0xFC | v.lives; };

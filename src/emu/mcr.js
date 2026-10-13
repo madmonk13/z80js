@@ -294,7 +294,7 @@ export class MCR {
     const out = this.native, pri = this.pri, spr = this.spriteRam, pal = this.palette, pix = this.spritePix;
     for (let offs = 0; offs < 0x200; offs += 4) {
       const code = spr[offs + 1] & 0x3F, hflip = spr[offs + 1] & 0x40 ? 31 : 0, vflip = spr[offs + 1] & 0x80 ? 31 : 0;
-      const sx = ((spr[offs + 2] - 4) * 2) & 0x1FF;
+      const sx = ((spr[offs + 2] - 4) * 2 + (this.cfg.spriteX || 0)) & 0x1FF;
       let sy = ((240 - spr[offs]) * 2) & 0x1FF;
       for (let y = 0; y < 32; y++, sy = (sy + 1) & 0x1FF) {
         if (sy >= H) continue;
@@ -464,3 +464,62 @@ DominoMan.switches = [
   { id: 'music', label: 'Music', options: [['On', 0x00], ['Off', 0x01]], default: 0x00 },
   { id: 'skin', label: 'Skin color', options: [['Light', 0x02], ['Dark', 0x00]], default: 0x02 },
 ];
+
+export class Timber extends Tapper {
+  constructor(roms) { super(roms); this.buttons = 2; this.button2 = 'Chop 2'; }
+  // IP1: right, left, down, up, the two chop buttons.
+  setInputs(s) {
+    super.setInputs(s);
+    if (s.fire2) this.ip[1] &= ~0x20;
+  }
+}
+Timber.id = 'timber';
+Timber.title = 'Timber';
+
+export class SolarFox extends MCR {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'four-way';
+    this.buttons = 2;
+    this.button2 = 'Speed';
+    this.sound.gain = 0.8;
+  }
+  // On the upright, the game reads the player through what the wiring calls
+  // the cocktail side: IP0 bit 2 speed (also starts), bit 4 fire; IP1's low
+  // nibble the stick.
+  setInputs(s) {
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.fire2 || s.start1 ? 0x04 : 0) | (s.fire ? 0x10 : 0));
+    this.ip[1] = 0xF0 | (0x0F & ~((s.right ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.down ? 0x04 : 0) | (s.up ? 0x08 : 0)));
+  }
+  applySwitches(v) { this.ip[3] = 0xEC | v.bonus; }   // demo sounds on, upright
+}
+SolarFox.config = { board: 90009, clock: 19968000 / 8, romEnd: 0x7000, transpose: true, spriteX: 16 };
+SolarFox.id = 'solarfox';
+SolarFox.title = 'Solar Fox';
+SolarFox.switches = [
+  { id: 'bonus', label: 'Bonus', options: [['None', 0x02], ['After 10 racks', 0x03], ['After 20 racks', 0x01]], default: 0x03 },
+];
+
+export class Wacko extends MCR {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 0;
+    this.twinStick = true;
+    this.sound.gain = 0.55;
+  }
+  // IP1/IP2: the trackball's counts (rolled by the left stick); IP4: the
+  // firing stick.
+  setInputs(s) {
+    const a = s.aim || {}, speed = 4;
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0));
+    this.ip[1] = (this.ip[1] + (s.right ? speed : 0) - (s.left ? speed : 0)) & 0xFF;
+    this.ip[2] = (this.ip[2] - (s.down ? speed : 0) + (s.up ? speed : 0)) & 0xFF;
+    this.ip[4] = 0xFF & ~((a.right ? 0x01 : 0) | (a.left ? 0x02 : 0) | (a.down ? 0x04 : 0) | (a.up ? 0x08 : 0));
+  }
+  applySwitches() { this.ip[3] = 0x3F; }             // upright, one coin meter
+}
+Wacko.config = { board: 90010, clock: 19968000 / 8, romEnd: 0x8000, rotate: false };
+Wacko.id = 'wacko';
+Wacko.title = 'Wacko';
+Wacko.switches = [];

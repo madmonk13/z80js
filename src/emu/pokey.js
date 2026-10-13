@@ -37,6 +37,7 @@ export class Pokey {
     this.buffer = new Float32Array(1 << 15);
     this.rate = RATE;
     this.readPots = null;     // optional () -> the ALLPOT byte the game reads (a set bit: that pot is still counting)
+    this.readPot = null;      // optional (n) -> a paddle's count, read from POT0-7
     this.level = 0;           // the latest sample before filtering, for mixing several chips
     this.reset();
   }
@@ -66,6 +67,7 @@ export class Pokey {
       for (let i = 0; i < 8; i++) v |= p[(this.clock + i) % p.length] << i;
       return v;
     }
+    if ((r & 15) < 8 && this.readPot) return this.readPot(r & 7);
     if ((r & 15) === 8 && this.readPots) return this.readPots();      // ALLPOT
     if ((r & 15) < 8 && this.readPots) return (this.readPots() >> (r & 7)) & 1 ? 228 : 0;   // POT0-7: a pot still counting reads high
     return 0xFF;

@@ -19,7 +19,7 @@ import { capture, apply } from './state.js';
 
 const W = 248, H = 208;
 const LINES = 256, CPU_CLOCK = 11000000 / 4, LINE_CYCLES = CPU_CLOCK / 60 / LINES;
-const STATE = ['vram', 'page', 'palBank', 'scroll', 'cycleCarry', 'sampleCarry', 'line', 'in0', 'cpu', 'sound'];
+const STATE = ['vram', 'page', 'palBank', 'videoReg', 'scroll', 'cycleCarry', 'sampleCarry', 'line', 'in0', 'cpu', 'sound'];
 
 // Notes as MIDI numbers with lengths in beats.
 const FUR_ELISE = [[76, 1], [75, 1], [76, 1], [75, 1], [76, 1], [71, 1], [74, 1], [72, 1], [69, 2], [60, 1], [64, 1], [69, 1], [71, 2],
@@ -160,7 +160,7 @@ export class Phoenix {
 
   reset() {
     this.vram.fill(0);
-    this.page = 0; this.palBank = 0; this.scroll = 0;
+    this.page = 0; this.palBank = 0; this.videoReg = 0; this.scroll = 0;
     this.cycleCarry = this.sampleCarry = 0;
     this.line = 0;
     this.cpu.reset();
@@ -172,20 +172,22 @@ export class Phoenix {
   read(a) {
     if (a < 0x4000) return this.roms.main[a];
     if (a < 0x5000) return this.vram[this.page * 0x1000 + (a & 0xFFF)];
-    if (a >= 0x7000 && a < 0x7400) return this.in0;
+    if (a >= 0x7000 && a < 0x7400) return this.readIn0();
     if (a >= 0x7800 && a < 0x7C00) return this.dsw | (this.line >= H ? 0 : 0x80);   // bit 7 low in vertical blank
     return 0xFF;
   }
 
   write(a, v) {
     if (a >= 0x4000 && a < 0x5000) { this.vram[this.page * 0x1000 + (a & 0xFFF)] = v; return; }
-    if (a >= 0x5000 && a < 0x5400) { this.page = v & 1; this.palBank = (v >> 1) & 1; return; }
+    if (a >= 0x5000 && a < 0x5400) { this.page = v & 1; this.palBank = (v >> 1) & this.constructor.bankMask; this.videoReg = v; this.sound.writeC?.(v); return; }
     if (a >= 0x5800 && a < 0x5C00) { this.scroll = v; return; }
     if (a >= 0x6000 && a < 0x6400) { this.sound.writeA(v); return; }
     if (a >= 0x6800 && a < 0x6C00) this.sound.writeB(v);
   }
 
   // ---------------------------------------------------------------- inputs
+
+  readIn0() { return this.in0; }
 
   // IN0 (active low): coin, starts, fire, right, left, shield.
   setInputs(s) {
@@ -215,7 +217,7 @@ export class Phoenix {
   // the code and the palette bank; the PROM index interleaves pen and code.
   color(code, pen, fg) {
     const c = (code >> 5) | (this.palBank << 3);
-    return this.palette[(c & 7) | (pen << 3) | ((c & 8) << 3) | (fg ? 0x20 : 0)];
+    return this.palette[(c & 7) | (pen << 3) | ((c & 0x18) << 3) | (fg ? 0x20 : 0)];
   }
 
   render() {
@@ -236,9 +238,118 @@ export class Phoenix {
   }
 }
 
+Phoenix.bankMask = 1;
 Phoenix.id = 'phoenix';
 Phoenix.title = 'Phoenix';
 Phoenix.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x01], ['5', 0x02], ['6', 0x03]], default: 0x00 },
   { id: 'bonus', label: 'Bonus', options: [['3K/30K', 0x00], ['4K/40K', 0x04], ['5K/50K', 0x08], ['6K/60K', 0x0C]], default: 0x00 },
 ];
+
+// ---------------------------------------------------------------- Pleiads
+
+// Pleiads' sound board: a tone from an 8 kHz clock divided by latch A's low
+// nibble; two 556 tones swept by a capacitor on latch B bit 4 (on with bit 5);
+// a third swept by latch C (the video register's bits 4-5) and the noise
+// bit, gated by two more capacitors; shift-register noise; and a TMS3615
+// that sounds one note (latch B's low nibble, octave in bits 6-7) as four
+// decaying organ footages. The part values are best guesses.
+const TMS_CLOCK = 247, P_STATE = ['a', 'b', 'c', 'pb4', 'pc4', 'pc5', 'pa5', 'pa6', 't1', 't1div', 't2', 't3', 't4', 'tq', 'noise', 'nacc', 'poly', 'notes', 'nph', 'nvol', 'dcIn', 'dcOut'];
+
+class PleiadsSound extends PhoenixSound {
+  saveState() { return capture(this, P_STATE); }
+  loadState(s) { apply(this, P_STATE, s); }
+  reset() {
+    this.a = this.b = this.c = 0;
+    this.pb4 = 0; this.pc4 = 0.14; this.pc5 = 0; this.pa5 = 0; this.pa6 = 0;
+    this.t1 = 0; this.t1div = 0; this.t2 = 0; this.t3 = 0; this.t4 = 0; this.tq = 0;
+    this.noise = 0; this.nacc = 0; this.poly = 0;
+    this.notes = new Float64Array(4); this.nph = new Float64Array(4); this.nvol = 0;
+    this.dcIn = this.dcOut = 0;
+    this.writePos = this.readPos = 0;
+  }
+  writeA(v) { this.a = v; }
+  writeB(v) {
+    if (v === this.b) return;
+    this.b = v;
+    const note = v & 15, octave = Math.min(2, v >> 6);
+    if (note > 12) return;
+    // footages 16', 8', 4' and 2' of semitone `note` above B
+    const f = TMS_CLOCK / 2 * Math.pow(2, (note + 2) / 12 + octave);
+    for (let i = 0; i < 4; i++) this.notes[i] = f * (1 << i);
+    this.nvol = 1;
+  }
+  writeC(v) { this.c = v; }
+
+  sample() {
+    const dt = 1 / RATE, rc = (v, target, tau) => v + (target - v) * (1 - Math.exp(-dt / tau));
+    const a = this.a, b = this.b, c = this.c;
+    // tone 1: 8 kHz divided by 16 - n
+    let s1 = 0;
+    if ((a & 15) !== 15) { this.t1 = (this.t1 + 8000 / (16 - (a & 15)) / 2 * dt) % 1; }
+    s1 = this.t1 < 0.5 ? 1 : -1;
+    // tones 2 and 3: pitch falls as the capacitor on B4 charges
+    this.pb4 = rc(this.pb4, b & 0x10 ? 1 : 0, 0.1);
+    let s23 = 0;
+    if (b & 0x20) {
+      const lv = 1 - this.pb4;
+      if (lv < 0.999) {
+        this.t2 = (this.t2 + 351 * lv / 2 * dt) % 1;
+        this.t3 = (this.t3 + 582 * (1 / 3 + 2 / 3 * lv) / 2 * dt) % 1;
+      }
+      s23 = ((this.t2 < 0.5 ? 1 : -1) + (this.t3 < 0.5 ? 1 : -1)) / 2;
+    }
+    // tone 4: swept by C4 and the noise bit, gated by C5 and A5
+    this.pc4 = rc(this.pc4, c & 0x10 ? 1 : 0.14, c & 0x10 ? 0.066 : 0.022);
+    this.pc5 = rc(this.pc5, c & 0x20 ? 1 : 0, c & 0x20 ? 0.0033 : 0.1);
+    this.pa5 = rc(this.pa5, a & 0x20 ? 1 : 0, a & 0x20 ? 3.3 : 2.2);
+    const cv = this.poly ? this.pc4 + (1 - this.pc4) * 20 / 67 : this.pc4 * 47 / 67;
+    this.t4 = (this.t4 + 1315 * cv / 2 * dt) % 1;
+    const s4 = (this.t4 < 0.5 ? 1 : -1) * (this.pc5 * 33 + this.pa5 * 47) / 80;
+    // noise: an 18-bit shift register at one of two rates
+    if (a & 0x40) this.pa6 = rc(this.pa6, 1, 0.000726);
+    else if (this.poly) this.pa6 = rc(this.pa6, 0, 0.1);
+    this.nacc += 1412 * (a & 0x10 ? 2 / 3 : 1 / 3) * dt;
+    while (this.nacc >= 1) {
+      this.nacc -= 1;
+      const r = this.noise;
+      this.noise = ((r << 1) | (((r >> 16) & 1) === ((r >> 17) & 1) ? 1 : 0)) & 0x3FFFF;
+      this.poly = (this.noise >> 17) & 1;
+    }
+    const sn = (this.poly ? 1 : -1) * (this.pa6 + (a & 0x80 ? 1 : 0)) / 2;
+    // the note chip
+    let sm = 0;
+    if (this.nvol > 0) {
+      for (let i = 0; i < 4; i++) { this.nph[i] = (this.nph[i] + this.notes[i] * dt) % 1; sm += this.nph[i] < 0.5 ? 1 : 0; }
+      sm = (sm / 4) * this.nvol;
+      this.nvol = Math.max(0, this.nvol - dt / 0.33);
+    }
+    const s = (s1 / 2 + s23 / 2 + s4 + sn) * 0.25 + sm * 0.65;
+    const out = s - this.dcIn + 0.995 * this.dcOut;
+    this.dcIn = s; this.dcOut = out;
+    const mask = this.buffer.length - 1;
+    this.buffer[this.writePos] = out;
+    this.writePos = (this.writePos + 1) & mask;
+    if (this.writePos === this.readPos) this.readPos = (this.readPos + 1) & mask;
+  }
+}
+
+// Pleiads (1981): Phoenix's board with four palette banks, its own sound
+// board, and a protection check that answers through IN0 bit 3 depending
+// on what was last written to the video register.
+export class Pleiads extends Phoenix {
+  constructor(roms) {
+    super(roms);
+    this.button2 = 'Warp';
+    this.sound = new PleiadsSound();
+  }
+  readIn0() {
+    const q = this.videoReg & 0xFC;
+    return (this.in0 & 0xF7) | (q === 0x0C || q === 0x30 ? 0x08 : 0);
+  }
+  applySwitches(v) { this.dsw = v.lives | v.bonus | 0x60; }
+}
+Pleiads.bankMask = 3;
+Pleiads.id = 'pleiads';
+Pleiads.title = 'Pleiads';
+Pleiads.switches = Phoenix.switches;

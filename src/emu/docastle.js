@@ -278,3 +278,21 @@ DoWildRide.vertical = false;
 DoWildRide.id = 'dowild';
 DoWildRide.title = "Mr. Do's Wild Ride";
 DoWildRide.switches = DoRunRun.switches;
+
+// Kick Rider (1984): the Do! Run Run board; a motorbike rider who kicks with
+// either foot (two buttons).
+export class KickRider extends DoRunRun {
+  constructor(roms) { super(roms); this.buttons = 2; this.button2 = 'Kick 2'; }
+  setInputs(s) {
+    super.setInputs(s);
+    this.in1 = 0xFF & ~((s.fire ? 0x01 : 0) | (s.fire2 ? 0x02 : 0) | (s.start1 ? 0x08 : 0) | (s.start2 ? 0x80 : 0));
+  }
+  // Difficulty; rack test and flip off, upright, the unknown switches off.
+  applySwitches(v) { this.dsw = 0xDC | v.difficulty; }
+}
+KickRider.vertical = false;
+KickRider.id = 'kickridr';
+KickRider.title = 'Kick Rider';
+KickRider.switches = [
+  { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x03], ['Medium', 0x02], ['Hard', 0x01], ['Hardest', 0x00]], default: 0x03 },
+];

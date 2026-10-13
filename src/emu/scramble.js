@@ -233,3 +233,53 @@ SuperCobra.title = 'Super Cobra';
 SuperCobra.switches = [
   { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x02]], default: 0x00 },
 ];
+
+// ---------------------------------------------------------------- Stern's games on the Super Cobra board
+
+const bit = (v, n) => (v >> n) & 1;
+// Graphics ROMs with their address lines scrambled (Anteater, Lost Tomb).
+function unscramble(gfx, map) {
+  const out = new Uint8Array(gfx.length);
+  for (let i = 0; i < gfx.length; i++) out[i] = gfx[map(i)];
+  return out;
+}
+
+// Armored Car (1981): Super Cobra's controls; 3 lives and demo sounds by default.
+export class ArmoredCar extends SuperCobra {
+  constructor(roms) { super(roms); this.controls = 'four-way'; this.button2 = 'Turbo'; this.sound.gain *= 0.35; }
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.fire2 ? 0x02 : 0) | (s.fire ? 0x08 : 0) | (s.right ? 0x10 : 0) | (s.left ? 0x20 : 0) | (s.coin ? 0x80 : 0));
+    this.in1 = (0xFC | this.lives) & ~((s.start2 ? 0x40 : 0) | (s.start1 ? 0x80 : 0)) & 0xFF;
+    this.in2 = 0xBB & ~((s.up ? 0x10 : 0) | (s.down ? 0x40 : 0)) | 0x02;
+  }
+}
+ArmoredCar.id = 'armorcar'; ArmoredCar.title = 'Armored Car';
+ArmoredCar.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0x01], ['5', 0x00]], default: 0x01 }];
+
+// Tazz-Mania and Anteater share a layout: stick and buttons on IN0, starts on IN2.
+class SternStick extends SuperCobra {
+  setInputs(s) {
+    const k = this.constructor;
+    this.in0 = 0xFF & ~((s.fire ? k.fireBit : 0) | (s.fire2 ? (k.fire2Bit || 0) : 0) | (s.up ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.right ? 0x10 : 0) | (s.left ? 0x20 : 0) | (s.coin ? 0x80 : 0));
+    this.in1 = 0xFC | this.lives;
+    this.in2 = 0xFB & ~((s.start1 ? 0x01 : 0) | (s.start2 ? 0x40 : 0));
+  }
+}
+
+export class TazzMania extends SternStick {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; this.buttons = 2; this.button2 = 'Smart bomb'; this.sound.gain *= 0.18; }
+}
+TazzMania.id = 'tazmania'; TazzMania.title = 'Tazz-Mania';
+TazzMania.fireBit = 0x02; TazzMania.fire2Bit = 0x01;
+TazzMania.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0x01], ['5', 0x00]], default: 0x01 }];
+
+export class Anteater extends SternStick {
+  constructor(roms) {
+    super({ ...roms, gfx: unscramble(roms.gfx, (i) => (i & 0x9BF) | ((bit(i, 4) ^ bit(i, 9) ^ (bit(i, 2) & bit(i, 10))) << 6) | ((bit(i, 2) ^ bit(i, 10)) << 9) | ((bit(i, 0) ^ bit(i, 6) ^ 1) << 10)) });
+    this.controls = 'four-way'; this.buttons = 1;
+    this.sound.gain *= 0.15;                     // (these games play the AY chips far louder than Scramble does)
+  }
+}
+Anteater.id = 'anteater'; Anteater.title = 'Anteater';
+Anteater.fireBit = 0x01;
+Anteater.switches = [{ id: 'lives', label: 'Lives', options: [['3', 0x01], ['5', 0x00]], default: 0x01 }];

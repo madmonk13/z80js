@@ -155,7 +155,7 @@ export class SpaceInvaders {
   saveState() { return capture(this, STATE); }
   loadState(s) { apply(this, STATE, s); }
 
-  // roms: { main 8K }
+  // roms: { main 8K (or 18K with ROM at 4000), colors (1K per player) for the color boards }
   constructor(roms) {
     this.width = H;
     this.height = W;
@@ -164,7 +164,7 @@ export class SpaceInvaders {
     this.buttons = 1;
     this.roms = roms;
     this.ram = new Uint8Array(0x2000);         // 2000-23FF work RAM, 2400-3FFF the bitmap
-    this.sound = new Speaker(new InvadersSound());
+    this.sound = new Speaker(new (this.constructor.Sound || InvadersSound)());
     this.cpu = new Z80({
       read: (a) => this.read(a), write: (a, v) => this.write(a, v),
       input: (p) => this.input(p & 7), output: (p, v) => this.output(p & 7, v),
@@ -172,7 +172,9 @@ export class SpaceInvaders {
     this.cpu.onIrqAck = () => { this.cpu.irq = false; };
     this.native = new Uint32Array(W * H);
     this.frame = new Uint32Array(W * H);
-    this.tint = Uint32Array.from({ length: W * H }, (_, i) => overlay(i % H, (i / H) | 0));
+    this.tint = Uint32Array.from({ length: W * H }, (_, i) => (this.constructor.plain ? WHITE : overlay(i % H, (i / H) | 0)));
+    // The color boards: a PROM color (red, blue, green bits) per 8x8 block, one map per player.
+    this.pens = Uint32Array.from({ length: 8 }, (_, i) => rgba((i & 1) * 0xFF, ((i >> 2) & 1) * 0xFF, ((i >> 1) & 1) * 0xFF));
     this.in1 = 0x09; this.ctl = 0;
     this.applySwitches(defaultSwitches(this.constructor.switches));
     this.reset();
@@ -201,7 +203,7 @@ export class SpaceInvaders {
 
   input(p) {
     switch (p & 3) {
-      case 0: return 0x08 | (this.ctl << 4);
+      case 0: return this.constructor.in0 ?? (0x08 | (this.ctl << 4));
       case 1: return this.in1;
       case 2: return this.dsw | (this.ctl << 4);
       default: return (this.shift >> (8 - this.shiftCount)) & 0xFF;   // the shifter's result
@@ -211,9 +213,9 @@ export class SpaceInvaders {
   output(p, v) {
     switch (p) {
       case 2: this.shiftCount = v & 7; break;
-      case 3: this.sound.source.write3(v); break;
+      case 3: this.port3 = v; this.sound.source.write3(v); break;
       case 4: this.shift = (this.shift >> 8) | (v << 8); break;
-      case 5: this.sound.source.write5(v); break;
+      case 5: this.port5 = v; this.sound.source.write5(v); break;
       // 6: watchdog
     }
   }
@@ -224,7 +226,7 @@ export class SpaceInvaders {
   // The controls are wired to both IN0 and IN2 as well (fire, left, right).
   setInputs(s) {
     this.ctl = (s.fire ? 1 : 0) | (s.left ? 2 : 0) | (s.right ? 4 : 0);
-    this.in1 = (s.coin ? 0 : 0x01) | (s.start2 ? 0x02 : 0) | (s.start1 ? 0x04 : 0) | 0x08 | (this.ctl << 4);
+    this.in1 = (!s.coin !== !this.constructor.coinHigh ? 0 : 0x01) | (s.start2 ? 0x02 : 0) | (s.start1 ? 0x04 : 0) | 0x08 | (this.ctl << 4);
   }
   // Lives, bonus base at 1000 or 1500, show coinage.
   applySwitches(v) { this.dsw = v.lives | v.bonus; }
@@ -246,6 +248,7 @@ export class SpaceInvaders {
 
   // Each line is 32 bytes, least significant bit leftmost.
   render() {
+    if (this.roms.colors) { this.renderColor(); return; }
     const out = this.native, ram = this.ram;
     let o = 0;
     for (let y = 0; y < H; y++) {
@@ -260,9 +263,113 @@ export class SpaceInvaders {
   }
 }
 
+
+// Color boards: port 3 bit 2 turns the whole screen red (the base exploding),
+// port 5 bit 5 picks player 2's color map.
+SpaceInvaders.prototype.renderColor = function renderColor() {
+  const out = this.native, ram = this.ram, pens = this.pens, red = this.port3 & 0x04;
+  const map = this.roms.colors, base = this.port5 & 0x20 ? 0x400 : 0;
+  let o = 0;
+  for (let y = 0; y < H; y++) {
+    for (let b = 0; b < 32; b++) {
+      const v = ram[0x400 + y * 32 + b], fore = pens[red ? 1 : map[base + ((y >> 3) << 5) + b] & 7];
+      for (let bit = 0; bit < 8; bit++) out[o++] = (v >> bit) & 1 ? fore : BLACK;
+    }
+  }
+  rotate270(out, W, H, this.frame);
+};
+
 SpaceInvaders.id = 'invaders';
 SpaceInvaders.title = 'Space Invaders';
 SpaceInvaders.switches = [
   { id: 'lives', label: 'Bases', options: [['3', 0x00], ['4', 0x01], ['5', 0x02], ['6', 0x03]], default: 0x00 },
   { id: 'bonus', label: 'Extra base', options: [['1500', 0x00], ['1000', 0x08]], default: 0x00 },
+];
+
+// ---------------------------------------------------------------- variants
+
+// Taito's color boards. Part II: a second shot type, splitting invaders, and
+// a name reset button wired active low into IN0.
+export class SpaceInvadersPartII extends SpaceInvaders {
+  applySwitches(v) { this.dsw = v.lives; }
+}
+SpaceInvadersPartII.id = 'invadpt2';
+SpaceInvadersPartII.title = 'Space Invaders Part II';
+SpaceInvadersPartII.in0 = 0x40;
+SpaceInvadersPartII.switches = [
+  { id: 'lives', label: 'Bases', options: [['3', 0x00], ['4', 0x01]], default: 0x00 },
+];
+
+// The original game on the color board.
+export class SpaceInvadersCV extends SpaceInvaders {}
+SpaceInvadersCV.id = 'sicv';
+SpaceInvadersCV.title = 'Space Invaders (Color)';
+SpaceInvadersCV.in0 = 0x00;
+SpaceInvadersCV.switches = SpaceInvaders.switches;
+
+// Lunar Rescue's sound: one-shot effects on port 3 (thrust, shot, death,
+// alien hit, bonus ship) and port 5 (two footstep tones, the men-saved
+// count, a one-bit speaker for the tunes, the shooting star while held).
+class LunarRescueSound extends InvadersSound {
+  reset() { super.reset(); this.x = new Float64Array(5); this.xph = new Float64Array(3); this.lowp = 0; }
+  saveState() { return { base: super.saveState(), x: Array.from(this.x), xph: Array.from(this.xph), lowp: this.lowp }; }
+  loadState(s) { super.loadState(s.base); this.x.set(s.x); this.xph.set(s.xph); this.lowp = s.lowp; }
+  write3(v) {
+    if (v & ~this.p3 & 0x01) this.x[0] = 1;                  // thrust
+    super.write3(v & ~0x01 | (this.p3 & 0x01));
+  }
+  write5(v) {
+    const rise = v & ~this.p5;
+    if (rise & 0x03) { this.t[5] = 0; this.env[5] = 1; this.fleet = rise & 1 ? 196 : 147; }   // footsteps
+    if (rise & 0x04) this.x[1] = 1;                          // men saved
+    this.p5 = v;
+  }
+  sample() {
+    super.sample();
+    if (!(this.p3 & 0x20)) return;
+    const dt = 1 / RATE, x = this.x, ph = this.xph, white = (this.noise & 1) * 2 - 1;
+    let s = 0;
+    if (x[0] > 0.001) { this.lowp += (white - this.lowp) * 0.08; s += x[0] * this.lowp * 1.2; x[0] *= Math.exp(-dt / 0.15); }
+    if (x[1] > 0.001) { ph[0] = (ph[0] + 1200 * dt) % 1; s += x[1] * (ph[0] < 0.5 ? 0.2 : -0.2); x[1] *= Math.exp(-dt / 0.05); }
+    if (this.p5 & 0x08) s += 0.25;                            // the tune speaker
+    if (this.p5 & 0x10) {                                     // shooting star / rescue ship
+      x[2] += dt; ph[1] = (ph[1] + (1800 - 900 * ((x[2] * 3) % 1)) * dt) % 1; s += ph[1] < 0.5 ? 0.12 : -0.12;
+    } else x[2] = 0;
+    this.out += s;
+  }
+}
+
+export class LunarRescue extends SpaceInvaders {
+  constructor(roms) { super(roms); this.buttons = 1; }
+  applySwitches(v) { this.dsw = v.lives; }
+}
+LunarRescue.id = 'lrescue';
+LunarRescue.title = 'Lunar Rescue';
+LunarRescue.Sound = LunarRescueSound;
+LunarRescue.in0 = 0x00;
+LunarRescue.switches = SpaceInvaders.switches.slice(0, 1);
+
+// Black and white games on the Midway board.
+export class GalaxyWars extends SpaceInvaders {
+  applySwitches(v) { this.dsw = v.lives | v.bonus; }
+}
+GalaxyWars.id = 'galxwars';
+GalaxyWars.title = 'Galaxy Wars';
+GalaxyWars.in0 = 0x40;
+GalaxyWars.switches = [
+  { id: 'lives', label: 'Lives', options: [['2', 0x00], ['3', 0x01], ['4', 0x02], ['5', 0x03]], default: 0x01 },
+  { id: 'bonus', label: 'Bonus', options: [['3000', 0x00], ['5000', 0x08]], default: 0x00 },
+];
+
+export class OzmaWars extends SpaceInvaders {
+  applySwitches(v) { this.dsw = v.energy | v.bonus; }
+}
+OzmaWars.id = 'ozmawars';
+OzmaWars.title = 'Ozma Wars';
+OzmaWars.plain = true;
+OzmaWars.coinHigh = true;
+OzmaWars.in0 = 0x00;
+OzmaWars.switches = [
+  { id: 'energy', label: 'Energy', options: [['15000', 0x00], ['20000', 0x01], ['25000', 0x02], ['35000', 0x03]], default: 0x00 },
+  { id: 'bonus', label: 'Bonus energy', options: [['15000', 0x00], ['10000', 0x08]], default: 0x00 },
 ];

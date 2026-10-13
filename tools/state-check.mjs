@@ -16,7 +16,7 @@ const sets = process.argv.slice(2).length ? process.argv.slice(2)
 const inputs = (f) => ({ coin: f >= 1500 && f < 1506, start1: f >= 1700 && f < 1706,
   left: f > 1000 && !!((f >> 5) & 1), right: f > 1000 && !((f >> 5) & 1), up: f > 1000 && (f % 97) < 20, fire: f > 1000 && (f % 23) < 4 });
 const picOf = (b) => (b.vector ? b.vectors.data.subarray(0, b.vectors.count * 7) : b.frame);
-const ramOf = (b) => [b.ram, b.vram, b.obj, b.spritePos, b.spriteRam, b.bitmap, b.fgRam, b.bgRam, b.sprites].filter(Boolean);
+const ramOf = (b) => [b.ram, b.vram, b.obj, b.spritePos, b.spriteRam, b.bitmap, b.fgRam, b.bgRam, b.sprites].filter((r) => ArrayBuffer.isView(r));
 
 for (const z of sets) {
   let Board, roms;

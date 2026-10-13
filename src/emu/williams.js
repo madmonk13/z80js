@@ -449,6 +449,43 @@ export class Defender extends DefenderControls(Williams) {
     if (o >= 0xC00) this.pia[o & 4 ? 0 : 1].write(o & 3, v);
   }
 }
+
+// Colony 7 (Taito, 1981): defend the colony with a free-moving ship; an
+// 8-way stick and three buttons, its two switches in IN2.
+export class Colony7 extends Defender {
+  constructor(roms) {
+    super(roms);
+    this.width = H; this.height = W;                // a vertical monitor
+    this.native = new Uint32Array(W * H);
+    this.frame = new Uint32Array(W * H);
+    this.controls = 'eight-way'; this.buttons = 3; this.button2 = 'Bomb'; this.button3 = 'Shield'; this.dsw = 0x01;
+  }
+  setInputs(s) {
+    this.in0 = (s.down ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.left ? 0x04 : 0) | (s.up ? 0x08 : 0)
+      | (s.start2 ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (s.fire ? 0x40 : 0) | (s.fire2 ? 0x80 : 0);
+    this.in1 = s.fire3 ? 0x01 : 0;
+    this.in2 = this.dsw | (s.coin ? 0x10 : 0);
+  }
+  applySwitches(v) { this.dsw = v.lives | v.bonus; }
+}
+
+// Mayday (1980): a Defender bootleg. The ship only flies right; a back-fire
+// button shoots behind. Its protection check compares A190/A191 with
+// A193/A194, so reading those gives the expected answer.
+export class Mayday extends Defender {
+  constructor(roms) { super(roms); this.controls = 'eight-way'; this.buttons = 3; this.button2 = 'Mayday'; this.button3 = 'Back fire'; }
+  setInputs(s) {
+    this.in0 = (s.fire ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.fire2 ? 0x04 : 0) | (s.fire3 || s.left ? 0x08 : 0)
+      | (s.start2 ? 0x10 : 0) | (s.start1 ? 0x20 : 0) | (s.down ? 0x80 : 0);
+    this.in1 = s.up ? 0x01 : 0;
+    this.in2 = 0x03 | (s.coin ? 0x10 : 0);
+  }
+  read(a) {
+    if (a === 0xA190 || a === 0xA191) return this.ram[a + 3 - 0x9800];
+    return super.read(a);
+  }
+}
+
 Defender.id = 'defender';
 Defender.title = 'Defender';
 Defender.switches = [];
@@ -495,3 +532,13 @@ export class Sinistar extends Williams {
 Sinistar.id = 'sinistar';
 Sinistar.title = 'Sinistar';
 Sinistar.switches = [];
+
+Colony7.id = 'colony7';
+Colony7.title = 'Colony 7';
+Colony7.switches = [
+  { id: 'lives', label: 'Lives', options: [['2', 0x00], ['3', 0x01]], default: 0x01 },
+  { id: 'bonus', label: 'Bonus', options: [['20K/40K', 0x00], ['30K/50K', 0x02]], default: 0x00 },
+];
+Mayday.id = 'mayday';
+Mayday.title = 'Mayday';
+Mayday.switches = [];

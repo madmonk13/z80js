@@ -6,7 +6,7 @@ import { ScreenVector } from './render/vector.js';
 import { Input } from './input.js';
 import { AudioOut } from './audio-out.js';
 import { store, readRomFile, withLoading, toast } from './shared.js';
-import { library, renderLibrary } from './library.js';
+import { library, renderLibrary, server, romId } from './library.js';
 import { TouchControls } from './touch.js';
 
 const $ = (id) => document.getElementById(id);
@@ -33,13 +33,14 @@ const audio = new AudioOut(SOUND_RATE);
 let screen2d = null;
 const touch = new TouchControls({
   surface: $('surface'), dpad: $('dpad'), aimPad: $('aimpad'), ripples: $('ripples'),
-  buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn')],
+  buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn'), $('start2Btn')],
 });
 input.sources.push(touch);
 
 const settings = { ...DEFAULTS, ...(store.get('settings') || {}) };
 settings.switches = { ...settings.switches };
-const state = { romId: null, menuOpen: false, paused: false };
+const state = { romId: null, serverFile: null, menuOpen: false, paused: false };
+const LAST_SERVER = 'lastServerFile';
 let board = null;
 
 // Block page-level zoom/scroll gestures; this is a full-screen app.
@@ -108,7 +109,25 @@ const RESUME = 'resume:';
 const RESUME_VERSION = 1;              // bump when saved state stops being compatible
 const RESUME_EVERY_MS = 5000;
 
+// Battery-backed RAM (a board's `nvram`: settings and high scores) is kept
+// per ROM set, whether or not resume is on.
+const NVRAM = 'nvram:';
+
+function saveNvram() {
+  if (board?.nvram && state.romId) store.trySet(NVRAM + state.romId, encode(board.nvram));
+}
+
+function loadNvram(id) {
+  const text = board.nvram && store.getRaw(NVRAM + id);
+  if (!text) return;
+  try {
+    const v = decode(text);
+    if (v.length === board.nvram.length) board.nvram.set(v);
+  } catch { store.remove(NVRAM + id); }
+}
+
 function saveResume() {
+  saveNvram();
   if (!board || !settings.resume || !state.romId) return;
   const key = RESUME + state.romId;
   const text = encode({ v: RESUME_VERSION, board: board.constructor.id, bv: board.constructor.stateVersion ?? 1, state: board.saveState() });
@@ -142,7 +161,9 @@ window.addEventListener('pagehide', saveResume);
 // ---------------------------------------------------------------- ROM sets
 
 // Start a board from a ROM set (the zip as added) and record it.
-async function loadSet(bytes, name, id) {
+// keep: store the set on the device (always, for uploads). Saves, high
+// scores and resume points are keyed by the set's content either way.
+async function loadSet(bytes, name, id, keep = true) {
   if (state.paused) setPaused(false);
   const { Board, roms } = identify(await extractAll(bytes));
   saveResume();                          // keep the game being left
@@ -188,16 +209,58 @@ async function loadSet(bytes, name, id) {
     $('fireHintTitle').textContent = 'Fire';
     $('fireHintText').textContent = 'Drag on this side to shoot that way';
   }
+  // Games where each start button picks a side (Silkworm's helicopter or jeep) name both.
+  const starts = board.startLabels;
+  $('startBtn').querySelector('.face').textContent = starts ? starts[0] : 'Start';
+  $('start2Btn').querySelector('.face').textContent = starts ? starts[1] : 'Start 2';
+  $('start2Btn').hidden = !starts;
+  document.body.classList.toggle('two-starts', !!starts);
   $('fire2ZoneTitle').textContent = board.button2 || '';
   $('fire3ZoneTitle').textContent = board.button3 || '';
   renderSwitches();
   layout2D();
-  const res = await library.add(name, bytes, Board.title);
-  if (!res.stored) toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.');
+  const res = keep ? await library.add(name, bytes, Board.title) : { id: romId(bytes), stored: false };
+  if (keep && !res.stored) toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.');
   state.romId = id || res.id;
+  state.serverFile = null;
+  loadNvram(state.romId);
   restoreResume(state.romId);
-  if (res.stored) library.setLast(state.romId);
+  if (res.stored) { library.setLast(state.romId); store.remove(LAST_SERVER); }
   refreshLibrary();
+  return Board;
+}
+
+// Copy a set from the server's roms/ folder to the device (for offline play).
+async function keepServer(file) {
+  try {
+    const bytes = await server.fetch(file);
+    const { Board } = identify(await extractAll(bytes));
+    server.learn(file, Board.title);
+    const res = await library.add(file, bytes, Board.title);
+    if (!res.stored) { toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.'); return; }
+    if (state.serverFile === file) { state.serverFile = null; library.setLast(res.id); store.remove(LAST_SERVER); }
+    toast(`${Board.title} saved to this device`);
+  } catch (err) {
+    toast(`Couldn't save ${file}: ${err.message}`);
+  }
+  refreshLibrary();
+}
+
+// Play a set from the server's roms/ folder.
+async function playServer(file) {
+  try {
+    await withLoading(file, async () => {
+      const bytes = await server.fetch(file);
+      const Board = await loadSet(bytes, file, null, false);
+      server.learn(file, Board.title);
+      state.serverFile = file;
+      store.set(LAST_SERVER, file); store.remove('lastRomId');
+      refreshLibrary();
+    });
+    closeMenu();
+  } catch (err) {
+    toast(`Couldn't load ${file}: ${err.message}`);
+  }
 }
 
 function refreshLibrary() {
@@ -205,20 +268,34 @@ function refreshLibrary() {
     titles: SUPPORTED,
     files: ROM_FILES,
     showAll: settings.showAll,
-    currentId: state.romId,
+    currentId: state.serverFile ? null : state.romId,
+    currentFile: state.serverFile,
     onAdd: () => $('romFile').click(),
+    onServer: (file) => playServer(file),
+    onKeep: (file) => keepServer(file),
     onPlay: (entry) => playEntry(entry),
     onRemove: (entry) => {
       library.remove(entry.id);
-      store.remove(RESUME + entry.id);
-      if (entry.id === state.romId) { board = null; state.romId = null; }
+      // A set that's still on the server keeps its saves, and keeps running from there.
+      const base = (n) => n.replace(/\.zip$/i, '').toLowerCase();
+      const file = server.files.find((f) => base(f) === base(entry.name));
+      if (file) {
+        if (entry.id === state.romId) { state.serverFile = file; store.set(LAST_SERVER, file); }
+      } else {
+        store.remove(RESUME + entry.id);
+        store.remove(NVRAM + entry.id);
+        if (entry.id === state.romId) { board = null; state.romId = null; }
+      }
       refreshLibrary();
     },
   });
   const n = library.list().length;
+  const playable = server.files.filter((f) => SUPPORTED.includes(server.titleOf(f, ROM_FILES))).length;
+  const served = playable ? ` · ${playable} on the server` : '';
   $('libraryInfo').textContent = n
-    ? `${n} saved · ${(library.usage() / 1048576).toFixed(1)} MB on this device`
-    : 'Add a game\'s ROM set (the zip used by MAME) to enable it. Sets are kept on this device.';
+    ? `${n} saved · ${(library.usage() / 1048576).toFixed(1)} MB on this device${served}`
+    : playable ? `${playable} games on the server; add more with Add ROM set.`
+      : 'Add a game\'s ROM set (the zip used by MAME) to enable it. Sets are kept on this device.';
 }
 
 async function playEntry(entry) {
@@ -257,6 +334,7 @@ const SHEETS = { menu: 'closeMenu', cartsMenu: 'closeCarts' }; // backdrop id �
 
 function openSheet(id) {
   for (const other of Object.keys(SHEETS)) $(other).hidden = other !== id;
+  if (id === 'cartsMenu') server.refresh().then(refreshLibrary);   // pick up sets added to roms/
   state.menuOpen = true;
   touch.releaseAll();
   touch.enabled = false;
@@ -412,6 +490,7 @@ function holdButton(el, key) {
 }
 holdButton($('coinBtn'), 'uiCoin');
 holdButton($('startBtn'), 'uiStart');
+holdButton($('start2Btn'), 'uiStart2');
 
 // The touch-zone hints fade once the player starts playing, whether by touch,
 // mouse, keyboard or gamepad.
@@ -566,15 +645,20 @@ function tick(now) {
   syncMenu();
   audio.setMuted(!settings.sound);
   refreshLibrary();
+  await server.refresh();
+  refreshLibrary();
   const lastId = library.lastId();
   const last = lastId ? library.entry(lastId) : null;
   const bytes = last && await library.get(last.id);
+  const lastFile = !bytes && store.get(LAST_SERVER);
   if (bytes) {
     try {
       await withLoading(last.name, () => loadSet(bytes, last.name, last.id));
     } catch (err) {
       toast(`Couldn't load ${last.name}: ${err.message}`);
     }
+  } else if (lastFile && server.files.includes(lastFile)) {
+    await playServer(lastFile);
   } else {
     $('loading').classList.remove('show');
   }

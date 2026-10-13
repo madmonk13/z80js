@@ -129,6 +129,40 @@ export const library = {
   usage() { return readIndex().reduce((n, e) => n + (e.size || 0), 0); },
 };
 
+// ---------------------------------------------------------------- ROM sets served beside the app
+
+// When the app is served from a folder with ROM sets in roms/ (running it
+// locally from the repo), the server's directory listing names them. Sets
+// played from there stream in each time unless kept on the device.
+const LEARNED = 'serverSets';            // file name -> game title, learned by loading it
+
+export const server = {
+  files: [],
+  async refresh() {
+    try {
+      const res = await fetch('roms/', { cache: 'no-cache' });
+      if (!res.ok) { this.files = []; return; }
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const names = [...doc.querySelectorAll('a[href]')]
+        .map((a) => decodeURIComponent(a.getAttribute('href').split(/[?#]/)[0].split('/').pop()))
+        .filter((n) => /\.zip$/i.test(n));
+      this.files = [...new Set(names)].sort();
+    } catch { this.files = []; }
+  },
+  async fetch(file) {
+    const res = await fetch('roms/' + encodeURIComponent(file));
+    if (!res.ok) throw new Error(`the server answered ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
+  },
+  learn(file, title) { const m = store.get(LEARNED) || {}; if (m[file] !== title) { m[file] = title; store.trySet(LEARNED, m); } },
+  // The game a served file is for: learned from loading it, else by its MAME set name.
+  titleOf(file, files) {
+    const m = store.get(LEARNED) || {};
+    if (m[file]) return m[file];
+    return Object.keys(files).find((t) => files[t] === file) || null;
+  },
+};
+
 function ago(t) {
   if (!t) return '';
   const s = (Date.now() - t) / 1000;
@@ -146,12 +180,14 @@ function sizeLabel(bytes) {
 // alphabetical order, each ROM set added for it as a playable row and games
 // without one greyed out (tapping those calls onAdd; with showAll off they're
 // left out). Sets for games no longer recognized are listed after them.
-// Removing takes two taps.
-export function renderLibrary(el, { titles, files = {}, showAll = true, currentId, onPlay, onRemove, onAdd }) {
+// Removing takes two taps. Sets served beside the app show a download arrow
+// (onKeep copies one to the device) until kept; then their ✕ removes the
+// device copy and they go back to streaming.
+export function renderLibrary(el, { titles, files = {}, showAll = true, currentId, currentFile, onPlay, onRemove, onAdd, onServer, onKeep }) {
   el.textContent = '';
-  const row = (label, detail, { entry, missing } = {}) => {
+  const row = (label, detail, { entry, missing, file } = {}) => {
     const li = document.createElement('li');
-    li.className = 'cart-item' + (entry && entry.id === currentId ? ' playing' : '') + (missing ? ' missing' : '');
+    li.className = 'cart-item' + ((entry && entry.id === currentId) || (file && file === currentFile) ? ' playing' : '') + (missing ? ' missing' : '');
     const play = document.createElement('button');
     play.className = 'cart-play';
     const name = document.createElement('b');
@@ -159,9 +195,10 @@ export function renderLibrary(el, { titles, files = {}, showAll = true, currentI
     const meta = document.createElement('small');
     meta.textContent = detail;
     play.append(name, meta);
-    play.addEventListener('click', () => (entry ? onPlay(entry) : onAdd()));
+    play.addEventListener('click', () => (entry ? onPlay(entry) : file ? onServer(file) : onAdd()));
     li.append(play);
-    if (entry) li.append(removeButton(entry, label, onRemove));
+    if (entry) li.append(removeButton(entry, label, onRemove, onServerToo(entry)));
+    else if (file) li.append(keepButton(file, label, onKeep));
     el.append(li);
   };
   const detail = (e) => (e.id === currentId ? 'Playing'
@@ -169,10 +206,20 @@ export function renderLibrary(el, { titles, files = {}, showAll = true, currentI
 
   const entries = library.list();
   const byTitle = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-  // Games you have first, then the ones still waiting for a ROM set; each
-  // group alphabetical.
+  // Sets on the server, by game. Files that aren't named for a supported
+  // game's MAME set (other games, BIOS sets) are left out.
+  const served = {};
+  for (const f of server.files) {
+    const t = server.titleOf(f, files);
+    if (t && titles.includes(t)) (served[t] ||= []).push(f);
+  }
+  const serverDetail = (f) => (f === currentFile ? 'Playing from the server' : `On the server · ${f}`);
+  const base = (n) => n.replace(/\.zip$/i, '').toLowerCase();
+  const onServerToo = (e) => server.files.some((f) => base(f) === base(e.name));
+  // Games you have (on the device or the server) first, then the ones still
+  // waiting for a ROM set; each group alphabetical.
   const sorted = [...titles].sort(byTitle);
-  const have = sorted.filter((t) => entries.some((e) => e.mapper === t));
+  const have = sorted.filter((t) => entries.some((e) => e.mapper === t) || served[t]);
   // Sets that aren't a known game (shouldn't happen, but keep them reachable) go with the uploaded ones.
   const others = entries.filter((x) => !titles.includes(x.mapper));
   const uploaded = [...have.map((t) => ({ title: t })), ...others.map((e) => ({ title: e.name, entry: e }))].sort((a, b) => byTitle(a.title, b.title));
@@ -181,6 +228,8 @@ export function renderLibrary(el, { titles, files = {}, showAll = true, currentI
     const sets = entries.filter((e) => e.mapper === title);
     // Two sets for one game (a clone, say) are told apart by file name.
     for (const e of sets) row(title, sets.length > 1 ? `${e.name} · ${detail(e)}` : detail(e), { entry: e });
+    // Served sets not already kept on the device (by file name).
+    for (const f of served[title] || []) if (!sets.some((e) => base(e.name) === base(f))) row(title, serverDetail(f), { file: f });
   }
   if (!showAll) return;                     // the setting hides games still waiting for a ROM set
   for (const title of sorted.filter((t) => !have.includes(t))) {
@@ -188,10 +237,24 @@ export function renderLibrary(el, { titles, files = {}, showAll = true, currentI
   }
 }
 
-function removeButton(entry, label, onRemove) {
+// Copy a served set to the device: a down arrow, busy while it downloads.
+function keepButton(file, label, onKeep) {
+  const b = document.createElement('button');
+  b.className = 'cart-remove cart-keep';
+  b.setAttribute('aria-label', `Save ${label} to this device`);
+  b.textContent = '↓';
+  b.addEventListener('click', async () => {
+    if (b.disabled) return;
+    b.disabled = true; b.classList.add('busy'); b.textContent = '…';
+    try { await onKeep(file); } finally { b.disabled = false; b.classList.remove('busy'); b.textContent = '↓'; }
+  });
+  return b;
+}
+
+function removeButton(entry, label, onRemove, served = false) {
   const rm = document.createElement('button');
   rm.className = 'cart-remove';
-  rm.setAttribute('aria-label', `Remove ${label}`);
+  rm.setAttribute('aria-label', served ? `Remove ${label} from this device (it stays on the server)` : `Remove ${label}`);
   rm.textContent = '✕';
   let timer = 0;
   rm.addEventListener('click', () => {

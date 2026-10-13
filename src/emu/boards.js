@@ -13,6 +13,7 @@
 //   buttons              number of fire buttons (0-3; button2 and button3 name the second and third)
 //   dialControl          true if the game has a spinner (read as `spin`); dialHint
 //                        optionally names it for the touch hint [title, text]
+//   startLabels          optional [label1, label2]: show two start buttons (each start picks a side)
 //   sound                sample source: buffer/readPos/writePos/available()/pull(), rate
 //   runFrame(), reset()
 //   setInputs({ left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2 })
@@ -20,26 +21,26 @@
 //   Board.stateVersion   (optional) bumped when older saved states no longer restore correctly
 
 import { Galaga } from './galaga.js';
-import { PacMan, MsPacMan, JrPacMan, Piranha, CrushRoller, PuckMan, PacManPlus } from './pacman.js';
-import { Galaxian, MoonCresta } from './galaxian.js';
+import { PacMan, MsPacMan, JrPacMan, Piranha, CrushRoller, PuckMan, PacManPlus, Eyes, MrTNT, LizardWizard, Ponpoko, JumpShot, MakeTrax, MagicBrush, DreamShopper } from './pacman.js';
+import { Galaxian, MoonCresta, Eagle, UniWarS, Pisces, BlackHole, Swarm, RedUFO, MoonAlien, WarOfTheBugs } from './galaxian.js';
 import { DonkeyKong, DonkeyKongJr } from './dkong.js';
 import { Frogger } from './frogger.js';
-import { Scramble, Amidar, SuperCobra } from './scramble.js';
+import { Scramble, Amidar, SuperCobra, ArmoredCar, TazzMania, Anteater } from './scramble.js';
 import { DigDug } from './digdug.js';
 import { TimePilot, Pooyan } from './timeplt.js';
 import { MrDo } from './mrdo.js';
-import { SatansHollow, Tron, Tapper, Kick, DominoMan } from './mcr.js';
+import { SatansHollow, Tron, Tapper, Kick, DominoMan, Timber, SolarFox, Wacko } from './mcr.js';
 import { Bosconian, Xevious, SuperXevious } from './bosco.js';
 import { Berzerk, Frenzy } from './berzerk.js';
 import { RallyX, NewRallyX } from './rallyx.js';
 import { WarpWarp } from './warpwarp.js';
-import { Mappy, DigDug2, Motos, Druaga } from './mappy.js';
-import { Centipede } from './centiped.js';
-import { Phoenix } from './phoenix.js';
-import { SpaceInvaders } from './invaders.js';
-import { LadyBug } from './ladybug.js';
+import { Mappy, DigDug2, Motos, Druaga, SuperPacMan, PacAndPal, Grobda } from './mappy.js';
+import { Centipede, Millipede, Warlords } from './centiped.js';
+import { Phoenix, Pleiads } from './phoenix.js';
+import { SpaceInvaders, SpaceInvadersPartII, SpaceInvadersCV, LunarRescue, GalaxyWars, OzmaWars } from './invaders.js';
+import { LadyBug, CosmicAvenger, SnapJack } from './ladybug.js';
 import { C1942 } from './c1942.js';
-import { DoCastle, DoRunRun, DoWildRide } from './docastle.js';
+import { DoCastle, DoRunRun, DoWildRide, KickRider } from './docastle.js';
 import { Popeye } from './popeye.js';
 import { Pengo } from './pengo.js';
 import { BombJack } from './bombjack.js';
@@ -47,18 +48,29 @@ import { MarioBros } from './mario.js';
 import { MoonPatrol } from './mpatrol.js';
 import { Zaxxon } from './zaxxon.js';
 import { GhostsNGoblins } from './gng.js';
-import { Asteroids } from './asteroids.js';
+import { Asteroids, AsteroidsDeluxe, LunarLander } from './asteroids.js';
 import { Tempest } from './tempest.js';
-import { Battlezone } from './bzone.js';
+import { Battlezone, RedBaron } from './bzone.js';
+import { BlackWidow, Gravitar, SpaceDuel } from './bwidow.js';
 import { StarWars } from './starwars.js';
 import { TailGunner } from './tailg.js';
+import { Silkworm } from './tecmo.js';
+import { RoboCop } from './dec0.js';
+import { Aliens, Ajax, CrimeFighters, SuperContra, GangBusters, BottomOfTheNinth } from './konamik.js';
+import { TMNT, MissingInAction } from './tmnt.js';
+import { StarCastle, RipOff, ArmorAttack, SolarQuest } from './cinemat.js';
 import { RushNAttack, GreenBeretJ, MrGoemon } from './gberet.js';
 import { YieArKungFu } from './yiear.js';
+import { Qbert, MadPlanets, Krull, QbertsQubes } from './gottlieb.js';
+import { LegendOfKage } from './lkage.js';
+import { Shinobi } from './segas16b.js';
+import { RollingThunder, WonderMomo, Genpei, ReturnOfIshtar, HoppingMappy, SkyKidDeluxe } from './namcos86.js';
+import { SmashTV, TotalCarnage, MortalKombat } from './midyunit.js';
 import { RType, RType2, HammerinHarry, MajorTitle, BattleChopper, NinjaSpirit, ImageFight, HeroTonma, XMultiply, DragonBreed, AirDuel, Gallop } from './m72.js';
 import { MetalSlug, MetalSlug2, MetalSlugX } from './neogeo.js';
 import { Strider, Mercs, FinalFight, StreetFighter2, GhoulsNGhosts, ForgottenWorlds, Game1941, Knights, CaptainCommando } from './cps1.js';
 import { Gorf, WizardOfWor, RobbyRoto, SpaceZap, ExtraBases, SeaWolf2 } from './astrocade.js';
-import { Robotron, Joust, Bubbles, Splat, Stargate, Defender, Sinistar } from './williams.js';
+import { Robotron, Joust, Bubbles, Splat, Stargate, Defender, Sinistar, Colony7, Mayday } from './williams.js';
 
 const BOARDS = [
   {
@@ -122,6 +134,48 @@ const BOARDS = [
       palette: Uint8Array.from({ length: 32 }, (_, i) => (c.palLow[i] & 0x0F) | ((c.palHigh[i] & 0x0F) << 4)),
       lut: c.lut, wave: c.wave,
     }),
+  },
+  ...[
+    // Pac-Man board games: [Board, main [file, offset]..., ext (8000-BFFF) [file, offset]..., gfx [file, offset]... (8K: tiles then sprites), palette, lut]
+    [Eyes, [['d7', 0], ['e7', 0x1000], ['f7', 0x2000], ['h7', 0x3000]], [], [['d5', 0], ['e5', 0x1000]], '82s123\\.7f', '82s129\\.4a'],
+    [MrTNT, [['tnt\\.1', 0], ['tnt\\.2', 0x1000], ['tnt\\.3', 0x2000], ['tnt\\.4', 0x3000]], [], [['tnt\\.5', 0], ['tnt\\.6', 0x1000]], '82s123\\.7f', '82s126\\.4a'],
+    [LizardWizard, [['6e\\.cpu', 0], ['6f\\.cpu', 0x1000], ['6h\\.cpu', 0x2000], ['6j\\.cpu', 0x3000]], [['wiza', 0], ['wizb', 0x1000]], [['5e\\.cpu', 0], ['5f\\.cpu', 0x1000]], '7f\\.cpu', '4a\\.cpu'],
+    [Ponpoko, [['ppokoj1\\.bin', 0], ['ppokoj2\\.bin', 0x1000], ['ppokoj3\\.bin', 0x2000], ['ppokoj4\\.bin', 0x3000]],
+      [['ppoko5\\.bin', 0], ['ppoko6\\.bin', 0x1000], ['ppoko7\\.bin', 0x2000], ['ppokoj8\\.bin', 0x3000]], [['ppoko9\\.bin', 0], ['ppoko10\\.bin', 0x1000]], '82s123\\.7f', '82s126\\.4a'],
+    [JumpShot, [['6e', 0], ['6f', 0x1000], ['6h', 0x2000], ['6j', 0x3000]], [], [['5e', 0], ['5f', 0x1000]], 'prom\\.7f', 'prom\\.4a'],
+    [MakeTrax, [['maketrax\\.6e', 0], ['maketrax\\.6f', 0x1000], ['maketrax\\.6h', 0x2000], ['maketrax\\.6j', 0x3000]], [], [['maketrax\\.5e', 0], ['maketrax\\.5f', 0x1000]], '82s123\\.7f', '2s140\\.4a'],
+    [MagicBrush, [['mbrush\\.6e', 0], ['mbrush\\.6f', 0x1000], ['mbrush\\.6h', 0x2000], ['mbrush\\.6j', 0x3000]], [],
+      [['tpa', 0], ['mbrush\\.5h', 0x800], ['mbrush\\.5f', 0x1000], ['tpd', 0x1800]], '82s123\\.7f', '2s140\\.4a'],
+  ].map(([Board, main, ext, gfx, palette, lut]) => {
+    const re = (p) => [new RegExp(`^${p}$`)];
+    return {
+      Board,
+      chips: [...main.map(([p], i) => [`m${i}`, null, re(p)]), ...ext.map(([p], i) => [`x${i}`, null, re(p)]), ...gfx.map(([p], i) => [`g${i}`, null, re(p)]),
+        ['palette', 0x20, re(palette)], ['lut', 0x100, re(lut)], ['wave', 0x100, re('82s126\\.1m|pr\\.1k')]],
+      assemble: (c) => {
+        const mainRom = new Uint8Array(0x4000), gfxRom = new Uint8Array(0x2000);
+        main.forEach(([, at], i) => mainRom.set(c[`m${i}`], at));
+        gfx.forEach(([, at], i) => gfxRom.set(c[`g${i}`], at));
+        let extRom = null;
+        if (ext.length) { extRom = new Uint8Array(0x4000); ext.forEach(([, at], i) => extRom.set(c[`x${i}`], at)); }
+        return { main: mainRom, ext: extRom, tiles: gfxRom.slice(0, 0x1000), sprites: gfxRom.slice(0x1000), palette: c.palette, lut: c.lut, wave: c.wave };
+      },
+    };
+  }),
+  {
+    Board: DreamShopper,
+    chips: [
+      ...['1\\.50', '2\\.51', '3\\.52', '4\\.53', '5\\.39', '6\\.40', '7\\.41'].map((n, i) => [`m${i}`, 0x1000, [new RegExp(`^red_${n}$`)]]),
+      ['tiles', 0x1000, [/^red-20\.18$/]],
+      ['sprites', 0x1000, [/^red-21\.19$/]],
+      ['palette', 0x20, [/^6331-1\.6$/]],
+      ['lut', 0x100, [/^6301-1\.37$/]],
+    ],
+    assemble: (c) => {
+      const ext = new Uint8Array(0x4000).fill(0xFF);
+      ext.set(cat(c.m4, c.m5, c.m6), 0);
+      return { main: cat(c.m0, c.m1, c.m2, c.m3), ext, tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: new Uint8Array(0x100) };
+    },
   },
   {
     Board: Piranha,
@@ -197,6 +251,45 @@ const BOARDS = [
     ],
     assemble: (c) => ({ main: cat(c.h, c.g, c.f, c.e) }),
   },
+  // Invaders-board games: [Board, ROMs at 0000 up, ROMs at 4000 up, color PROMs]
+  ...[
+    [SpaceInvadersPartII, ['pv\\.?01', 'pv\\.?02', 'pv\\.?03', 'pv\\.?04'], ['pv\\.?05'], ['pv\\.?06', 'pv\\.?07']],
+    [SpaceInvadersCV, ['cv17\\.bin', 'cv18\\.bin', 'cv19\\.bin', 'cv20\\.bin'], [], ['cv01', 'cv02']],
+    [LunarRescue, ['lrescue\\.1', 'lrescue\\.2', 'lrescue\\.3', 'lrescue\\.4'], ['lrescue\\.5', 'lrescue\\.6'], ['7643-1\\.cpu']],
+    [GalaxyWars, ['univgw3\\.0', 'univgw4\\.1', 'univgw5\\.2', 'univgw6\\.3'], ['univgw1\\.4', 'univgw2\\.5'], []],
+    [OzmaWars, ['mw01', 'mw02', 'mw03', 'mw04'], ['mw05', 'mw06'], []],
+  ].map(([Board, lo, hi, proms]) => ({
+    Board,
+    chips: [
+      ...lo.map((n, i) => [`lo${i}`, null, [new RegExp(`^${n}`)]]),
+      ...hi.map((n, i) => [`hi${i}`, null, [new RegExp(`^${n}`)]]),
+      ...proms.map((n, i) => [`c${i}`, 0x400, [new RegExp(`^${n}`)]]),
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x5000);
+      const place = (arr, at) => { for (const r of arr) { main.set(r, at); at += r.length; } };
+      place(lo.map((_, i) => c[`lo${i}`]), 0);
+      place(hi.map((_, i) => c[`hi${i}`]), 0x4000);
+      const colors = proms.length ? cat(c.c0, c.c1 || c.c0) : null;
+      return colors ? { main, colors } : { main };
+    },
+  })),
+  ...[
+    [SnapJack, ['sj2a\\.bin', 'sj2b\\.bin', 'sj2c\\.bin', 'sj2d\\.bin', 'sj2e\\.bin', 'sj2f\\.bin'], ['sj2i\\.bin', 'sj2j\\.bin'], ['sj2h\\.bin', 'sj2g\\.bin'], 'sj8t\\.bin', 'sj9k\\.bin'],
+    [CosmicAvenger, ['1', '2', '3', '4', '5', '6'], ['9', '0'], ['8'], 't8\\.bpr', 'k9\\.bpr'],
+  ].map(([Board, main, chars, sprites, palette, lut]) => {
+    const re = (p) => [new RegExp(`^${p}$`)];
+    return {
+      Board,
+      chips: [...main.map((p, i) => [`m${i}`, 0x1000, re(p)]), ...chars.map((p, i) => [`c${i}`, 0x1000, re(p)]), ...sprites.map((p, i) => [`s${i}`, 0x1000, re(p)]),
+        ['palette', 0x20, re(palette)], ['lut', 0x20, re(lut)]],
+      assemble: (c) => {
+        const spr = new Uint8Array(0x2000);
+        sprites.forEach((_, i) => spr.set(c[`s${i}`], i * 0x1000));
+        return { main: cat(...main.map((_, i) => c[`m${i}`])), chars: cat(...chars.map((_, i) => c[`c${i}`])), sprites: spr, palette: c.palette, spriteLut: c.lut };
+      },
+    };
+  }),
   {
     Board: LadyBug,
     chips: [
@@ -279,6 +372,20 @@ const BOARDS = [
       const main = new Uint8Array(0xA000);         // 0000-1FFF and 4000-9FFF
       main.set(c.p1, 0); main.set(c.l1, 0x4000); main.set(c.k1, 0x6000); main.set(c.n1, 0x8000);
       return { main, sub: c.sub, chars: c.chars, sprites: cat(c.m4, c.l4, c.j4, c.h4), palette: c.palette };
+    },
+  },
+  {
+    Board: KickRider,
+    chips: [
+      ...['k1', 'k3', 'k4', 'k2', 'k6', 'k7', 'k8', 'k9'].map((n) => [n, 0x2000, [new RegExp(`^${n}$`)]]),
+      ['sub', 0x4000, [/^k10$/]],
+      ['chars', 0x4000, [/^k5$/]],
+      ['palette', 0x100, [/^kickridr\.clr$/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0xA000);         // 0000-1FFF and 4000-9FFF
+      main.set(c.k1, 0); main.set(c.k3, 0x4000); main.set(c.k4, 0x6000); main.set(c.k2, 0x8000);
+      return { main, sub: c.sub, chars: c.chars, sprites: cat(c.k6, c.k7, c.k8, c.k9), palette: c.palette };
     },
   },
   {
@@ -478,6 +585,31 @@ const BOARDS = [
     },
   },
   {
+    Board: Colony7,
+    chips: [
+      ...[3, 2, 1].map((n) => [`m${n}`, 0x1000, [new RegExp(`^cs0${n}\\.bin$`)]]),
+      ...[6, 4, 7, 5, 8].map((n) => [`b${n}`, 0x800, [new RegExp(`^cs0${n}\\.bin$`)]]),
+      ['sound', 0x800, [/^cs11\.bin$/]],
+    ],
+    assemble: (c) => {
+      const banked = new Uint8Array(0x9000).fill(0xFF);
+      [[6, 0], [4, 0x800], [7, 0x1000], [5, 0x1800], [8, 0x2000], [8, 0x2800]].forEach(([n, o]) => banked.set(c[`b${n}`], o));
+      return { main: cat(c.m3, c.m2, c.m1), sound: cat(c.sound, c.sound), banked };
+    },
+  },
+  {
+    Board: Mayday,
+    chips: [
+      ...['03-3', '02-2', '01-1', '04-4', '05-5', '06-6', '07-7d'].map((n) => [n, 0x1000, [new RegExp(`^ic${n}\\.bin$`)]]),
+      ['sound', 0x800, [/^ic28-8\.bin$/]],
+    ],
+    assemble: (c) => {
+      const banked = new Uint8Array(0x9000).fill(0xFF);
+      [['04-4', 0], ['05-5', 0x1000], ['06-6', 0x2000], ['07-7d', 0x6000]].forEach(([n, o]) => banked.set(c[n], o));
+      return { main: cat(c['03-3'], c['02-2'], c['01-1']), sound: cat(c.sound, c.sound), banked };
+    },
+  },
+  {
     Board: Sinistar,
     chips: [
       ['top10', 0x1000, [/^sinistar\.10$/]],
@@ -529,6 +661,19 @@ const BOARDS = [
       };
     },
   },
+  ...[
+    // Stern on the Super Cobra board: [Board, main ROMs..., sound ROMs..., gfx ROMs (first half, second), palette]
+    [ArmoredCar, ['cpu\\.2c', 'cpu\\.2e', 'cpu\\.2f', 'cpu\\.2h', 'cpu\\.2j'], ['sound\\.5c', 'sound\\.5d'], ['cpu\\.5f', 'cpu\\.5h'], '82s123\\.6e'],
+    [TazzMania, ['2c\\.cpu', '2e\\.cpu', '2f\\.cpu', '2h\\.cpu', '2j\\.cpu', '2k\\.cpu'], ['rom0\\.snd'], ['5f\\.cpu', '5h\\.cpu'], 'colr6f\\.cpu'],
+    [Anteater, ['ra1-2c', 'ra1-2e', 'ra1-2f', 'ra1-2h'], ['ra4-5c', 'ra4-5d'], ['ra6-5f', 'ra6-5h'], 'colr6f\\.cpu'],
+  ].map(([Board, main, sound, gfx, palette]) => {
+    const re = (p) => [new RegExp(`^${p}$`)];
+    return {
+      Board,
+      chips: [...main.map((p, i) => [`m${i}`, 0x1000, re(p)]), ...sound.map((p, i) => [`s${i}`, 0x800, re(p)]), ...gfx.map((p, i) => [`g${i}`, 0x800, re(p)]), ['palette', 0x20, re(palette)]],
+      assemble: (c) => ({ main: cat(...main.map((_, i) => c[`m${i}`])), sound: cat(...sound.map((_, i) => c[`s${i}`])), gfx: cat(c.g0, c.g1), palette: c.palette }),
+    };
+  }),
   {
     Board: SuperCobra,
     chips: [
@@ -550,6 +695,28 @@ const BOARDS = [
       gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
     }),
   },
+  ...[
+    // Galaxian-board games: [Board, main ROMs (2K each, or [file, address, size]), gfx ROMs (plane 0 first), palette]
+    [UniWarS, ['f07_1a\\.bin', 'h07_2a\\.bin', 'k07_3a\\.bin', 'm07_4a\\.bin', 'd08p_5a\\.bin', 'gg6', 'm08p_7a\\.bin', 'n08p_8a\\.bin'], ['egg10', 'h01_2\\.bin', 'egg9', 'k01_2\\.bin'], 'uniwars\\.clr'],
+    [Pisces, ['p1\\.bin', 'p2\\.bin', 'p3\\.bin', 'p4\\.bin', 'p5\\.bin', 'p6\\.bin'], ['g09\\.bin', 'g11\\.bin', 'g10\\.bin', 'g12\\.bin'], 'colour\\.bin'],
+    [BlackHole, ['bh1', 'bh2', 'bh3', 'bh4', 'bh5', 'bh6'], ['bh7', 'bh8'], '6l\\.bpr'],
+    [Swarm, ['swarm1\\.bin', 'swarm2\\.bin', 'swarm3\\.bin', 'swarm4\\.bin', 'swarm5\\.bin'], ['swarma\\.bin', 'swarmb\\.bin'], '6l\\.bpr'],
+    [RedUFO, ['ru1a', 'ru2a', 'ru3a', 'ru4a', 'ru5a', 'ru6a'], ['ruhja', 'rukla'], '6l\\.bpr'],
+    [MoonAlien, ['galx\\.u', 'prg2\\.bin', 'prg3\\.bin', 'superg\\.y', 'prg5\\.bin'], ['ca1\\.bin', 'ca2\\.bin'], '6l\\.bpr'],
+    [WarOfTheBugs, ['warofbug\\.u', 'warofbug\\.v', 'warofbug\\.w', 'warofbug\\.y', 'warofbug\\.z'], ['warofbug\\.1k', 'warofbug\\.1j'], 'warofbug\\.clr'],
+  ].map(([Board, main, gfx, palette]) => {
+    const re = (p) => [new RegExp(`^${p}$`)];
+    const parts = main.map((m, i) => (Array.isArray(m) ? m : [m, i * 0x800, 0x800]));
+    return {
+      Board,
+      chips: [...parts.map(([p, , size], i) => [`m${i}`, size, re(p)]), ...gfx.map((p, i) => [`g${i}`, 0x800, re(p)]), ['palette', 0x20, re(palette)]],
+      assemble: (c) => {
+        const mainRom = new Uint8Array(Math.max(...parts.map(([, at, size]) => at + size)));
+        parts.forEach(([, at], i) => mainRom.set(c[`m${i}`], at));
+        return { main: mainRom, gfx: cat(...gfx.map((_, i) => c[`g${i}`])), palette: c.palette };
+      },
+    };
+  }),
   {
     Board: Galaxian,
     chips: [
@@ -701,6 +868,19 @@ const BOARDS = [
       main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1),
       gfx: cat(c.gfx0, c.gfx1), palette: c.palette,
     }),
+  },
+  {
+    Board: Eagle,
+    chips: [
+      ...['e1', 'e2', 'f03\\.bin', 'f04\\.bin', 'e5', 'e6', 'e7', 'e8'].map((n, i) => [`main${i}`, 0x800, [new RegExp(`^${n}$`)]]),
+      ['e10', 0x800, [/^e10$/]], ['e12', null, [/^e12$/]], ['e9', 0x800, [/^e9$/]], ['e11', null, [/^e11$/]],
+      ['palette', 0x20, [/^l06_prom\.bin$/]],
+    ],
+    assemble: (c) => {
+      const gfx = new Uint8Array(0x2000);
+      gfx.set(c.e10, 0); gfx.set(c.e12.subarray(0, 0x800), 0x800); gfx.set(c.e9, 0x1000); gfx.set(c.e11.subarray(0, 0x800), 0x1800);
+      return { main: cat(...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => c[`main${n}`])), gfx, palette: c.palette };
+    },
   },
   {
     Board: MoonCresta,
@@ -948,6 +1128,26 @@ const BOARDS = [
     ],
     assemble: (c) => ({ main: cat(c.r0, c.r1, c.r2, c.r3), chars: c.chars }),
   },
+  ...[
+    // Super Pac-Man board: [Board, main ROMs (low to high), sub, chars, sprites..., palette, char LUT, sprite LUT, wave]
+    [SuperPacMan, ['sp1-2\\.1c', 'sp1-1\\.1b'], 'spc-3\\.1k', 'sp1-6\\.3c', ['spv-2\\.3f'], 'superpac\\.4c', 'superpac\\.4e', 'superpac\\.3l', 'superpac\\.3m'],
+    [PacAndPal, ['(pap13b\\.1d|pap1-3b\\.1d)', '(pap12b\\.1c|pap1-2b\\.1c)', '(pap1\\.1b|pap3-1\\.1b)'], '(pap14\\.1k|pap1-4\\.1k)', '(pap16\\.3c|pap1-6\\.3c)', ['(pap15\\.3f|pap1-5\\.3f)'],
+      '(papi6\\.4c|pap1-6\\.4c)', '(papi5\\.4e|pap1-5\\.4e)', '(papi4\\.3l|pap1-4\\.3l)', '(papi3\\.3m|pap1-3\\.3m)'],
+    [Grobda, ['gr2-3\\.1d', 'gr2-2\\.1c', 'gr2-1\\.1b'], 'gr1-4\\.1k', 'gr1-7\\.3c', ['gr1-5\\.3f', 'gr1-6\\.3e'], 'gr1-6\\.4c', 'gr1-5\\.4e', 'gr1-4\\.3l', 'gr1-3\\.3m'],
+  ].map(([Board, main, sub, chars, sprites, palette, charLut, spriteLut, wave]) => {
+    const re = (p) => [new RegExp(`^${p}$`)];
+    return {
+      Board,
+      chips: [...main.map((p, i) => [`m${i}`, null, re(p)]), ['sub', null, re(sub)], ['chars', 0x1000, re(chars)], ...sprites.map((p, i) => [`s${i}`, 0x2000, re(p)]),
+        ['palette', 0x20, re(palette)], ['charLut', 0x100, re(charLut)], ['spriteLut', 0x100, re(spriteLut)], ['wave', 0x100, re(wave)]],
+      assemble: (c) => {
+        const subRom = new Uint8Array(0x2000).fill(0xFF);
+        subRom.set(c.sub, 0x2000 - c.sub.length);
+        return { main: cat(...main.map((_, i) => c[`m${i}`])), sub: subRom, chars: c.chars, sprites: cat(...sprites.map((_, i) => c[`s${i}`])),
+          palette: c.palette, charLut: c.charLut, spriteLut: c.spriteLut, wave: c.wave };
+      },
+    };
+  }),
   {
     Board: Mappy,
     chips: [
@@ -1038,6 +1238,40 @@ const BOARDS = [
     assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2, c.p3), gfx: cat(c.g0, c.g1) }),
   },
   {
+    Board: Warlords,
+    chips: [
+      ...[154, 153, 158, 157, 156, 155].map((n, i) => [`p${i}`, 0x800, [new RegExp(`^037${n}`)]]),
+      ['gfx', 0x800, [/^037159/]],
+      ['prom', 0x100, [/^warlord\.clr$/]],
+    ],
+    assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2, c.p3, c.p4, c.p5), gfx: c.gfx, prom: c.prom }),
+  },
+  {
+    Board: Millipede,
+    chips: [
+      ...[104, 103, 102, 101].map((n, i) => [`p${i}`, 0x1000, [new RegExp(`^(milliped|136013)[.-]${n}`)]]),
+      ['g0', 0x800, [/^(milliped|136013)[.-]107/]],
+      ['g1', 0x800, [/^(milliped|136013)[.-]106/]],
+    ],
+    assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2, c.p3), gfx: cat(c.g0, c.g1) }),
+  },
+  {
+    Board: Pleiads,
+    chips: [
+      ...['ic47.r1', 'ic48.r2', 'ic47.bin', 'ic48.bin', 'ic51.r5', 'ic50.bin', 'ic53.r7', 'ic52.bin'].map((n, i) => [`main${i}`, 0x800, [new RegExp(`^${n.replace('.', '\\.')}$`)]]),
+      ['bg0', 0x800, [/^ic23\.bin$/]],
+      ['bg1', 0x800, [/^ic24\.bin$/]],
+      ['fg0', 0x800, [/^ic39\.bin$/]],
+      ['fg1', 0x800, [/^ic40\.bin$/]],
+      ['palLo', 0x100, [/^7611-5\.26$/]],
+      ['palHi', 0x100, [/^7611-5\.33$/]],
+    ],
+    assemble: (c) => ({
+      main: cat(...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => c[`main${n}`])), bg: cat(c.bg0, c.bg1), fg: cat(c.fg0, c.fg1),
+      palLo: c.palLo, palHi: c.palHi,
+    }),
+  },
+  {
     Board: Phoenix,
     chips: [
       ...[45, 46, 47, 48, 49, 50, 51, 52].map((n, i) => [`main${i}`, 0x800, [new RegExp(`^(h\\d-)?ic${n}(\\.\\d?a)?$`)]]),
@@ -1076,6 +1310,51 @@ const BOARDS = [
       ['r4', 0x1000, [/^6d-4/]],
     ],
     assemble: (c) => ({ main: cat(c.r0, c.r1, c.r2, c.r3), high: c.r4 }),
+  },
+  {
+    Board: Timber,
+    chips: [
+      ...[0, 1, 2, 3].map((n) => [`main${n}`, null, [new RegExp(`^timpg${n}\\.bin$`)]]),
+      ...[7, 8, 9].map((n) => [`sound${n}`, 0x1000, [new RegExp(`^tima${n}\\.bin$`)]]),
+      ['bg0', 0x4000, [/^timbg0\.bin$/]],
+      ['bg1', 0x4000, [/^timbg1\.bin$/]],
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => [`fg${n}`, 0x4000, [new RegExp(`^timfg${n}\\.bin$`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound7, c.sound8, c.sound9),
+      bg: cat(c.bg1, c.bg0), fg: cat(c.fg1, c.fg0, c.fg3, c.fg2, c.fg5, c.fg4, c.fg7, c.fg6), prom: c.prom,
+    }),
+  },
+  {
+    Board: SolarFox,
+    chips: [
+      ...['3b', '4b', '5b', '4d', '5d', '6d', '7d'].map((n, i) => [`main${i}`, 0x1000, [new RegExp(`^sfcpu\\.${n}$`)]]),
+      ...['7a', '8a', '9a'].map((n, i) => [`sound${i}`, 0x1000, [new RegExp(`^sfsnd\\.${n}$`)]]),
+      ['bg0', 0x1000, [/^sfcpu\.4g$/]],
+      ['bg1', 0x1000, [/^sfcpu\.5g$/]],
+      ...['1a', '1b', '1d', '1e'].map((n, i) => [`fg${i}`, 0x2000, [new RegExp(`^sfvid\\.${n}$`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(...[0, 1, 2, 3, 4, 5, 6].map((n) => c[`main${n}`])), sound: cat(c.sound0, c.sound1, c.sound2),
+      bg: cat(c.bg0, c.bg1), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3), prom: c.prom,
+    }),
+  },
+  {
+    Board: Wacko,
+    chips: [
+      ...['2d', '3d', '4d', '5d'].map((n, i) => [`main${i}`, 0x2000, [new RegExp(`^wackocpu\\.${n}$`)]]),
+      ...['7a', '8a', '9a'].map((n, i) => [`sound${i}`, 0x1000, [new RegExp(`^wackosnd\\.${n}$`)]]),
+      ['bg0', 0x2000, [/^wackocpu\.3g$/]],
+      ['bg1', 0x2000, [/^wackocpu\.4g$/]],
+      ...['1e', '1d', '1b', '1a'].map((n, i) => [`fg${i}`, 0x2000, [new RegExp(`^wackovid\\.${n}$`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.main0, c.main1, c.main2, c.main3), sound: cat(c.sound0, c.sound1, c.sound2),
+      bg: cat(c.bg0, c.bg1), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3), prom: c.prom,
+    }),
   },
   {
     Board: Kick,
@@ -1164,6 +1443,18 @@ const BOARDS = [
     }),
   },
   {
+    Board: AsteroidsDeluxe,
+    chips: [['p0', 0x800, [/^036430\./]], ['p1', 0x800, [/^036431\./]], ['p2', 0x800, [/^036432\./]], ['p3', 0x800, [/^036433\./]],
+      ['v0', 0x800, [/^036800\./]], ['v1', 0x800, [/^036799\./]]],
+    assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2, c.p3), vector: cat(c.v0, c.v1) }),
+  },
+  {
+    Board: LunarLander,
+    chips: [['p0', 0x800, [/^034572\./]], ['p1', 0x800, [/^034571\./]], ['p2', 0x800, [/^034570\./]], ['p3', 0x800, [/^034569\./]],
+      ['v0', 0x800, [/^034599\./]], ['v1', 0x800, [/^034598\./]]],
+    assemble: (c) => ({ main: cat(c.p0, c.p1, c.p2, c.p3), vector: cat(c.v0, c.v1) }),
+  },
+  {
     Board: Asteroids,
     chips: [
       ['p0', 0x800, [/^035145\.02$/]],
@@ -1185,6 +1476,33 @@ const BOARDS = [
     }),
   },
   {
+    Board: RedBaron,
+    chips: [['p0', 0x1000, [/^037587\./]], ['p1', 0x800, [/^037000\./]], ...['036998', '036997', '036996', '036995'].map((n) => [n, 0x800, [new RegExp(`^${n}\\.`)]]),
+      ['v0', 0x800, [/^037006\./]], ['v1', 0x800, [/^037007\./]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x3800);                   // 4800-7FFF
+      main.set(c.p0.subarray(0, 0x800), 0); main.set(c.p1, 0x800); main.set(c.p0.subarray(0x800), 0x1000);
+      ['036998', '036997', '036996', '036995'].forEach((n, k) => main.set(c[n], 0x1800 + k * 0x800));
+      return { main, vector: cat(c.v0, c.v1) };
+    },
+  },
+  ...[
+    // Atari color vector games: [Board, set prefix, [file, address]...] (the top ROM repeats up to FFFF).
+    [BlackWidow, '136017', [['107', 0x2800], ['108', 0x3000], ['109', 0x4000], ['110', 0x5000], ['101', 0x9000], ['102', 0xA000], ['103', 0xB000], ['104', 0xC000], ['105', 0xD000], ['106', 0xE000]]],
+    [Gravitar, '136010', [['210', 0x2800], ['207', 0x3000], ['208', 0x4000], ['309', 0x5000], ['301', 0x9000], ['302', 0xA000], ['303', 0xB000], ['304', 0xC000], ['305', 0xD000], ['306', 0xE000]]],
+    [SpaceDuel, '136006', [['106', 0x2800], ['107', 0x3000], ['201', 0x4000], ['102', 0x5000], ['103', 0x6000], ['104', 0x7000], ['105', 0x8000]]],
+  ].map(([Board, prefix, parts]) => ({
+    Board,
+    chips: parts.map(([n]) => [n, null, [new RegExp(`^${prefix}\\.${n}$`)]]),
+    assemble: (c) => {
+      const mem = new Uint8Array(0x10000);
+      for (const [n, at] of parts) mem.set(c[n], at);
+      const last = parts[parts.length - 1];
+      for (let a = last[1] + 0x1000; a < 0x10000; a += 0x1000) mem.set(c[last[0]], a);
+      return { mem };
+    },
+  })),
+  {
     Board: Battlezone,
     chips: ['414', '413', '412', '411', '410', '409', '422', '421']
       .map((n) => [`b${n}`, 0x800, [new RegExp(`^036${n}[.-]01`)]]),
@@ -1201,6 +1519,170 @@ const BOARDS = [
     assemble: (c) => ({
       main: cat(c.s102, c.s203, c.s104, c.s206), banked: c.s214, vector: c.s105,
       sound: cat(c.s107, c.s208), prom: cat(c.s110, c.s111, c.s112, c.s113),
+    }),
+  },
+  // Cinematronics: [Board, [even, odd] ROM pairs per bank]
+  ...[
+    [StarCastle, [['starcas3\\.t7', 'starcas3\\.p7'], ['starcas3\\.u7', 'starcas3\\.r7']]],
+    [RipOff, [['ripoff\\.t7', 'ripoff\\.p7'], ['ripoff\\.u7', 'ripoff\\.r7']]],
+    [ArmorAttack, [['ar414le\\.t6', 'ar414lo\\.p6'], ['ar414ue\\.u6', 'ar414uo\\.r6']]],
+    [SolarQuest, [['solar\\.6t', 'solar\\.6p'], ['solar\\.6u', 'solar\\.6r']]],
+  ].map(([Board, banks]) => ({
+    Board,
+    chips: banks.flatMap(([e, o], i) => [[`e${i}`, null, [new RegExp(`^${e}$`)]], [`o${i}`, null, [new RegExp(`^${o}$`)]]]),
+    assemble: (c) => ({ main: cat(...banks.map((_, i) => interleave(c[`e${i}`], c[`o${i}`]))) }),
+  })),
+  {
+    Board: Ajax,
+    chips: [
+      ['n11', 0x10000, [/^770_[mlk]01\.n11$/]], ['n12', 0x10000, [/^770_[lk]02\.n12$/]],
+      ['i16', 0x8000, [/^770_[lk]05\.i16$/]], ['g16', 0x10000, [/^770_f04\.g16$/]], ['sound', 0x8000, [/^770_h03\.f16$/]],
+      ['c13', 0x40000, [/^770c13/]], ['c12', 0x40000, [/^770c12/]], ['c09', 0x80000, [/^770c09/]], ['c08', 0x80000, [/^770c08/]],
+      ['c06', 0x40000, [/^770c06/]], ['c07', 0x40000, [/^770c07/]], ['c10', 0x40000, [/^770c10/]], ['c11', 0x80000, [/^770c11/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x28000);
+      main.set(c.n11.subarray(0, 0x8000), 0x10000); main.set(c.n11.subarray(0x8000), 0x8000); main.set(c.n12, 0x18000);
+      const sub = new Uint8Array(0x22000);
+      sub.set(c.i16.subarray(0, 0x2000), 0x20000); sub.set(c.i16.subarray(0x2000), 0xA000); sub.set(c.g16, 0x10000);
+      return { main, sub, sound: c.sound, tiles: cat(c.c13, c.c12), sprites: cat(c.c09, c.c08), zoom: cat(c.c06, c.c07),
+        samples1: c.c10, samples2: c.c11 };
+    },
+  },
+  {
+    Board: CrimeFighters,
+    chips: [
+      ['f24', 0x20000, [/^821l02\.f24$/]], ['sound', 0x8000, [/^821l01\.h4$/]],
+      ['t0', 0x40000, [/^821k06\.k13$/]], ['t1', 0x40000, [/^821k07\.k19$/]], ['s0', 0x80000, [/^821k04\.k2$/]], ['s1', 0x80000, [/^821k05\.k8$/]],
+      ['samples', 0x40000, [/^821k03\.e5$/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x28000);
+      main.set(c.f24.subarray(0, 0x18000), 0x10000); main.set(c.f24.subarray(0x18000), 0x8000);
+      return { main, sound: c.sound, tiles: cat(c.t0, c.t1), sprites: cat(c.s0, c.s1), samples: c.samples };
+    },
+  },
+  {
+    Board: SuperContra,
+    chips: [
+      ['k11', 0x10000, [/e02\.k11$/]], ['k13', 0x10000, [/e03\.k13$/]], ['sound', 0x8000, [/^775-c01\.bin$/]],
+      ...['a07a', 'a07e', 'f07c', 'f07g', 'f07d', 'f07h', 'a08a', 'a08e', 'f08c', 'f08g', 'f08d', 'f08h',
+        'a05a', 'a05e', 'a05b', 'a05f', 'f05c', 'f05g', 'f05d', 'f05h', 'a06a', 'a06e', 'a06b', 'a06f', 'f06c', 'f06g', 'f06d', 'f06h',
+        'a04a', 'a04b', 'a04c', 'a04d', 'f04e', 'f04f', 'f04g', 'f04h'].map((n) => [n, null, [new RegExp(`^775-${n}\\.bin$`)]]),
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x30800);
+      main.set(c.k11.subarray(0, 0x8000), 0x10000); main.set(c.k11.subarray(0x8000), 0x8000); main.set(c.k13, 0x20000);
+      // 16-bit ROM pairs: [even, odd, offset]
+      const build = (size, pairs) => { const r = new Uint8Array(size); for (const [e, o, at] of pairs) { const ev = c[e], od = c[o]; for (let i = 0; i < ev.length; i++) { r[at + i * 2] = ev[i]; r[at + i * 2 + 1] = od[i]; } } return r; };
+      const tiles = build(0x100000, [['a07a', 'a07e', 0], ['f07c', 'f07g', 0x40000], ['f07d', 'f07h', 0x60000],
+        ['a08a', 'a08e', 0x80000], ['f08c', 'f08g', 0xC0000], ['f08d', 'f08h', 0xE0000]]);
+      const sprites = build(0x100000, [['a05a', 'a05e', 0], ['a05b', 'a05f', 0x20000], ['f05c', 'f05g', 0x40000], ['f05d', 'f05h', 0x60000],
+        ['a06a', 'a06e', 0x80000], ['a06b', 'a06f', 0xA0000], ['f06c', 'f06g', 0xC0000], ['f06d', 'f06h', 0xE0000]]);
+      return { main, sound: c.sound, tiles, sprites, samples: cat(c.a04a, c.a04b, c.a04c, c.a04d, c.f04e, c.f04f, c.f04g, c.f04h) };
+    },
+  },
+  {
+    Board: GangBusters,
+    chips: [
+      ['k13', 0x10000, [/^878n02/]], ['k15', 0x10000, [/^878j03/]], ['sound', 0x8000, [/^878h01/]],
+      ['t0', 0x40000, [/^878c07/]], ['t1', 0x40000, [/^878c08/]], ['s0', 0x40000, [/^878c05/]], ['s1', 0x40000, [/^878c06/]], ['samples', 0x40000, [/^878c04/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x30800);
+      main.set(c.k13.subarray(0, 0x8000), 0x10000); main.set(c.k13.subarray(0, 0x8000), 0x18000);   // banked, and mirrored
+      main.set(c.k13.subarray(0x8000), 0x8000); main.set(c.k15, 0x20000);
+      return { main, sound: c.sound, tiles: cat(c.t0, c.t1), sprites: cat(c.s0, c.s1), samples: c.samples };
+    },
+  },
+  {
+    Board: BottomOfTheNinth,
+    chips: [
+      ['k17', 0x10000, [/^891n03\.k17$/]], ['k15', 0x10000, [/^891-t02\.k15$/]], ['sound', 0x8000, [/^891j01\.g8$/]],
+      ...['10c', '10a', '10d', '10b', '09c', '09a', '09d', '09b', '06e', '06a', '06f', '06b', '06g', '06c', '06h', '06d',
+        '05e', '05a', '05f', '05b', '05g', '05c', '05h', '05d', '07a', '07b', '08a', '08b', '08c', '08d', '04a', '04b', '04c', '04d']
+        .map((n) => [`e${n}`, 0x10000, [new RegExp(`^891e${n}$`)]]),
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x28000);
+      main.set(c.k17, 0x10000); main.set(c.k15.subarray(0, 0x8000), 0x20000); main.set(c.k15.subarray(0x8000), 0x8000);
+      const pairs = (names) => { const r = new Uint8Array(names.length * 0x10000); for (let k = 0; k < names.length; k += 2) { const ev = c[`e${names[k]}`], od = c[`e${names[k + 1]}`]; for (let i = 0; i < 0x10000; i++) { r[k * 0x10000 + i * 2] = ev[i]; r[k * 0x10000 + i * 2 + 1] = od[i]; } } return r; };
+      return {
+        main, sound: c.sound,
+        tiles: pairs(['10c', '10a', '10d', '10b', '09c', '09a', '09d', '09b']),
+        sprites: pairs(['06e', '06a', '06f', '06b', '06g', '06c', '06h', '06d', '05e', '05a', '05f', '05b', '05g', '05c', '05h', '05d']),
+        zoom: cat(c.e07a, c.e07b), samples1: cat(c.e08a, c.e08b, c.e08c, c.e08d), samples2: cat(c.e04a, c.e04b, c.e04c, c.e04d),
+      };
+    },
+  },
+  {
+    Board: TMNT,
+    chips: [
+      ['x23', 0x20000, [/^963-x23/]], ['x24', 0x20000, [/^963-x24/]], ['x21', 0x10000, [/^963-x21/]], ['x22', 0x10000, [/^963-x22/]],
+      ['sound', 0x8000, [/^963-?e20/]], ['a28', 0x80000, [/^963-?a28/]], ['a29', 0x80000, [/^963-?a29/]],
+      ['a17', 0x80000, [/^963-?a17/]], ['a18', 0x80000, [/^963-?a18/]], ['a15', 0x80000, [/^963-?a15/]], ['a16', 0x80000, [/^963-?a16/]],
+      ['prom', 0x100, [/^963-?a30/]], ['a26', 0x20000, [/^963-?a26/]], ['a27', 0x20000, [/^963-?a27/]], ['a25', 0x80000, [/^963-?a25/]],
+    ],
+    assemble: (c) => ({
+      main: cat(interleave(c.x23, c.x24), interleave(c.x21, c.x22)), sound: c.sound,
+      tiles: cat(c.a28, c.a29), sprites: cat(c.a17, c.a18, c.a15, c.a16), prom: c.prom,
+      samples: c.a26, speech: c.a27, title: c.a25,
+    }),
+  },
+  {
+    Board: MissingInAction,
+    chips: [
+      ['t20', 0x20000, [/^808t20/]], ['t21', 0x20000, [/^808t21/]], ['sound', 0x8000, [/^808e03/]],
+      ['e12', 0x10000, [/^808e12/]], ['e13', 0x10000, [/^808e13/]], ['e22', 0x10000, [/^808e22/]], ['e23', 0x10000, [/^808e23/]],
+      ['d17', 0x80000, [/^808d17/]], ['d15', 0x80000, [/^808d15/]], ['samples', 0x20000, [/^808d01/]],
+    ],
+    assemble: (c) => ({
+      main: interleave(c.t20, c.t21), sound: c.sound,
+      tiles: cat(interleave(c.e12, c.e13), interleave(c.e22, c.e23)), sprites: cat(c.d17, c.d15), samples: c.samples,
+    }),
+  },
+  {
+    Board: Aliens,
+    chips: [
+      ['e24', 0x10000, [/^e24_j02\.bin$/]], ['c24', 0x20000, [/^c24_j01\.bin$/]], ['sound', 0x8000, [/^g04_b03\.bin$/]],
+      ['t0', 0x80000, [/^k13_b11\.bin$/]], ['t1', 0x40000, [/^j13_b07\.bin$/]], ['t2', 0x80000, [/^k19_b12\.bin$/]], ['t3', 0x40000, [/^j19_b08\.bin$/]],
+      ['s0', 0x80000, [/^k08_b10\.bin$/]], ['s1', 0x40000, [/^j08_b06\.bin$/]], ['s2', 0x80000, [/^k02_b09\.bin$/]], ['s3', 0x40000, [/^j02_b05\.bin$/]],
+      ['samples', 0x40000, [/^875b04\.bin$/]],
+    ],
+    assemble: (c) => {
+      const main = new Uint8Array(0x38000);
+      main.set(c.e24.subarray(0, 0x8000), 0x10000); main.set(c.e24.subarray(0x8000), 0x8000); main.set(c.c24, 0x18000);
+      // Each graphics half: a 512K and a 256K ROM, the rest empty.
+      const gfx = (a, b, c2, d) => { const r = new Uint8Array(0x200000); r.set(a, 0); r.set(b, 0x80000); r.set(c2, 0x100000); r.set(d, 0x180000); return r; };
+      return { main, sound: c.sound, tiles: gfx(c.t0, c.t1, c.t2, c.t3), sprites: gfx(c.s0, c.s1, c.s2, c.s3), samples: c.samples };
+    },
+  },
+  {
+    Board: RoboCop,
+    chips: [
+      ['m05', 0x10000, [/^e[pm]05/]], ['m01', 0x10000, [/^e[pm]01/]], ['m04', 0x10000, [/^ep04/]], ['m00', 0x10000, [/^ep00/]],
+      ['sound', 0x8000, [/^ep03/]],
+      ['sub', 0x200, [/^en_24\.a2$/]],
+      ...[23, 22, 20, 21, 18, 19, 14, 15, 16, 17, 7, 6, 11, 10, 9, 8, 13, 12, 2].map((n) => [`g${n}`, null, [new RegExp(`^ep${String(n).padStart(2, '0')}$`)]]),
+    ],
+    assemble: (c) => {
+      const sub = new Uint8Array(0x10000); sub.set(c.sub, 0x1E00);
+      // Sprites: a 64K and a 32K ROM per plane quarter, the 32K one followed by a gap.
+      const sprites = new Uint8Array(0x80000);
+      [[7, 0], [6, 0x10000], [11, 0x20000], [10, 0x30000], [9, 0x40000], [8, 0x50000], [13, 0x60000], [12, 0x70000]].forEach(([n, at]) => sprites.set(c[`g${n}`], at));
+      return {
+        main: cat(interleave(c.m05, c.m01), interleave(c.m04, c.m00)), sound: c.sound, sub,
+        chars: cat(c.g23, c.g22), tiles2: cat(c.g20, c.g21, c.g18, c.g19), tiles3: cat(c.g14, c.g15, c.g16, c.g17),
+        sprites, samples: c.g2,
+      };
+    },
+  },
+  {
+    Board: Silkworm,
+    chips: [...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((n) => [`s${n}`, null, [new RegExp(`^silkworm\\.${n}$`)]])],
+    assemble: (c) => ({
+      main: cat(c.s4, c.s5), sound: c.s3, chars: c.s2, sprites: cat(c.s6, c.s7, c.s8, c.s9),
+      fg: cat(c.s10, c.s11, c.s12, c.s13), bg: cat(c.s14, c.s15, c.s16, c.s17), adpcm: c.s1,
     }),
   },
   {
@@ -1323,6 +1805,91 @@ const BOARDS = [
     [MetalSlug2, '241', [['241-p1', 0x100000], ['241-p2', 0x200000]], 2, 4],
     [MetalSlugX, '250', [['250-p1', 0x100000], ['250-p2', 0x400000]], 3, 6],
   ].map(neoEntry),
+  {
+    Board: Shinobi,
+    chips: [['a4', 0x10000, [/^shinobi\.a4$/]], ['a1', 0x10000, [/^shinobi\.a1$/]], ['p3', 0x10000, [/^epr11283/]], ['p4', 0x10000, [/^epr11281/]],
+      ['b9', 0x10000, [/^shinobi\.b9$/]], ['b10', 0x10000, [/^shinobi\.b10$/]], ['b11', 0x10000, [/^shinobi\.b11$/]],
+      ...[90, 91, 92, 93, 94, 95, 96, 97].map((n) => [`s${n}`, 0x10000, [new RegExp(`^epr112${n}`)]]),
+      ['a7', 0x8000, [/^shinobi\.a7$/]], ['a8', 0x8000, [/^shinobi\.a8$/]], ['a9', 0x8000, [/^shinobi\.a9$/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x40000);
+      const pair = (dst, even, odd, at) => { for (let i = 0; i < even.length; i++) { dst[at + i * 2] = even[i]; dst[at + i * 2 + 1] = odd[i]; } };
+      pair(main, c.a4, c.a1, 0); pair(main, c.p3, c.p4, 0x20000);
+      const sprites = new Uint8Array(0x80000);
+      [[94, 90], [95, 91], [96, 92], [97, 93]].forEach(([e, o], k) => pair(sprites, c[`s${e}`], c[`s${o}`], k * 0x20000));
+      return { main, tiles: cat(c.b9, c.b10, c.b11), sprites, sound: c.a7, samples: [c.a8, c.a9] };
+    },
+  },
+  ...[
+    // Midway Y-unit: [Board, program [low, high] (byte-interleaved, ending at the top of 1MB), sound, samples, gfx [plane chunk 0, 1, 2]]
+    [SmashTV, ['u105', 'u89'], ['u4', 'u19', 'u20'], null, [['u111', 'u112', 'u113'], ['u95', 'u96', 'u97'], ['u106', 'u107', 'u108']]],
+    [TotalCarnage, ['tcu105', 'tcu89'], ['tcu3'], ['tcu12', 'tcu13'], [['tcu111', 'tcu112', 'tcu113', 'tcu114'], ['tcu95', 'tcu96', 'tcu97', 'tcu98'], ['tcu106', 'tcu107', 'tcu108', 'tcu109']]],
+    [MortalKombat, ['mkg-u105', 'mkg-u89'], ['mks-u3'], ['mks-u12', 'mks-u13'], [['mkg-u111', 'mkg-u112', 'mkg-u113', 'mkg-u114'], ['mkg-u95', 'mkg-u96', 'mkg-u97', 'mkg-u98'], ['mkg-u106', 'mkg-u107', 'mkg-u108', 'mkg-u109']]],
+  ].map(yunitEntry),
+  ...[
+    // Namco System 86. Each ROM is [name pattern, offset]; sizes come from the files.
+    { Board: RollingThunder, main: 'rt3[-_]1b\\.9c', sub: [['rt3[-_]2b\\.12c', 0]], subBank: 'rt3[-_]3\\.12d', mcu: [['rt[13][-_]4\\.6b', 0x4000]],
+      t1: ['rt1[-_]7\\.7r', 'rt1[-_]8\\.7s'], t2: ['rt1[-_]5\\.4r', 'rt1[-_]6\\.4s'], sprites: [0x80000, ...['9.12h', '10.12k', '11.12l', '12.12m', '13.12p', '14.12r', '15.12t', '16.12u'].map((n, k) => [`rt1[-_]${n.replace('.', '\\.')}`, k * 0x10000])],
+      proms: ['(mb7124e|rt1-1)\\.3r', '(mb7116e|rt1-2)\\.3s', '(mb7138h|rt1-3)\\.4v', '(mb7138h\\.6v|rt1-4\\.5v)', '(mb7112e|rt1-5)\\.6u'],
+      user: [['rt1[-_]17\\.f1', 0], ['rt1[-_]18\\.h1', 0x10000], ['rt[13][-_]19\\.k1', 0x20000], ['rt[13][-_]20\\.m1', 0x30000]], voice: [['rt1[-_]21\\.f3', 0], ['rt[12][-_]22\\.h3', 0x20000]] },
+    { Board: WonderMomo, main: 'wm1[-_]1\\.9c', sub: [['wm1[-_]2\\.12c', 0]], mcu: [['wm1[-_]3\\.6b', 0x4000]],
+      t1: ['wm1[-_]6\\.7r', 'wm1[-_]7\\.7s'], t2: ['wm1[-_]4\\.4r', 'wm1[-_]5\\.4s'], sprites: [0x80000, ...[8, 9, 10, 11, 12, 13, 14, 15].map((n, k) => [`wm1[-_]${n}\\.12[hklmprtu]`, k * 0x10000])],
+      proms: ['wm1-1\\.3r', 'wm1-2\\.3s', 'wm1-3\\.4v', 'wm1-4\\.5v', 'wm1-5\\.6u'],
+      user: [['wm1[-_]16\\.f1', 0]], voice: [['wm1[-_]17\\.f3', 0], ['wm1[-_]18\\.h3', 0x20000], ['wm1[-_]19\\.k3', 0x40000], ['wm1[-_]20\\.m3', 0x60000]] },
+    { Board: Genpei, main: 'gt1[-_]1b\\.9c', sub: [['gt1[-_]2\\.12c', 0x4000]], mcu: [['gt1[-_]3\\.6b', 0x4000]],
+      t1: ['gt1[-_]7\\.7r', 'gt1[-_]6\\.7s'], t2: ['gt1[-_]5\\.4r', 'gt1[-_]4\\.4s'],
+      sprites: [0x100000, ['gt1[-_]11\\.12h', 0], ['gt1[-_]12\\.12k', 0x20000], ['gt1[-_]13\\.12l', 0x40000], ['gt1[-_]14\\.12m', 0x60000], ['gt1[-_]15\\.12p', 0x80000], ['gt1[-_]16\\.12r', 0xA0000], ['gt1[-_]8\\.12t', 0xC0000], ['gt1[-_]9\\.12u', 0xE0000]],
+      proms: ['gt1-1\\.3r', 'gt1-2\\.3s', 'gt1-3\\.4v', 'gt1-4\\.5v', 'gt1-5\\.6u'],
+      user: [['gt1[-_]10b\\.f1', 0]], voice: [['gt1[-_]17\\.f3', 0], ['gt1[-_]18\\.h3', 0x20000], ['gt1[-_]19\\.k3', 0x40000]] },
+    { Board: ReturnOfIshtar, main: 'ri1[-_]1c\\.9c', bank9d: ['ri1[-_]2\\.9d', 0x4000], sub: [['ri1[-_]3\\.12c', 0]], mcu: [['ri1[-_]4\\.6b', 0, 0x8000]],
+      t1: ['ri1[-_]14\\.7r', 'ri1[-_]15\\.7s'], t2: ['ri1[-_]12\\.4r', 'ri1[-_]13\\.4s'], sprites: [0x40000, ...[5, 6, 7, 8, 9, 10, 11].map((n, k) => [`ri1[-_]${n}\\.12[hklmprt]`, k * 0x8000])],
+      proms: ['ri1-1\\.3r', 'ri1-2\\.3s', 'ri1-3\\.4v', 'ri1-4\\.5v', 'ri1-5\\.6u'] },
+    { Board: HoppingMappy, main: '(hm1|hm1_1\\.9c)', sub: [['(hm2|hm1_2\\.12c)', 0x4000]], mcu: [['(hm3|hm1_3\\.6b)', 0x8000]], mcuInt: '(pl1|rt1|cus60).*',
+      t1: ['(hm6|hm1_6\\.7r)', null], t2: ['(hm5|hm1_5\\.4r)', null], sprites: [0x40000, ['(hm4|hm1_4\\.12h)', 0]],
+      proms: ['(hm11\\.bpr|hm1-1\\.3r)', '(hm12\\.bpr|hm1-2\\.3s)', '(hm13\\.bpr|hm1-3\\.4v)', '(hm14\\.bpr|hm1-4\\.5v)', '(hm15\\.bpr|hm1-5\\.6u)'] },
+    { Board: SkyKidDeluxe, main: 'sk3[-_]1b\\.9c', bank9d: ['sk3[-_]2\\.9d', 0], sub: [['sk3[-_]3\\.12c', 0]], mcu: [['sk3[-_]4\\.6b', 0x8000]],
+      t1: ['sk3[-_]9\\.7r', 'sk3[-_]10\\.7s'], t2: ['sk3[-_]7\\.4r', 'sk3[-_]8\\.4s'], sprites: [0x40000, ['sk3[-_]5\\.12h', 0], ['sk3[-_]6\\.12k', 0x8000]],
+      proms: ['sk3-1\\.3r', 'sk3-2\\.3s', 'sk3-3\\.4v', 'sk3-4\\.5v', 'sk3-5\\.6u'] },
+  ].map(s86Entry),
+  {
+    Board: LegendOfKage,
+    chips: [['p1', 0x8000, [/^a54-01-1/]], ['p2', 0x8000, [/^a54-02-1/]], ['snd', 0x8000, [/^a54-04/]], ['mcu', 0x800, [/^a54-09/]], ['data', 0x4000, [/^a54-03/]],
+      ['g5', 0x4000, [/^a54-05-1/]], ['g6', 0x4000, [/^a54-06-1/]], ['g7', 0x4000, [/^a54-07-1/]], ['g8', 0x4000, [/^a54-08-1/]]],
+    assemble: (c) => ({ main: cat(c.p1, c.p2), sound: c.snd, mcu: c.mcu, data: c.data, gfx: cat(c.g5, c.g6, c.g7, c.g8) }),
+  },
+  ...[
+    // Gottlieb: [Board, main [file, address]..., sound [file, address]..., tiles (null: RAM), sprites (fg3..fg0), ROM in RAM space]
+    [MadPlanets, [['rom4', 0x6000], ['rom3', 0x8000], ['rom2', 0xA000], ['rom1', 0xC000], ['rom0', 0xE000]], [['snd1', 0xF000], ['snd2', 0xF800]], ['bg0', 'bg1'], ['fg3', 'fg2', 'fg1', 'fg0'], null],
+    [Krull, [['rom4\\.bin', 0x6000], ['rom3\\.bin', 0x8000], ['rom2\\.bin', 0xA000], ['rom1\\.bin', 0xC000], ['rom0\\.bin', 0xE000]], [['snd1\\.bin', 0xE000], ['snd2\\.bin', 0xF000]], null,
+      ['fg3\\.bin', 'fg2\\.bin', 'fg1\\.bin', 'fg0\\.bin'], ['ram2\\.bin', 'ram4\\.bin']],
+    [QbertsQubes, [['qq-rom3\\.bin', 0x8000], ['qq-rom2\\.bin', 0xA000], ['qq-rom1\\.bin', 0xC000], ['qq-rom0\\.bin', 0xE000]], [['qb-snd1\\.bin', 0xF000], ['qb-snd2\\.bin', 0xF800]],
+      ['qq-bg0\\.bin', 'qq-bg1\\.bin'], ['qq-fg3\\.bin', 'qq-fg2\\.bin', 'qq-fg1\\.bin', 'qq-fg0\\.bin'], null],
+  ].map(([Board, main, sound, tiles, sprites, ramRom]) => {
+    const re = (p) => [new RegExp(`^${p}(\\..*)?$`)];
+    const all = [...main.map(([p]) => p), ...sound.map(([p]) => p), ...(tiles || []), ...sprites, ...(ramRom || [])];
+    return {
+      Board,
+      chips: all.map((p) => [p, null, re(p)]),
+      assemble: (c) => {
+        const m = new Uint8Array(0x10000).fill(0xFF), snd = new Uint8Array(0x10000).fill(0xFF);
+        for (const [p, at] of main) m.set(c[p], at);
+        for (const [p, at] of sound) snd.set(c[p], at);
+        return { main: m, sound: snd, tiles: tiles ? cat(...tiles.map((p) => c[p])) : null, sprites: cat(...sprites.map((p) => c[p])),
+          ramRom: ramRom ? cat(...ramRom.map((p) => c[p])) : null };
+      },
+    };
+  }),
+  {
+    Board: Qbert,
+    chips: [['rom0', 0x2000, [/^qb-rom0/]], ['rom1', 0x2000, [/^qb-rom1/]], ['rom2', 0x2000, [/^qb-rom2/]], ['snd1', 0x800, [/^qb-snd1/]], ['snd2', 0x800, [/^qb-snd2/]],
+      ['bg0', 0x1000, [/^qb-bg0/]], ['bg1', 0x1000, [/^qb-bg1/]], ['fg0', 0x2000, [/^qb-fg0/]], ['fg1', 0x2000, [/^qb-fg1/]], ['fg2', 0x2000, [/^qb-fg2/]], ['fg3', 0x2000, [/^qb-fg3/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x10000).fill(0xFF), sound = new Uint8Array(0x10000).fill(0xFF);
+      main.set(c.rom2, 0xA000); main.set(c.rom1, 0xC000); main.set(c.rom0, 0xE000);
+      sound.set(c.snd1, 0xF000); sound.set(c.snd2, 0xF800);
+      return { main, sound, tiles: cat(c.bg0, c.bg1), sprites: cat(c.fg3, c.fg2, c.fg1, c.fg0) };
+    },
+  },
   ...[
     // Irem M72 family: [Board, program [file, offset, 'even'|'odd', reload offset?], sound, sprites, tiles1, tiles2, samples, sprites2]
     [RType, [['rt_r-l0-', 0, 'even'], ['rt_r-h0-', 0, 'odd'], ['rt_r-l1-', 0x20000, 'even', 0xE0000], ['rt_r-h1-', 0x20000, 'odd', 0xE0000]], null,
@@ -1452,6 +2019,81 @@ function m72Entry([Board, prog, sound, sprites, tiles1, tiles2, samples, sprites
       }
       const join = (list) => (list ? cat(...list.map((n) => c[n])) : null);
       return { main, sound: sound ? c[sound] : null, sprites: join(sprites), tiles1: join(tiles1), tiles2: join(tiles2), samples: sampleList.length ? join(sampleList) : null, sprites2: join(sprites2) };
+    },
+  };
+}
+
+// Namco System 86 sets (see the table above): pieces placed into each CPU's space and the graphics regions.
+function s86Entry(g) {
+  const re = (p) => [new RegExp(`^${p}$`)];
+  const chips = [['main', 0x8000, re(g.main)], ['mcuInt', 0x1000, re(g.mcuInt || '(rt1-mcu\\.bin|cus60.*)')]];
+  const add = (role, p) => chips.push([role, null, re(p)]);
+  if (g.bank9d) add('bank9d', g.bank9d[0]);
+  g.sub.forEach(([p], i) => add(`sub${i}`, p));
+  if (g.subBank) add('subBank', g.subBank);
+  g.mcu.forEach(([p], i) => add(`mcu${i}`, p));
+  add('t1a', g.t1[0]); if (g.t1[1]) add('t1b', g.t1[1]);
+  add('t2a', g.t2[0]); if (g.t2[1]) add('t2b', g.t2[1]);
+  g.sprites.slice(1).forEach(([p], i) => add(`spr${i}`, p));
+  g.proms.forEach((p, i) => add(`prom${i}`, p));
+  (g.user || []).forEach(([p], i) => add(`user${i}`, p));
+  (g.voice || []).forEach(([p], i) => add(`voice${i}`, p));
+  return {
+    Board: g.Board, chips,
+    assemble: (c) => {
+      const sub = new Uint8Array(0x8000).fill(0xFF);
+      g.sub.forEach(([, at], i) => sub.set(c[`sub${i}`], at));
+      const mcu = new Uint8Array(0x10000).fill(0xFF);
+      g.mcu.forEach(([, at, split], i) => {
+        const r = c[`mcu${i}`];
+        if (split) { mcu.set(r.subarray(0, 0x4000), at); mcu.set(r.subarray(0x4000), split); } else mcu.set(r, at);
+      });
+      mcu.set(c.mcuInt, 0xF000);
+      // Tiles: planes 1-2 then plane 3 (missing plane 3 reads as 0s, inverted to 1s like the others).
+      const tiles = (a, b) => cat(c[a], b ? c[b] : new Uint8Array(c[a].length / 2));
+      const sprites = new Uint8Array(g.sprites[0]);
+      g.sprites.slice(1).forEach(([, at], i) => sprites.set(c[`spr${i}`], at));
+      let user = null;
+      if (g.user) { user = new Uint8Array(0x40000); g.user.forEach(([, at], i) => user.set(c[`user${i}`], at)); }
+      else if (g.bank9d) { user = new Uint8Array(0x8000); user.set(c.bank9d, g.bank9d[1]); }
+      const voice = new Uint8Array(0x80000).fill(0xFF);
+      (g.voice || []).forEach(([, at], i) => voice.set(c[`voice${i}`], at));
+      return {
+        main: c.main, sub, subBank: c.subBank || null, mcu, user: user || new Uint8Array(0x8000), voice,
+        tiles1: tiles('t1a', g.t1[1] && 't1b'), tiles2: tiles('t2a', g.t2[1] && 't2b'), sprites,
+        rg: c.prom0, b: c.prom1, tileCt: c.prom2, spriteCt: c.prom3, decoder: c.prom4,
+      };
+    },
+  };
+}
+
+// Midway Y-unit sets: ROMs are matched by name prefix (the extensions vary between dumps).
+function yunitEntry([Board, program, sound, samples, gfx]) {
+  const re = (n) => [new RegExp(`^${n.replace('-', '[-_]')}\\.`)];
+  const names = [...program, ...sound, ...(samples || []), ...gfx.flat()];
+  return {
+    Board,
+    chips: names.map((n) => [n, null, re(n)]),
+    assemble: (c) => {
+      const lo = c[program[0]], hi = c[program[1]], prog = new Uint8Array(0x100000);
+      const base = 0x100000 - lo.length * 2;
+      for (let i = 0; i < lo.length; i++) { prog[base + i * 2] = lo[i]; prog[base + i * 2 + 1] = hi[i]; }
+      let snd;
+      if (sound.length === 3) {                    // CVSD board: three 64K ROMs, each twice, 128K apart
+        snd = new Uint8Array(0x80000);
+        sound.forEach((n, k) => { snd.set(c[n], k * 0x20000); snd.set(c[n], k * 0x20000 + 0x10000); });
+      } else {
+        snd = new Uint8Array(0x40000);
+        for (let o = 0; o < 0x40000; o += c[sound[0]].length) snd.set(c[sound[0]], o);
+      }
+      let smp = null;
+      if (samples) {
+        smp = new Uint8Array(0x200000);
+        samples.forEach((n, k) => { smp.set(c[n], k * 0x80000); smp.set(c[n], k * 0x80000 + 0x40000); });
+      }
+      const g = new Uint8Array(0x800000);
+      gfx.forEach((list, chunk) => { let o = chunk * 0x200000; for (const n of list) { g.set(c[n], o); o += c[n].length; } });
+      return { program: prog, sound: snd, samples: smp, gfx: g };
     },
   };
 }

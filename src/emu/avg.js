@@ -25,7 +25,7 @@ const sx = (v, bits) => (v & (1 << (bits - 1)) ? v - (1 << bits) : v);
 
 export class AVG {
   // readByte(address) -> byte of the display list's address space (byte 0 =
-  // word 0). variant: 'tempest' | 'bzone' | 'starwars'. Star Wars (6809) stores
+  // word 0). variant: 'tempest' | 'bzone' | 'starwars' | 'avg' (color bits). Star Wars (6809) stores
   // words big-endian; the 6502 boards little-endian.
   constructor(readByte, variant) {
     this.readByte = readByte;
@@ -83,6 +83,7 @@ export class AVG {
           else if (v === 'starwars') { statInt = w & 0xFF; color = (w >> 8) & 7; }
           else {
             statInt = (w >> 4) & 15;
+            if (v === 'avg') color = w & 7;                 // Black Widow family: red, green, blue bits
             if (v === 'bzone' && !(w & 0x400)) { lst = w & 0x200 ? 1 : 0; hst = lst ? 0 : 1; }
           }
           break;

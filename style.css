@@ -220,6 +220,10 @@ body.two-way #dpad .knob, .dpad.dial .knob { height: 76%; }
   background: none; border: 0; border-radius: 0;
 }
 #bar > button:active { background: none; }
+#bar > button[hidden] { display: none; }
+/* Two start buttons (games where each start picks a side): tighter targets so the bar fits a phone. */
+body.two-starts #bar > button { padding: 0 3px; }
+body.two-starts #bar .pill .face { padding: 8px 10px; }
 #bar .face {
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.07);
@@ -335,6 +339,8 @@ button.wide { width: 100%; }
   color: var(--dim);
   transition: background 0.15s ease, color 0.15s ease;
 }
+.cart-keep { font-size: 18px; }
+.cart-keep.busy { opacity: 0.6; }
 .cart-remove.confirm { background: #a33; border-color: transparent; color: #fff; font-size: 13px; font-weight: 700; }
 
 .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -349,6 +355,7 @@ button.wide { width: 100%; }
 .field input[type=range]:disabled { opacity: 0.4; }
 
 /* iOS-style switch */
+label.switch[hidden] { display: none; }
 label.switch {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   min-height: 44px;

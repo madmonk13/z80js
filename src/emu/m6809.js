@@ -74,6 +74,7 @@ export class M6809 {
       this.pc = this.read16(0xFFF6);
       this.waiting = this.cwai = false;
       this.cycles += 10;
+      if (this.onTaken) this.onTaken('firq');   // boards with held (acknowledged) lines
       return true;
     }
     if (this.irq && !(this.cc & I)) {
@@ -82,6 +83,7 @@ export class M6809 {
       this.pc = this.read16(0xFFF8);
       this.waiting = this.cwai = false;
       this.cycles += 19;
+      if (this.onTaken) this.onTaken('irq');
       return true;
     }
     return false;

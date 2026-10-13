@@ -30,6 +30,7 @@ export class Input {
     this.keys = new Set();
     this.uiCoin = false;      // on-screen Coin / Start buttons
     this.uiStart = false;
+    this.uiStart2 = false;
     this.onActivity = null;   // called on keyboard or gamepad input
     // Extra sources (touch controls): objects with dir() -> 0x10 up / 0x20 down
     // / 0x40 left / 0x80 right bits, fire() and fire2() -> bool, spin() ->
@@ -60,7 +61,7 @@ export class Input {
     let left = any(LEFT), right = any(RIGHT), up = any(UP), down = any(DOWN), fire = any(FIRE), fire2 = any(FIRE2), fire3 = any(FIRE3);
     let spin = (any(SPIN_RIGHT) ? KEY_SPIN : 0) - (any(SPIN_LEFT) ? KEY_SPIN : 0) + this.wheel;
     this.wheel = 0;
-    let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = any(START2);
+    let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = this.uiStart2 || any(START2);
     const aim = { up: any(AIM_UP), down: any(AIM_DOWN), left: any(AIM_LEFT), right: any(AIM_RIGHT) };
     let hyper = any(HYPER), inviso = any(INVISO);
     let analog = null;          // { x, y } in -1..1 when a source has a real stick position

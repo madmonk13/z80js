@@ -103,10 +103,91 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Metal Slug 2 (1998) | SNK Neo Geo MVS (relies on the watchdog reset as a protection check) | `mslug2` | **Tested:** boots, title, coin and start |
 | Metal Slug X (1999) | SNK Neo Geo MVS with its protection checks patched out | `mslugx` | **Tested:** boots, attract mode, coin and start |
 | R-Type (1987) | Irem M72: NEC V30, Z80, YM2151; two tile layers with three priority levels, block sprites, a raster split for the status bar; the sound CPU runs from RAM the game loads | `rtype` (World) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Battle Chopper (1987) | Irem M72 with its protection MCU stood in for (see below) | `bchopper` | **Tested:** boots, attract mode with sound, coin, start and play |
+| Ninja Spirit (1988) | Irem M72, MCU stood in for | `nspirit` | **Tested:** boots, attract mode with sound, coin, start and play |
+| Image Fight (1988) | Irem M72, MCU stood in for; vertical monitor | `imgfight` (Japan) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Legend of Hero Tonma (1989) | Irem M72, MCU stood in for | `loht` | **Tested:** boots, attract mode with sound, coin, start and play |
+| X Multiply (1989) | Irem M72 (its own memory map), MCU stood in for | `xmultipl` (Japan) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Dragon Breed (1989) | Irem M72 version, MCU stood in for | `dbreed` (M72 board set) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Air Duel (1990) | Irem M72, MCU stood in for; vertical monitor | `airduel` (Japan) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Gallop - Armed Police Unit (1991) | Irem M72 | `gallop` (Japan) | **Tested:** boots, attract mode with sound, coin and start |
 | R-Type II (1989) | Irem M82: like M72, with ROM-based sound and a sample DAC | `rtype2` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Hammerin' Harry (1990) | Irem M82 | `hharry` (World) | **Tested:** boots, attract mode, coin, start and play |
 | Major Title (1990) | Irem M84: a wider background with row scroll and a second sprite list | `majtitle` (Japan) | **Tested:** boots, attract mode, coin and start |
+| The Legend of Kage (1984) | Taito: two Z80s, two YM2203s, and the 68705 MCU running its own (dumped) program; three tile layers | `lkage` | **Tested:** boots, attract mode with sound, coin, start and play |
+| Shinobi (1987) | Sega System 16B: a 68000 behind the 315-5195 memory mapper, two scrolling tile layers with row/column scroll, a text layer, 128 sprites with shadow/highlight; a Z80 with a YM2151 and the uPD7759 speech chip ("Ninjutsu!"). Three fire buttons: attack, jump, magic | `shinobi` | **Tested:** boots, attract mode with music and speech, coin, start and play |
+| Rolling Thunder (1986) | Namco System 86: two 6809s in lockstep, an HD63701 MCU running the sound (YM2151 and the CUS30 waveform chip), the 63701X voice player; four tile layers with priorities and sprites cut from 32x32 cells | `rthunder` | **Tested:** boots, attract mode with music and voices, coin, start and play |
+| Wonder Momo (1987) | Namco System 86 with the ROM/voice expansion board, like Rolling Thunder | `wndrmomo` | **Tested:** boots, intro, coin, start and play with music and voices |
+| Genpei ToumaDen (1986) | Namco System 86 with the expansion board (its main program runs partly from banked ROM) | `genpeitd` | **Tested:** boots, intro with music and voices, coin, start |
+| The Return of Ishtar (1986) | Namco System 86; two sticks, one per character | `roishtar` | **Tested:** boots, attract, coin, start, name entry with music |
+| Hopping Mappy (1986) | Namco System 86, no expansion board | `hopmappy` | **Tested:** boots, attract, coin, start and play with music |
+| Sky Kid Deluxe (1986) | Namco System 86 with a banked program ROM | `skykiddx` | **Tested:** boots (its self-test restarts once on power-up), coin, start and play with music |
+| Smash T.V. (1990) | Midway Y-unit: a TMS34010 graphics CPU, a DMA blitter drawing from 6-bit graphics ROMs into a 512x512 bitmap, 4096 colors; Williams CVSD sound board (6809, YM2151, DAC, HC55516 speech) | `smashtv` | **Tested:** boots through its self-test, attract mode, coin, start and play with music and speech |
+| Total Carnage (1992) | Midway Y-unit with the Williams ADPCM sound board (6809, YM2151, DAC, OKI M6295) and the protection chip | `totcarn` | **Tested:** boots, intro, coin, start and play with music and samples |
+| Mortal Kombat (1992) | Midway Y-unit (revision 4.0, the Y-unit board), ADPCM sound board and protection chip | `mkla4` | **Tested:** boots through the self-test, attract mode, coin, start, character select and fights with music and voices |
+| Q*bert (1982) | Gottlieb System 80: Intel 8088 (on the V30 core), tiles and sprites, a 6502 sound board with a DAC and a Votrax SC-01 (approximated); vertical monitor | `qbert` | **Tested:** boots, attract mode with sound and speech, coin, start and play |
 | Yie Ar Kung-Fu (1985) | Konami: 6809, SN76489, VLM5030 speech, a fixed tile map and 24 sprites | `yiear` | **Tested:** boots, attract mode with speech, coin, start and play |
+| Silkworm (1988) | Tecmo: two Z80s, a YM3812 (FM, new core) and an MSM5205; three tile layers, sprites built from 8x8 cells with layer priorities | `silkworm` | **Tested:** boots, attract mode, coin, start and play (helicopter and jeep) |
+| RoboCop (1988) | Data East MEC-M1: 68000, 6502 sound CPU with YM2203 + YM3812 + OKI M6295, three BAC06 playfields with row/column scroll, MXC06 sprites; a HuC6280 (new core) runs the protection program | `robocop` | **Tested:** boots, attract mode, coin, start and play |
+| Aliens (1990) | Konami: the 052526 "Konami" CPU (new core), K052109 tilemaps, K051960 sprites, a Z80 with YM2151 and K007232 | `aliens` | **Tested:** boots, attract mode, coin, start and play |
+| Ajax (1987) | Konami: Konami CPU plus a 6809 driving the K052109 and the K051316 rotate/zoom layer (3D stages), two K007232s and a YM2151; vertical monitor | `ajax` | **Tested:** boots, attract mode, coin, start and play |
+| Crime Fighters (1989) | Konami: as Aliens, sprites between the layers | `crimfght` | **Tested:** boots, attract mode, coin, start and play |
+| Super Contra (1988) | Konami: Konami CPU, K052109, K051960, K007232, YM2151; vertical monitor | `scontra` | **Tested:** boots, attract mode, coin, start and play |
+| Gang Busters (1988) | Konami: Super Contra's board; vertical monitor | `gbusters` | **Tested:** boots, attract mode, coin, start and play |
+| Bottom of the Ninth (1989) | Konami: 6809, K052109, K051960, K051316 (the field), two K007232s | `bottom9` | **Tested:** boots, attract mode, coin, start and play |
+| Teenage Mutant Ninja Turtles (1989) | Konami: 68000 with the K052109/K051960 pair, YM2151, K007232, uPD7759 speech (master mode) and the recorded title music | `tmnt` | **Tested:** boots, attract mode, coin, start and play with music and speech |
+| M.I.A. - Missing in Action (1989) | Konami: TMNT's board without the speech chip | `mia` | **Tested:** boots, attract mode, coin, start and play |
+| Eyes (1982) | Pac-Man board, program with swapped data lines and swapped graphics lines | `eyes` | **Tested:** boots, attract mode, coin, start and play |
+| Mr. TNT (1983) | Pac-Man board, scrambled like Eyes | `mrtnt` | **Tested:** boots, attract mode, coin, start and play |
+| Lizard Wizard (1985) | Pac-Man board, 8-way stick | `lizwiz` | **Tested:** boots, attract mode, coin, start and play |
+| Ponpoko (1982) | Sigma: Pac-Man board with rearranged graphics, active-high inputs; horizontal monitor | `ponpoko` | **Tested:** boots, attract mode, coin, start and play |
+| Jump Shot (1985) | Pac-Man board, encrypted program | `jumpshot` | **Tested:** boots, attract mode, coin, start and play |
+| Make Trax (1981) | Crush Roller's board and protection, as sold by Williams | `maketrax` | **Tested:** boots, attract mode, coin, start and play |
+| Magic Brush (1981) | Crush Roller variant | `mbrush` | **Tested:** boots, attract mode, coin, start and play |
+| Dream Shopper (1982) | Sanritsu: Pac-Man board with an AY-3-8910, a vblank NMI, more RAM and program | `dremshpr` | **Tested:** boots, attract mode, coin, start and play |
+| Space Invaders Part II (1979) | Taito's color board: a color PROM per 8x8 block (one map per player), red screen flash | `invadpt2` | **Tested:** boots, attract mode, coin, start and play |
+| Space Invaders (Color) (1979) | The original game on the color board | `sicv` | **Tested:** boots, attract mode, coin, start and play |
+| Lunar Rescue (1979) | Taito color board; its own sound map (synthesized) | `lrescue` | **Tested:** boots, attract mode, coin, start and play |
+| Galaxy Wars (1979) | Universal: Space Invaders board with the cellophane overlay | `galxwars` | **Tested:** boots, attract mode, coin, start and play |
+| Ozma Wars (1979) | SNK: Space Invaders board, black and white; energy instead of lives | `ozmawars` | **Tested:** boots, attract mode, coin, start and play |
+| Snap Jack (1982) | Universal: Lady Bug board | `snapjack` | **Tested:** boots, attract mode, coin, start and play |
+| Cosmic Avenger (1981) | Universal: Lady Bug board, horizontal shooter with fire and bomb | `cavenger` | **Tested:** boots, attract mode, coin, start and play |
+| Kick Rider (1984) | Universal: Do! Run Run board, two kick buttons | `kickridr` | **Tested:** boots, attract mode, coin, start and play |
+| Colony 7 (1981) | Taito: Defender board, vertical monitor, three buttons | `colony7` | **Tested:** boots, attract mode, coin, start and play |
+| Mayday (1980) | Defender board bootleg with a protection check | `mayday` | **Tested:** boots, attract mode, coin, start and play |
+| Armored Car (1981) | Stern: Scramble board | `armorcar` | **Tested:** boots, attract mode, coin, start and play |
+| Tazz-Mania (1982) | Stern: Scramble board, twin sticks | `tazmania` | **Tested:** boots, attract mode, coin, start and play |
+| Anteater (1982) | Tago/Stern: Scramble board, scrambled graphics | `anteater` | **Tested:** boots, attract mode, coin, start and play |
+| UniWar S (1980) | Irem: Galaxian board with a graphics bank latch | `uniwars` | **Tested:** boots, attract mode, coin, start and play |
+| Pisces (1980) | Subelectro: Galaxian board with a graphics bank latch | `pisces` | **Tested:** boots, attract mode, coin, start and play |
+| Black Hole (1981) | TDS: Galaxian board | `blkhole` | **Tested:** boots, attract mode, coin, start and play |
+| Swarm (1979) | Subelectro: Galaxian board | `swarm` | **Tested:** boots, attract mode, coin, start and play |
+| Defend the Terra Attack on the Red UFO (1981) | Galaxian board | `redufo` | **Tested:** boots, attract mode, coin, start and play |
+| Moon Alien (1980) | Nichibutsu: Galaxian board | `moonaln` | **Tested:** boots, attract mode, coin, start and play |
+| War of the Bugs (1981) | Armenia: Galaxian board, 8-way stick | `warofbug` | **Tested:** boots, attract mode, coin, start and play |
+| Eagle (1980) | Centuri: Moon Cresta, unencrypted, new graphics | `eagle` | **Tested:** boots, attract mode, coin, start and play |
+| Super Pac-Man (1982) | Namco Mappy board: 36x28 map, 2-bit sprites | `superpac` | **Tested:** boots, attract mode, coin, start and play |
+| Pac & Pal (1983) | Namco Mappy board with the 56xx/59xx I/O chips | `pacnpal` | **Tested:** boots, attract mode, coin, start and play |
+| Grobda (1984) | Namco Mappy board plus a DAC for speech | `grobda` | **Tested:** boots, attract mode, coin, start and play |
+| Millipede (1982) | Atari: Centipede board grown up: two POKEYs, 32 colors, banked tiles, EAROM | `milliped` | **Tested:** boots, attract mode, coin, start and play |
+| Warlords (1980) | Atari: Centipede board, four paddles on the POKEY's pot lines; the computer plays the empty castles | `warlords` | **Tested:** boots, attract mode, coin, start and play |
+| Pleiads (1981) | Tehkan: Phoenix board with four palette banks, a protection bit and its own sound board (modeled) | `pleiads` | **Tested:** boots, attract mode, coin, start and play |
+| Timber (1984) | Bally Midway MCR (91490, like Tapper), two chop buttons | `timber` | **Tested:** boots, attract mode, coin, start and play |
+| Solar Fox (1981) | Bally Midway MCR (90009, like Kick) | `solarfox` | **Tested:** boots, attract mode, coin, start and play |
+| Wacko (1982) | Bally Midway MCR (90010, like Tron): trackball and a firing stick | `wacko` | **Tested:** boots, attract mode, coin, start and play |
+| Asteroids Deluxe (1981) | Atari: Asteroids board with a POKEY and an EAROM | `astdelux` | **Tested:** boots, attract mode, coin, start and play |
+| Lunar Lander (1979) | Atari: Asteroids board, thrust lever | `llander` | **Tested:** boots, attract mode, coin, start and play |
+| Red Baron (1980) | Atari: Battlezone board, flight stick, EAROM | `redbaron` | **Tested:** boots, attract mode, coin, start and play |
+| Black Widow (1982) | Atari color vector board: AVG in 7 colors, two POKEYs, EAROM; twin sticks | `bwidow` | **Tested:** boots, attract mode, coin, start and play |
+| Gravitar (1982) | Atari color vector board; thrust and shield/tractor buttons | `gravitar` | **Tested:** boots, attract mode, coin, start and play |
+| Space Duel (1980) | Atari color vector board, 45 Hz picture | `spacduel` | **Tested:** boots, attract mode, coin, start and play |
+| Star Castle (1980) | Cinematronics CPU (like Tail Gunner), 8K program; sound synthesized | `starcas` | **Tested:** boots, attract mode, coin, start and play |
+| Rip Off (1980) | Cinematronics, 8K program; sound synthesized | `ripoff` | **Tested:** boots, attract mode, coin, start and play |
+| Armor Attack (1980) | Cinematronics, 16K program; sound synthesized (the buildings were an overlay on the glass, not drawn) | `armora` | **Tested:** boots, attract mode, coin, start and play |
+| Solar Quest (1981) | Cinematronics, 16K program, 64 intensity levels; sound synthesized | `solarq` | **Tested:** boots, attract mode, coin, start and play |
+| Mad Planets (1983) | Gottlieb System 80, dial | `mplanets` | **Tested:** boots, attract mode, coin, start and play |
+| Krull (1983) | Gottlieb System 80, twin sticks, tiles in RAM | `krull` | **Tested:** boots, attract mode, coin, start and play |
+| Q*bert's Qubes (1983) | Gottlieb System 80, sprite bank | `qbertqub` | **Tested:** boots, attract mode, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -150,10 +231,26 @@ The touch layout follows the game:
   mega crash bomb, 1941's the loop. **Street Fighter II** has six buttons on the cabinet; here the
   bottom is a medium punch and the top a medium kick (special moves work at any strength).
   **Forgotten Worlds:** hold to fire, push left or right on the fire side to turn the gun.
+- **Q*bert:** the cabinet's stick is mounted diagonally; push diagonally on the touch pad (up-right,
+  up-left, down-left, down-right) to hop that way. Keyboard arrows give the stick's own four directions.
 - **R-Type games:** the bottom of the fire side shoots (hold to charge the beam), the top launches
   and recalls the Force. **Hammerin' Harry:** swing at the bottom, jump on top.
 - **Metal Slug games:** the fire side is split in three: the bottom shoots, the middle jumps, the
   top throws a grenade (keyboard Z / X / F; gamepad A / B / Y).
+- **Shinobi:** three buttons like Metal Slug: the bottom attacks (shuriken, or the sword up close),
+  the middle jumps (hold up or down with it to leap between levels), the top casts ninja magic.
+- **Smash T.V. / Total Carnage:** twin sticks: the left side moves, and dragging on the right
+  side shoots that way. In Total Carnage the Start button drops a bomb. Both want two coins
+  (two credits) to start.
+- **Mortal Kombat:** the fire side is split in three: the bottom punches (high punch), the middle
+  kicks (high kick), the top blocks; down plus punch is an uppercut. It needs two credits, or turn
+  on **Free play** in Game switches (Blood and Violence are switches too).
+- **The Return of Ishtar:** twin sticks: the left side moves Gil, the right side moves Ki. Ki's
+  magic and Gil's sword are on keyboard / gamepad buttons (Z, X; A, B); touch has no room for them.
+- **Hopping Mappy:** one button, jump. **Sky Kid Deluxe:** fire, and the top button loops.
+- **Genpei ToumaDen / Wonder Momo:** attack at the bottom, jump on top.
+- **Rolling Thunder:** the bottom of the fire side shoots, the top jumps; hold up while jumping to
+  leap to the balcony above (or down to drop below), and push up at a door to hide in it.
 - **Yie Ar Kung-Fu:** an 8-way stick; the bottom of the right half punches, the top kicks.
 - **Satan's Hollow:** the left half is a left/right pad; on the right half, the bottom
   fires and the top raises the shield.
@@ -188,6 +285,29 @@ The touch layout follows the game:
   the right half fires and the top loops. **Mr. Do's Castle:** 4-way stick, fire swings the
   hammer. **Popeye:** 4-way stick, fire punches. **Pengo:** 4-way stick, fire pushes ice.
   **Super Cobra:** as Scramble.
+- **Millipede:** as Centipede. **Warlords:** you're the bottom-left castle; drag the dial pad (or push
+  left/right) to slide your shield, and the button catches the fireball. Press it during the join
+  countdown to take your castle; the computer plays the rest.
+- **Pleiads:** left/right; fire at the bottom, warp on top. **Space Invaders Part II, Lunar Rescue,
+  Galaxy Wars, Ozma Wars:** left/right and fire.
+- **Timber:** 4-way stick; the two buttons chop. **Solar Fox:** 4-way stick; fire at the bottom,
+  speed on top (it also starts the game). **Wacko:** twin sticks: the left rolls the trackball, the
+  right shoots that way.
+- **Star Castle, Rip Off, Armor Attack:** left/right rotate, fire at the bottom, thrust on top.
+  **Solar Quest:** the same plus hyperspace (third button); the nova bomb is 2-player Start.
+- **Kick Rider:** 8-way stick, two kick buttons. **Eagle:** as Moon Cresta. **Dream Shopper:** 4-way
+  stick and fire.
+- **Colony 7:** 8-way stick; fire, bomb and shield. **Mayday:** 8-way stick (left fires behind);
+  fire, Mayday bomb, back fire.
+- **Silkworm:** the top bar's start buttons read **Heli** and **Jeep**: the one you press picks your
+  vehicle (as on the cabinet, where player 1 flies the helicopter and player 2 drives the jeep). Fire at
+  the bottom of the right half; the top makes the jeep jump.
+- **RoboCop:** 8-way stick; fire at the bottom, jump on top.
+- **Konami games:** **Aliens, Crime Fighters, Super Contra, TMNT:** attack/fire at the bottom, jump on
+  top. **Ajax:** fire, missile and super weapon (three buttons). **Gang Busters:** the stick moves the
+  sight; shoot and grenade. **Bottom of the Ninth:** the stick and two buttons (swing/pitch, run/throw).
+  **M.I.A.:** fire, weapon, knife. Crime Fighters and TMNT start a player from their coin slot (Coin or
+  Start both work).
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
   for a second button (fire in one-button games), F for a third, Q/E or the mouse wheel (or the
@@ -217,10 +337,20 @@ The touch layout follows the game:
   **Show all supported ROMs** to list only the games you've added. Tap one, or **Add ROM set…**, to add
   its zip. Sets are kept whole in the browser's IndexedDB (large sets like Metal Slug X run to
   30 MB; the app asks for persistent storage so the browser keeps them), and the last game played starts on launch.
+- **Sets served beside the app:** when z80js is served from a folder that also holds ROM sets in a
+  `roms/` folder with a browsable listing (for example `npm start` in this repo), the Games list shows
+  those sets too ("On the server · tmnt.zip") and plays them straight from the server. Each one has a
+  **↓** button that saves a copy to the device for offline play; once saved, the same button becomes
+  **✕**, which removes the device copy (the game stays playable from the server). Files are matched to
+  games by their MAME set name (or by what loading one reveals). Saves, high scores and switches are
+  kept on the device either way and are shared between the server and device copies of a set.
 - **Controls, Sound and volume**, as in 6502js.
 - **Resume where I left off** (on by default): the game in progress is saved when the
   page is hidden or closed, and every few seconds while playing, so a refresh or relaunch
   picks up exactly where you were. Restart / Power cycle starts over.
+- **Battery RAM:** boards with battery-backed settings and high scores (the Midway Y-unit
+  games' CMOS) keep it per ROM set, so the first launch's "factory settings restored"
+  message (press any button) appears only once.
 - **Game switches:** each game's own DIP switches (lives, bonus life, difficulty and so
   on), remembered per game. Like the real boards, games read them at power-on, so they
   apply when you tap **Restart game**.
@@ -315,7 +445,7 @@ right, up, down, fire) then holds a control.
 - `src/emu/tempest.js`: Tempest. `src/emu/bzone.js`: Battlezone. `src/emu/avg.js` is Atari's
   Analog Vector Generator (per instruction), `src/emu/mathbox.js` the math box for both.
 - `src/emu/starwars.js`: Star Wars (including the matrix processor, which runs the
-  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/v30.js` is a NEC V30 (8086/80186 plus NEC's extensions) for the Irem boards; `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
+  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/m6805.js` is a 68705 MCU core (Legend of Kage); `src/emu/segas16b.js` is Sega System 16B and `src/emu/upd7759.js` its uPD7759 ADPCM speech chip (slave mode); `src/emu/tms34010.js` is a TI TMS34010 graphics CPU core (bit-addressed fields, the X,Y instructions, PIXT, FILL and PIXBLT, the video timing and display interrupt) and `src/emu/midyunit.js` the Midway Y-unit board with its DMA blitter and the Williams CVSD and ADPCM sound boards; `src/emu/namcos86.js` is Namco System 86 and `src/emu/cus30.js` its CUS30 waveform chip (the HD63701 MCU runs on the 6803 core, which has its extra instructions); `src/emu/v30.js` is a NEC V30 (8086/80186 plus NEC's extensions) for the Irem boards. Most M72 games have an 8751 protection MCU whose program was never read out; `src/emu/m72.js` stands in for its start-up routine (leaving the bytes the games check for and jumping to their entry points) and supplies their sample start addresses; `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
 - `src/emu/tailg.js`: Tail Gunner; `src/emu/ccpu.js` is the Cinematronics CPU.
   `src/render/vector.js` draws vector games' display lists at the screen's own resolution,
   with a soft phosphor glow.
@@ -492,6 +622,16 @@ flowchart LR
   lattice filter), so the film's voices are recognizable but not bit-exact.
 - **Asteroids' sound** came from analog circuits; z80js synthesizes stand-ins for the
   heartbeat, saucers, shots, thrust, explosions and extra-life tone.
+- **Cinematronics sounds** (Star Castle, Rip Off, Armor Attack, Solar Quest) were analog boards
+  MAME plays from recordings; z80js synthesizes stand-ins from the same triggers. Star Castle's
+  colored ring overlay and Armor Attack's buildings (printed on the glass) aren't drawn.
+- **Pleiads' sound** is modeled from the circuit description, whose part values are guesses.
+  **Lunar Rescue's** sound is synthesized by ear like Space Invaders'.
+- **YM3812 (OPL2):** modeled from its documented behavior like the other FM chips; the rhythm-mode
+  drums are approximations. **HuC6280:** only RoboCop's protection program runs on it so far.
+- **Konami's K051960 sprite shadows** darken by a fixed amount, and its zoom is nearest-pixel. Ajax's
+  main CPU reads an unconnected address that returns random data on the real board (MAME does the
+  same); z80js returns a pseudo-random value.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
 
 ## Other games on related hardware
