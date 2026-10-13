@@ -25,6 +25,7 @@ const DEFAULTS = {
   volume: 70,        // percent
   switches: {},      // board id -> { switch id -> value }
   resume: true,      // pick games up where they were left
+  showAll: true,     // list every supported game, not just the ones with a ROM set added
 };
 
 const input = new Input();
@@ -203,6 +204,7 @@ function refreshLibrary() {
   renderLibrary($('library'), {
     titles: SUPPORTED,
     files: ROM_FILES,
+    showAll: settings.showAll,
     currentId: state.romId,
     onAdd: () => $('romFile').click(),
     onPlay: (entry) => playEntry(entry),
@@ -330,6 +332,7 @@ function syncMenu() {
   $('sound').checked = settings.sound;
   $('volume').value = settings.volume;
   $('resume').checked = settings.resume;
+  $('showAll').checked = settings.showAll;
   applySound();
   $('hapticsRow').hidden = !navigator.vibrate;
   applyControls();
@@ -352,6 +355,7 @@ $('haptics').addEventListener('change', (e) => {
   if (settings.haptics && navigator.vibrate) navigator.vibrate(15);
 });
 $('zones').addEventListener('change', (e) => { settings.zones = e.target.checked; applyControls(); save(); });
+$('showAll').addEventListener('change', (e) => { settings.showAll = e.target.checked; save(); refreshLibrary(); });
 $('zoneOpacity').addEventListener('input', (e) => { settings.zoneOpacity = +e.target.value; applyControls(); save(); });
 $('zoneOverlap').addEventListener('input', (e) => { settings.zoneOverlap = +e.target.value; applyControls(); layout2D(); save(); });
 $('hints').addEventListener('change', (e) => {

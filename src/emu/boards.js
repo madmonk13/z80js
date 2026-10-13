@@ -54,6 +54,7 @@ import { StarWars } from './starwars.js';
 import { TailGunner } from './tailg.js';
 import { RushNAttack, GreenBeretJ, MrGoemon } from './gberet.js';
 import { YieArKungFu } from './yiear.js';
+import { RType, RType2, HammerinHarry, MajorTitle, BattleChopper, NinjaSpirit, ImageFight, HeroTonma, XMultiply, DragonBreed, AirDuel, Gallop } from './m72.js';
 import { MetalSlug, MetalSlug2, MetalSlugX } from './neogeo.js';
 import { Strider, Mercs, FinalFight, StreetFighter2, GhoulsNGhosts, ForgottenWorlds, Game1941, Knights, CaptainCommando } from './cps1.js';
 import { Gorf, WizardOfWor, RobbyRoto, SpaceZap, ExtraBases, SeaWolf2 } from './astrocade.js';
@@ -1322,6 +1323,33 @@ const BOARDS = [
     [MetalSlug2, '241', [['241-p1', 0x100000], ['241-p2', 0x200000]], 2, 4],
     [MetalSlugX, '250', [['250-p1', 0x100000], ['250-p2', 0x400000]], 3, 6],
   ].map(neoEntry),
+  ...[
+    // Irem M72 family: [Board, program [file, offset, 'even'|'odd', reload offset?], sound, sprites, tiles1, tiles2, samples, sprites2]
+    [RType, [['rt_r-l0-', 0, 'even'], ['rt_r-h0-', 0, 'odd'], ['rt_r-l1-', 0x20000, 'even', 0xE0000], ['rt_r-h1-', 0x20000, 'odd', 0xE0000]], null,
+      ['cpu-00', 'cpu-01', 'cpu-10', 'cpu-11', 'cpu-20', 'cpu-21', 'cpu-30', 'cpu-31'], ['cpu-a0', 'cpu-a1', 'cpu-a2', 'cpu-a3'], ['cpu-b0', 'cpu-b1', 'cpu-b2', 'cpu-b3'], null],
+    [RType2, [['ic60.9d', 0, 'even'], ['ic54.8d', 0, 'odd'], ['ic59.9b', 0x40000, 'even', 0xC0000], ['ic53.8b', 0x40000, 'odd', 0xC0000]], 'ic17.4f',
+      ['ic31.6l', 'ic21.4l', 'ic32.6m', 'ic22.4m'], ['ic50.7s', 'ic51.7u', 'ic56.8s', 'ic57.8u', 'ic65.9r', 'ic66.9u', 'ic63.9m', 'ic64.9p'], null, 'ic14.4c'],
+    [HammerinHarry, [['a-l0-v', 0, 'even'], ['a-h0-v', 0, 'odd'], ['a-l1-0', 0x60000, 'even', 0xE0000], ['a-h1-0', 0x60000, 'odd', 0xE0000]], 'a-sp-0',
+      ['hh_00', 'hh_10', 'hh_20', 'hh_30'], ['hh_a0', 'hh_a1', 'hh_a2', 'hh_a3'], null, 'a-v0-0'],
+    [MajorTitle, [['mt_l0', 0, 'even'], ['mt_m0', 0, 'odd'], ['mt_l1', 0x40000, 'even', 0xC0000], ['mt_m1', 0x40000, 'odd', 0xC0000]], 'mt_sp',
+      ['mt_n0', 'mt_n1', 'mt_n2', 'mt_n3'], ['mt_c0', 'mt_c1', 'mt_c2', 'mt_c3'], null, 'mt_vo', ['mt_f0', 'mt_f1', 'mt_f2', 'mt_f3']],
+    [BattleChopper, [['c-l0-b', 0, 'even'], ['c-h0-b', 0, 'odd'], ['c-l1-b', 0x20000, 'even'], ['c-h1-b', 0x20000, 'odd'], ['c-l3-b', 0x60000, 'even', 0xE0000], ['c-h3-b', 0x60000, 'odd', 0xE0000]], null,
+      ['c-00-a', 'c-01-b', 'c-10-a', 'c-11-b', 'c-20-a', 'c-21-b', 'c-30-a', 'c-31-b'], ['b-a0-b', 'b-a1-b', 'b-a2-b', 'b-a3-b'], ['b-b0-', 'b-b1-', 'b-b2-', 'b-b3-'], 'c-v0-b'],
+    [NinjaSpirit, [0, 1, 2, 3].flatMap((k) => [[`nin-c-l${k}`, k * 0x20000, 'even', k === 3 ? 0xE0000 : undefined], [`nin-c-h${k}`, k * 0x20000, 'odd', k === 3 ? 0xE0000 : undefined]]), null,
+      ['nin-r00', 'nin-r10', 'nin-r20', 'nin-r30'], ['nin-b-a0', 'nin-b-a1', 'nin-b-a2', 'nin-b-a3'], ['nin-b0', 'nin-b1', 'nin-b2', 'nin-b3'], 'nin-v0'],
+    [ImageFight, [['if-c-l0', 0, 'even'], ['if-c-h0', 0, 'odd'], ['if-c-l3', 0x40000, 'even', 0xC0000], ['if-c-h3', 0x40000, 'odd', 0xC0000]], null,
+      ['if-c-00', 'if-c-10', 'if-c-20', 'if-c-30'], ['if-a-a0', 'if-a-a1', 'if-a-a2', 'if-a-a3'], ['if-a-b0', 'if-a-b1', 'if-a-b2', 'if-a-b3'], ['if-c-v0', 'if-c-v1']],
+    [HeroTonma, [['tom_c-l0', 0, 'even'], ['tom_c-h0', 0, 'odd'], ['tom_c-l3', 0x40000, 'even', 0xC0000], ['tom_c-h3', 0x40000, 'odd', 0xC0000]], null,
+      ['tom_m53', 'tom_m51', 'tom_m49', 'tom_m47'], ['tom_m21', 'tom_m22', 'tom_m20', 'tom_m23'], ['tom_m26', 'tom_m27', 'tom_m25', 'tom_m24'], 'tom_m44'],
+    [XMultiply, [['cl3.l3', 0, 'even'], ['ch3.h3', 0, 'odd'], ['cl0.l0', 0x40000, 'even', 0xE0000], ['ch0.h0', 0x40000, 'odd', 0xE0000]], null,
+      ['t44.00', 't45.01', 't46.10', 't47.11', 't48.20', 't49.21', 't50.30', 't51.31'], ['t53.a0', 't54.a1', 't55.a2', 't56.a3'], ['t57.b0', 't58.b1', 't59.b2', 't60.b3'], 't52.v0'],
+    [DragonBreed, [['db_c-l3', 0, 'even'], ['db_c-h3', 0, 'odd'], ['db_c-l0', 0x60000, 'even', 0xE0000], ['db_c-h0', 0x60000, 'odd', 0xE0000]], null,
+      ['db_k800m', 'db_k801m', 'db_k802m', 'db_k803m'], ['db_a0m', 'db_a1m', 'db_a2m', 'db_a3m'], ['db_b0m', 'db_b1m', 'db_b2m', 'db_b3m'], 'db_c-v0'],
+    [AirDuel, [['ad-c-l0', 0, 'even'], ['ad-c-h0', 0, 'odd'], ['ad-c-l3', 0x40000, 'even', 0xC0000], ['ad-c-h3', 0x40000, 'odd', 0xC0000]], null,
+      ['ad-00', 'ad-10', 'ad-20', 'ad-30'], ['ad-a0', 'ad-a1', 'ad-a2', 'ad-a3'], ['ad-b0', 'ad-b1', 'ad-b2', 'ad-b3'], 'ad-v0'],
+    [Gallop, [['cc-c-l0', 0, 'even'], ['cc-c-h0', 0, 'odd'], ['cc-c-l3', 0x40000, 'even', 0xC0000], ['cc-c-h3', 0x40000, 'odd', 0xC0000]], null,
+      ['cc-c-00', 'cc-c-10', 'cc-c-20', 'cc-c-30'], ['cc-b-a0', 'cc-b-a1', 'cc-b-a2', 'cc-b-a3'], ['cc-b-b0', 'cc-b-b1', 'cc-b-b2', 'cc-b-b3'], 'cc-c-v0'],
+  ].map(m72Entry),
 ];
 
 function interleave(even, odd) {
@@ -1406,6 +1434,26 @@ function crc32(data) {
   let crc = -1;
   for (let i = 0; i < data.length; i++) crc = CRC_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
   return (crc ^ -1) >>> 0;
+}
+
+// An Irem M72-family registry entry (see the table above).
+function m72Entry([Board, prog, sound, sprites, tiles1, tiles2, samples, sprites2]) {
+  const sampleList = samples ? [].concat(samples) : [];
+  const names = [...prog.map((p) => p[0]), ...(sound ? [sound] : []), ...sprites, ...tiles1, ...(tiles2 || []), ...sampleList, ...(sprites2 || [])];
+  const esc = (n) => n.replace(/[.]/g, '\\.');
+  return {
+    Board,
+    chips: names.map((n) => [n, null, [new RegExp(`^${esc(n)}(\\.(bin|rom))?$`)]]),
+    assemble: (c) => {
+      const main = new Uint8Array(0x100000).fill(0xFF);
+      for (const [n, at, half, reload] of prog) {
+        const r = c[n], k = half === 'odd' ? 1 : 0;
+        for (const base of reload === undefined ? [at] : [at, reload]) for (let i = 0; i < r.length; i++) main[base + i * 2 + k] = r[i];
+      }
+      const join = (list) => (list ? cat(...list.map((n) => c[n])) : null);
+      return { main, sound: sound ? c[sound] : null, sprites: join(sprites), tiles1: join(tiles1), tiles2: join(tiles2), samples: sampleList.length ? join(sampleList) : null, sprites2: join(sprites2) };
+    },
+  };
 }
 
 // A 64K address space image: ROMs at their addresses, 0xFF elsewhere.

@@ -144,9 +144,10 @@ function sizeLabel(bytes) {
 
 // Render the games list into `el` (a <ul>): every supported game in
 // alphabetical order, each ROM set added for it as a playable row and games
-// without one greyed out (tapping those calls onAdd). Sets for games no longer
-// recognized are listed after them. Removing takes two taps.
-export function renderLibrary(el, { titles, files = {}, currentId, onPlay, onRemove, onAdd }) {
+// without one greyed out (tapping those calls onAdd; with showAll off they're
+// left out). Sets for games no longer recognized are listed after them.
+// Removing takes two taps.
+export function renderLibrary(el, { titles, files = {}, showAll = true, currentId, onPlay, onRemove, onAdd }) {
   el.textContent = '';
   const row = (label, detail, { entry, missing } = {}) => {
     const li = document.createElement('li');
@@ -181,6 +182,7 @@ export function renderLibrary(el, { titles, files = {}, currentId, onPlay, onRem
     // Two sets for one game (a clone, say) are told apart by file name.
     for (const e of sets) row(title, sets.length > 1 ? `${e.name} · ${detail(e)}` : detail(e), { entry: e });
   }
+  if (!showAll) return;                     // the setting hides games still waiting for a ROM set
   for (const title of sorted.filter((t) => !have.includes(t))) {
     row(title, `Upload ${files[title] || 'ROM'} to enable`, { missing: true });
   }

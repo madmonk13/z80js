@@ -102,6 +102,10 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Metal Slug (1996) | SNK Neo Geo MVS: 68000, Z80, YM2610 (FM, SSG, ADPCM-A/B), the LSPC's shrinking sprite strips and fix layer; boots through the MVS BIOS | `mslug` (a merged set: the zip must include the BIOS files, sp-s2.sp1, sfix.sfx and 000-lo.lo) | **Tested:** boots through the BIOS, attract mode, coin and start |
 | Metal Slug 2 (1998) | SNK Neo Geo MVS (relies on the watchdog reset as a protection check) | `mslug2` | **Tested:** boots, title, coin and start |
 | Metal Slug X (1999) | SNK Neo Geo MVS with its protection checks patched out | `mslugx` | **Tested:** boots, attract mode, coin and start |
+| R-Type (1987) | Irem M72: NEC V30, Z80, YM2151; two tile layers with three priority levels, block sprites, a raster split for the status bar; the sound CPU runs from RAM the game loads | `rtype` (World) | **Tested:** boots, attract mode with sound, coin, start and play |
+| R-Type II (1989) | Irem M82: like M72, with ROM-based sound and a sample DAC | `rtype2` | **Tested:** boots, attract mode with sound, coin, start and play |
+| Hammerin' Harry (1990) | Irem M82 | `hharry` (World) | **Tested:** boots, attract mode, coin, start and play |
+| Major Title (1990) | Irem M84: a wider background with row scroll and a second sprite list | `majtitle` (Japan) | **Tested:** boots, attract mode, coin and start |
 | Yie Ar Kung-Fu (1985) | Konami: 6809, SN76489, VLM5030 speech, a fixed tile map and 24 sprites | `yiear` | **Tested:** boots, attract mode with speech, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
@@ -146,6 +150,8 @@ The touch layout follows the game:
   mega crash bomb, 1941's the loop. **Street Fighter II** has six buttons on the cabinet; here the
   bottom is a medium punch and the top a medium kick (special moves work at any strength).
   **Forgotten Worlds:** hold to fire, push left or right on the fire side to turn the gun.
+- **R-Type games:** the bottom of the fire side shoots (hold to charge the beam), the top launches
+  and recalls the Force. **Hammerin' Harry:** swing at the bottom, jump on top.
 - **Metal Slug games:** the fire side is split in three: the bottom shoots, the middle jumps, the
   top throws a grenade (keyboard Z / X / F; gamepad A / B / Y).
 - **Yie Ar Kung-Fu:** an 8-way stick; the bottom of the right half punches, the top kicks.
@@ -207,7 +213,8 @@ The touch layout follows the game:
 ## Settings (⚙) and Games
 
 - **Games:** every supported game, in alphabetical order. Games you haven't added a ROM
-  set for are greyed out and name the zip they expect ("Upload invaders.zip to enable"); tap one, or **Add ROM set…**, to add
+  set for are greyed out and name the zip they expect ("Upload invaders.zip to enable"); turn off
+  **Show all supported ROMs** to list only the games you've added. Tap one, or **Add ROM set…**, to add
   its zip. Sets are kept whole in the browser's IndexedDB (large sets like Metal Slug X run to
   30 MB; the app asks for persistent storage so the browser keeps them), and the last game played starts on launch.
 - **Controls, Sound and volume**, as in 6502js.
@@ -308,7 +315,7 @@ right, up, down, fire) then holds a control.
 - `src/emu/tempest.js`: Tempest. `src/emu/bzone.js`: Battlezone. `src/emu/avg.js` is Atari's
   Analog Vector Generator (per instruction), `src/emu/mathbox.js` the math box for both.
 - `src/emu/starwars.js`: Star Wars (including the matrix processor, which runs the
-  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
+  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/v30.js` is a NEC V30 (8086/80186 plus NEC's extensions) for the Irem boards; `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
 - `src/emu/tailg.js`: Tail Gunner; `src/emu/ccpu.js` is the Cinematronics CPU.
   `src/render/vector.js` draws vector games' display lists at the screen's own resolution,
   with a soft phosphor glow.
