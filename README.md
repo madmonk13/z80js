@@ -1,9 +1,13 @@
 # z80js
 
-A touch-first emulator for Z80-based arcade boards of the late 1970s and early 80s, for
-phones and desktop. Plain HTML, CSS and JavaScript modules, with no dependencies and no
-build step. It shares its app shell (touch controls, settings, game library, audio) with
-[6502js](https://github.com/madmonk13/6502js), the Atari 2600 emulator it was forked from.
+A touch-first emulator for retro arcade games, for phones and desktop. Plain HTML, CSS and
+JavaScript modules, with no dependencies and no build step. It shares its app shell (touch
+controls, settings, game library, audio) with [6502js](https://github.com/madmonk13/6502js),
+the Atari 2600 emulator it was forked from.
+
+z80js started out as an emulator for Z80-based arcade boards only, and grew from there: it now
+also runs boards built around the 6502, 6809, 68000, V30, ARM and other processors, from the
+late 1970s into the 1990s. The name may change in a future rebrand.
 
 **Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **195 games supported**
 
@@ -709,12 +713,3 @@ flowchart LR
   main CPU reads an unconnected address that returns random data on the real board (MAME does the
   same); z80js returns a pseudo-random value.
 - Upright cabinets only (no cocktail flip); coinage is fixed at 1 coin, 1 credit.
-
-## Other games on related hardware
-
-Namco's next boards share Galaga's design (three Z80s, the 06xx and 51xx chips, the
-waveform sound) but each adds its own video and custom chips:
-
-| Game | Year | What it adds |
-|---|---|---|
-| Xevious | 1982 | Two scrolling tile layers, a ROM-based terrain data chip, and the 50xx and 52xx. |
