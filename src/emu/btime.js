@@ -150,25 +150,36 @@ export class BurgerTime {
     }
   }
 
-  render() {
-    const out = this.native, m = this.mem, pal = this.palette, full = new Uint8Array(W * 256);
-    // Background: 16x16 tiles from the ROM maps, when bit 4 of the scroll register is set.
-    const bg = this.scroll1 & 0x10;
-    if (bg) {
-      let scroll = -((this.scroll1 & 3) << 8);
-      for (let i = 0; i < 5; i++, scroll += 256) {
-        if (scroll > 256) break;
-        if (scroll < -256) continue;
-        const map = (((1 + i) & 3) | (this.scroll1 & 4)) * 0x100;
-        for (let offs = 0; offs < 0x100; offs++) {
-          const x0 = 240 - (16 * (offs >> 4) + scroll), y0 = 16 * (offs & 15), code = this.roms.tileMap[map + offs] & 63;
-          for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-            const px = x0 + x;
-            if (px >= 0 && px < W) full[(y0 + y) * W + px] = 8 + this.tilePix[code * 256 + y * 16 + x];
-          }
+  // The background picture (16x16 tiles from the ROM maps): it only changes with the scroll register,
+  // so it's built once per setting and copied each frame.
+  background() {
+    const key = this.scroll1 & 0x07;
+    if (this.bgKey === key) return this.bgCache;
+    const bgBuf = this.bgCache || (this.bgCache = new Uint8Array(W * 256));
+    bgBuf.fill(0);
+    let scroll = -((this.scroll1 & 3) << 8);
+    for (let i = 0; i < 5; i++, scroll += 256) {
+      if (scroll > 256) break;
+      if (scroll < -256) continue;
+      const map = (((1 + i) & 3) | (this.scroll1 & 4)) * 0x100;
+      for (let offs = 0; offs < 0x100; offs++) {
+        const x0 = 240 - (16 * (offs >> 4) + scroll), y0 = 16 * (offs & 15), code = this.roms.tileMap[map + offs] & 63;
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+          const px = x0 + x;
+          if (px >= 0 && px < W) bgBuf[(y0 + y) * W + px] = 8 + this.tilePix[code * 256 + y * 16 + x];
         }
       }
     }
+    this.bgKey = key;
+    return bgBuf;
+  }
+
+  render() {
+    const out = this.native, m = this.mem, pal = this.palette;
+    const full = this.full || (this.full = new Uint8Array(W * 256));
+    // Background, when bit 4 of the scroll register is set.
+    const bg = this.scroll1 & 0x10;
+    if (bg) full.set(this.background()); else full.fill(0);
     // Characters: video RAM is stored a column at a time, right to left.
     for (let offs = 0; offs < 0x400; offs++) {
       const x0 = 8 * (31 - (offs >> 5)), y0 = 8 * (offs & 31), code = (m[0x1000 + offs] + 256 * (m[0x1400 + offs] & 3)) & 1023;

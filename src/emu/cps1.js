@@ -27,7 +27,7 @@ import { rgba, rotate270 } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
-const W = 384, H = 224, LEFT = 64, TOP = 16;
+export const W = 384, H = 224, LEFT = 64, TOP = 16;
 const LINES = 262, REFRESH = 59.637;
 const Z80_CLOCK = 3579545;
 
@@ -41,6 +41,8 @@ const CPS_B = {
   B12: [0x60, 0x0402, 0, 0, 0, 0, 0x6c, [0x6a, 0x68, 0x66, 0x64], [0x02, 0x04, 0x08, 0x00, 0x00]],
   BAT3: [0x00, 0x0000, 0x46, 0x44, 0x42, 0x40, 0x60, [0x6e, 0x6c, 0x6a, 0x68], [0x20, 0x12, 0x12, 0x00, 0x00]],
   BAT4: [0x00, 0x0000, 0x46, 0x44, 0x42, 0x40, 0x68, [0x66, 0x64, 0x62, 0x60], [0x20, 0x10, 0x02, 0x00, 0x00]],
+  // CPS-2 boards all use this one.
+  NOBATTRY: [0x00, 0x0000, 0x40, 0x42, 0x44, 0x46, 0x66, [0x68, 0x6a, 0x6c, 0x6e], [0x02, 0x04, 0x08, 0x30, 0x30]],
 };
 
 const STATE = ['ram', 'gfxram', 'out', 'objBuf', 'soundRam', 'latch', 'fade', 'bank', 'dialBase', 'frameCount',
@@ -279,8 +281,8 @@ export class CPS1 {
     }
   }
 
-  // Tile layers: 1 = 8x8, 2 = 16x16, 3 = 32x32.
-  drawLayer(l, front) {
+  // Tile layers: 1 = 8x8, 2 = 16x16, 3 = 32x32. priBit (CPS-2): OR this into this.pri for every pixel drawn.
+  drawLayer(l, front, priBit = 0) {
     const cfg = this.cfg, out = this.native, pal = this.palette, pix = this.pixels, mask = this.mask;
     const size = l === 1 ? 8 : l === 2 ? 16 : 32, shift = l === 1 ? 3 : l === 2 ? 4 : 5;
     const span = 64 * size - 1;
@@ -310,7 +312,7 @@ export class CPS1 {
         let code = this.gw(o & 0x3FFFF);
         const attr = this.gw((o + 2) & 0x3FFFF);
         let blank = false;
-        if (l === 1) { if (code === 0x0020 || (cfg.kludge === 3 && code === 0xF020)) blank = true; }
+        if (l === 1) { if ((code === 0x0020 && !cfg.cps2) || (cfg.kludge === 3 && code === 0xF020)) blank = true; }
         else if (code < lo || code > hi || (l === 2 && cfg.kludge === 4 && code >= 0x1E00 && code < 0x5400)) blank = true;
         if (l === 3 && cfg.kludge === 2 && code < 0x0E00) code += 0x1000;
         code += bank;
@@ -328,6 +330,7 @@ export class CPS1 {
             if (pen === 15) continue;
             out[y * W + x + i] = pal[colBase + pen];
             if ((hiMask >> pen) & 1) mask[y * W + x + i] = 1;
+            if (priBit) this.pri[y * W + x + i] |= priBit;
           }
         }
         x += run;
@@ -381,7 +384,7 @@ export class CPS1 {
 
 // The graphics ROMs hold four bitplanes interleaved a byte at a time in each
 // 32-bit group; unpack them to one pen per byte, eight pixels per group.
-function decodeGfx(raw) {
+export function decodeGfx(raw) {
   const px = new Uint8Array(raw.length * 2);
   for (let i = 0, o = 0; i < raw.length; i += 4) {
     const b0 = raw[i], b1 = raw[i + 1], b2 = raw[i + 2], b3 = raw[i + 3];

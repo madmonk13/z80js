@@ -5,7 +5,7 @@ phones and desktop. Plain HTML, CSS and JavaScript modules, with no dependencies
 build step. It shares its app shell (touch controls, settings, game library, audio) with
 [6502js](https://github.com/madmonk13/6502js), the Atari 2600 emulator it was forked from.
 
-**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **193 games supported**
+**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **195 games supported**
 
 No ROMs are included: add your own ROM sets, the zips used by MAME. A set is recognized
 by its chips' file names, so the zip's own name doesn't matter.
@@ -212,6 +212,8 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Qix (1981) | Taito: two 6809s (game and a 256x256 8-bit bitmap), 6821 PIAs, a 6802 playing samples through a DAC; battery-backed CMOS | `qix` | **Tested:** boots (runs the operator setup on first power-on), attract mode, coin, start and play |
 | Salamander (1986) | Konami Nemesis: 68000 with all graphics uploaded into RAM, per-line and per-column scrolling, zoomable sprites; Z80 with YM2151, K007232 and VLM5030 speech | `salamand` | **Tested:** boots, attract mode with speech, coin, start and play |
 | Blades of Steel (1987) | Konami: HD6309 (run on the 6809 core; the game uses no 6309-only instructions), K007342 tilemaps, K007420 sprites, K051733 protection; 6809 with YM2203 and uPD7759 speech | `bladstle` (version E, joystick) | **Tested:** boots, attract mode with speech, coin, start and play |
+| Marvel Super Heroes (1995) | Capcom CPS-2: 68000 with its program decrypted at load (CPS-2's two Feistel networks), the CPS-1 video chips plus CPS-2 sprites and priorities, a Z80 with QSound, EEPROM settings | `msh` | **Tested:** boots, attract mode, coin, start and a match with music |
+| Captain America and The Avengers (1991) | Data East 32-bit: ARM2 (new core), three playfields with row scroll and a raster interrupt, graphics decrypted at load (chip 56); HuC6280 with YM2151 and two OKI M6295s | `captaven` | **Tested:** boots, attract mode, coin, hero select, start and play with music and samples |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -341,6 +343,10 @@ The touch layout follows the game:
 - **Qix:** 4-way stick; the bottom button draws fast (blue), the top slow (red, worth double).
 - **Salamander:** 8-way stick; fire at the bottom, missile on top. **Blades of Steel:** 8-way stick; shoot at the
   bottom, pass in the middle, check on top.
+- **Marvel Super Heroes:** 8-way stick; the bottom of the right half is medium punch, the middle medium
+  kick, the top heavy punch (the other three of the six buttons aren't on screen).
+- **Captain America and The Avengers:** 8-way stick; attack at the bottom, jump on top. After starting, pick
+  your hero (Captain America, Hawkeye, Iron Man or Vision) with the stick and press attack.
 - **Four-player games** (TMNT, Trog, The Simpsons, Gauntlet): Start opens a choice of character
   (Leo/Mike/Don/Raph, Red/Blue/Yellow/Pink, Marge/Homer/Bart/Lisa, Warrior/Valkyrie/Wizard/Elf);
   picking one starts as that character and closes the choice (keyboard 1-4 pick directly). Where each
@@ -623,6 +629,9 @@ flowchart LR
 
 ## Known gaps
 
+- **Marvel Super Heroes** needs about 100 MB of memory once its graphics are unpacked; its raster effects
+  (the lava level) are approximate, the QSound positioning is reduced to mono, and only three of its six
+  buttons are on screen.
 - **Qix** keeps its settings in battery-backed CMOS. On the very first power-on (no saved CMOS) the board shows the
   operator's setup pages; z80js steps through them with the factory settings, which takes about eight seconds.
 - **Blades of Steel:** only the joystick version (`bladstle`) is supported; the trackball version (`bladestl`) isn't.

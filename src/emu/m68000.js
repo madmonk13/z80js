@@ -40,8 +40,9 @@ export class M68000 {
     this.xf = this.nf = this.zf = this.vf = this.cf = 0;
     this.irq = 0; this.stopped = 0;
     this.cycles = this.cycles || 0;
-    this.a[7] = this.rl(0);
-    this.pc = this.rl(4) & 0xFFFFFF;
+    // The vectors are read as program words (decrypted, on boards that encrypt their program).
+    this.a[7] = this.opRead ? ((this.opRead(0) << 16) | this.opRead(2)) >>> 0 : this.rl(0);
+    this.pc = (this.opRead ? ((this.opRead(4) << 16) | this.opRead(6)) : this.rl(4)) & 0xFFFFFF;
   }
 
   // ---------------------------------------------------------------- bus
@@ -55,7 +56,16 @@ export class M68000 {
   read(a, sz) { return sz === 1 ? this.rb(a) : sz === 2 ? this.rw(a) : this.rl(a); }
   write(a, sz, v) { if (sz === 1) this.wb(a, v); else if (sz === 2) this.ww(a, v); else this.wl(a, v); }
 
-  fetch() { const v = this.rw(this.pc); this.pc = (this.pc + 2) & 0xFFFFFF; return v; }
+  // Instruction words. Boards with encrypted programs (CPS-2) set opRead(a) to supply the decrypted
+  // word; it also serves PC-relative operands, which the 68000 reads from program space too.
+  fetch() { const v = this.opRead ? (this.cycles += 4, this.opRead(this.pc & 0xFFFFFE)) : this.rw(this.pc); this.pc = (this.pc + 2) & 0xFFFFFF; return v; }
+  pcRead(a, sz) {
+    a &= 0xFFFFFF;
+    this.cycles += sz === 4 ? 8 : 4;
+    if (sz === 1) { const w = this.opRead(a & ~1); return a & 1 ? w & 0xFF : w >> 8; }
+    if (sz === 2) return this.opRead(a);
+    return ((this.opRead(a) << 16) | this.opRead((a + 2) & 0xFFFFFE)) >>> 0;
+  }
   fetchL() { const hi = this.fetch(); return ((hi << 16) | this.fetch()) >>> 0; }
   push16(v) { this.a[7] -= 2; this.ww(this.a[7], v); }
   push32(v) { this.a[7] -= 4; this.wl(this.a[7], v); }
@@ -152,6 +162,7 @@ export class M68000 {
       const v = this.fetch();
       return sz === 1 ? v & 0xFF : v;
     }
+    if (mode === 7 && (reg === 2 || reg === 3) && this.opRead) return this.pcRead(this.addr(mode, reg, sz), sz) >>> 0;
     return this.read(this.addr(mode, reg, sz), sz) >>> 0;
   }
 

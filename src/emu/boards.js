@@ -79,6 +79,9 @@ import { Gyruss } from './gyruss.js';
 import { Qix } from './qix.js';
 import { Salamander } from './nemesis.js';
 import { BladesOfSteel } from './bladestl.js';
+import { MarvelSuperHeroes } from './cps2.js';
+import { CaptainAmerica } from './captaven.js';
+import { deco56Decrypt } from './decocrypt.js';
 import { RollingThunder, WonderMomo, Genpei, ReturnOfIshtar, HoppingMappy, SkyKidDeluxe } from './namcos86.js';
 import { SmashTV, TotalCarnage, MortalKombat, Trog, Narc } from './midyunit.js';
 import { RType, RType2, HammerinHarry, MajorTitle, BattleChopper, NinjaSpirit, ImageFight, HeroTonma, XMultiply, DragonBreed, AirDuel, Gallop } from './m72.js';
@@ -1704,6 +1707,56 @@ const BOARDS = [
     }),
   },
   {
+    // Captain America and The Avengers (Asia Rev 1.4). The ARM program is byte-interleaved four ways
+    // (little-endian words); each 256-color tile ROM is split in four 256K pieces spread 1.25M apart;
+    // both tile regions are decrypted (Data East chip 56).
+    Board: CaptainAmerica,
+    chips: [['p0', 0x20000, [/^hn_00-4\.1e$/]], ['p1', 0x20000, [/^hn_01-4\.1h$/]], ['p2', 0x20000, [/^hn_02-4\.1k$/]], ['p3', 0x20000, [/^hn_03-4\.1m$/]],
+      ['p4', 0x20000, [/^man-12\.3e$/]], ['p5', 0x20000, [/^man-13\.3h$/]], ['p6', 0x20000, [/^man-14\.3k$/]], ['p7', 0x20000, [/^man-15\.3m$/]],
+      ['snd', 0x10000, [/^hj_08\.17k$/]], ['chars', 0x80000, [/^man-00\.8a$/]],
+      ...[5, 4, 3, 2, 1].map((n) => [`t${n}`, 0x100000, [new RegExp(`^man-0${n}\\.`)]]),
+      ...[6, 7, 8, 9].map((n) => [`s${n}`, 0x100000, [new RegExp(`^man-0${n}\\.`)]]),
+      ['o0', 0x80000, [/^man-10\.14k$|^mbh-10/]], ['o1', 0x80000, [/^man-11\.16k$|^mbh-11/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x100000);
+      [['p0', 'p1', 'p2', 'p3', 0], ['p4', 'p5', 'p6', 'p7', 0x80000]].forEach(([a, b, d, e, at]) => {
+        for (let i = 0; i < 0x20000; i++) { main[at + 4 * i] = c[a][i]; main[at + 4 * i + 1] = c[b][i]; main[at + 4 * i + 2] = c[d][i]; main[at + 4 * i + 3] = c[e][i]; }
+      });
+      const chars = c.chars.slice();
+      deco56Decrypt(chars);
+      const tiles8 = new Uint8Array(0x500000);
+      [5, 4, 3, 2, 1].forEach((n, k) => { for (let j = 0; j < 4; j++) tiles8.set(c[`t${n}`].subarray(j * 0x40000, (j + 1) * 0x40000), k * 0x40000 + j * 0x140000); });
+      deco56Decrypt(tiles8);
+      const sprites = new Uint8Array(0x400000);
+      for (let i = 0; i < 0x100000; i++) { sprites[2 * i] = c.s6[i]; sprites[2 * i + 1] = c.s7[i]; sprites[0x200000 + 2 * i] = c.s8[i]; sprites[0x200001 + 2 * i] = c.s9[i]; }
+      return { main, sound: c.snd, chars, tiles8, sprites, oki0: c.o0, oki1: c.o1 };
+    },
+  },
+  {
+    // Marvel Super Heroes (Euro 951024). Program ROMs hold byte-swapped words; each graphics ROM gives
+    // a 2-byte group every 8 bytes, then each 2M bank is "unshuffled" (CPS-2's address wiring).
+    Board: MarvelSuperHeroes,
+    chips: [...['mshe.03e', 'mshe.04e', 'msh.05', 'msh.06b', 'msh.07a', 'msh.08a', 'msh.09a', 'msh.10b'].map((n) => [n, 0x80000, [new RegExp(`^${n.replace('.', '\\.')}$`)]]),
+      ...[13, 14, 15, 16, 17, 18, 19, 20].map((n) => [`g${n}`, 0x400000, [new RegExp(`^msh\\.${n}m?$`)]]),
+      ['s01', 0x20000, [/^msh\.01$/]], ['s02', 0x20000, [/^msh\.02$/]], ['q11', 0x200000, [/^msh\.11m?$/]], ['q12', 0x200000, [/^msh\.12m?$/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x400000);
+      ['mshe.03e', 'mshe.04e', 'msh.05', 'msh.06b', 'msh.07a', 'msh.08a', 'msh.09a', 'msh.10b'].forEach((n, i) => {
+        const r = c[n]; for (let k = 0; k < r.length; k += 2) { main[i * 0x80000 + k] = r[k + 1]; main[i * 0x80000 + k + 1] = r[k]; }
+      });
+      const gfx = new Uint8Array(0x2000000);
+      [[13, 0], [15, 2], [17, 4], [19, 6], [14, 0x1000000], [16, 0x1000002], [18, 0x1000004], [20, 0x1000006]].forEach(([n, at]) => {
+        const r = c[`g${n}`]; for (let i = 0; i < r.length; i += 2) { gfx[at + i * 4] = r[i]; gfx[at + i * 4 + 1] = r[i + 1]; }
+      });
+      for (let b = 0; b < gfx.length; b += 0x200000) unshuffle(gfx, b, 0x200000 / 8);
+      const sound = new Uint8Array(0x50000);
+      sound.set(c.s01.subarray(0, 0x8000), 0); sound.set(c.s01.subarray(0x8000), 0x10000); sound.set(c.s02, 0x28000);
+      const samples = cat(c.q11, c.q12);
+      for (let i = 0; i < samples.length; i += 2) { const x = samples[i]; samples[i] = samples[i + 1]; samples[i + 1] = x; }
+      return { main, gfx, sound, samples };
+    },
+  },
+  {
     // Blades of Steel (version E, joystick): the program ROM's first half is the banked area, the second the fixed 8000-FFFF.
     Board: BladesOfSteel,
     chips: [['prg', 0x10000, [/^797e01/]], ['snd', 0x8000, [/^797c02/]], ['t', 0x40000, [/^797a05/]], ['s', 0x40000, [/^797a06/]],
@@ -2404,6 +2457,17 @@ function place(parts) {
   const out = new Uint8Array(0x10000).fill(0xFF);
   for (const [rom, at] of parts) out.set(rom, at);
   return out;
+}
+
+// CPS-2 graphics: within each bank, swap the middle quarters of every block (8-byte units), recursively.
+function unshuffle(buf, start, len) {
+  if (len === 2) return;
+  len /= 2;
+  unshuffle(buf, start, len);
+  unshuffle(buf, start + len * 8, len);
+  const tmp = new Uint8Array(len * 4);
+  const a = start + (len / 2) * 8, b = start + len * 8;
+  tmp.set(buf.subarray(a, a + len * 4)); buf.copyWithin(a, b, b + len * 4); buf.set(tmp, b);
 }
 
 function cat(...parts) {

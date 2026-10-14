@@ -4,7 +4,7 @@
 // the current app) and falls back to the cache when offline. ROM sets under
 // roms/ aren't cached here: games kept on the device live in IndexedDB.
 
-const CACHE = 'z80js-f38257b2d44b';
+const CACHE = 'z80js-c45a94b80104';
 const FILES = [
   "./",
   "favicon-32.png",
@@ -16,6 +16,7 @@ const FILES = [
   "manifest.webmanifest",
   "src/audio-out.js",
   "src/audio-worklet.js",
+  "src/emu/arm.js",
   "src/emu/asteroids.js",
   "src/emu/astrocade-sound.js",
   "src/emu/astrocade.js",
@@ -30,12 +31,16 @@ const FILES = [
   "src/emu/bwidow.js",
   "src/emu/bzone.js",
   "src/emu/c1942.js",
+  "src/emu/captaven.js",
   "src/emu/ccpu.js",
   "src/emu/centiped.js",
   "src/emu/cinemat.js",
   "src/emu/cps1.js",
+  "src/emu/cps2.js",
+  "src/emu/cps2crypt.js",
   "src/emu/cus30.js",
   "src/emu/dec0.js",
+  "src/emu/decocrypt.js",
   "src/emu/digdug.js",
   "src/emu/dkong-sound.js",
   "src/emu/dkong.js",
@@ -91,6 +96,7 @@ const FILES = [
   "src/emu/pokey.js",
   "src/emu/popeye.js",
   "src/emu/qix.js",
+  "src/emu/qsound.js",
   "src/emu/rallyx.js",
   "src/emu/rocnrope.js",
   "src/emu/scramble.js",
@@ -140,7 +146,7 @@ const FILES = [
 const BUNDLED = new Set([]);
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -157,7 +163,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      // Ask the server every time (a 304 when unchanged): the browser's own HTTP cache could otherwise
+      // hand back an old module next to a new one after an update.
+      const res = await (req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req, { cache: 'no-cache' }));
       if (res.ok) cache.put(req, res.clone());
       return res;
     } catch {
