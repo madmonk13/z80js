@@ -11,6 +11,9 @@
 // sprites. Sprites are 16x16, stacked 1, 2, 4 or 8 high, copied from RAM by
 // a DMA write at the end of each frame.
 //
+// Heavy Barrel has an 8751 MCU (simulated here from its known replies) and
+// a rotary joystick per player: twelve positions read as one low bit each.
+//
 // RoboCop adds a HuC6280 running a small protection program, sharing 8K of
 // RAM with the 68000 (which sees its first 2K, a byte per word, and kicks
 // it with an interrupt by writing the last byte).
@@ -25,7 +28,7 @@ import { YM2203 } from './ym2203.js';
 import { YM3812 } from './ym3812.js';
 import { OKIM6295 } from './okim6295.js';
 import { SoundMix, RATE } from './mixer.js';
-import { decodeTiles, rgba, run } from './video.js';
+import { decodeTiles, rgba, run, rotate270 } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
@@ -34,6 +37,7 @@ const MAIN_CLOCK = 10000000, SOUND_CLOCK = 1500000, SUB_CLOCK = 21477200 / 16;
 const STATE = ['ram', 'spriteRam', 'spriteBuf', 'pal', 'palB', 'pf', 'ctl0', 'ctl1', 'rowScroll', 'colScroll', 'extraRam',
   'soundRam', 'subRam', 'shared', 'latch', 'pri', 'frameCount', 'in0', 'in2', 'cycleCarry', 'soundCarry', 'subCarry',
   'sampleCarry', 'cpu', 'snd', 'sub', 'ym2203', 'ym3812', 'oki'];
+const STATE_MCU = ['irqs', 'mcuPending', 'mcuReturn', 'mcuLevel', 'mcuTitle', 'rot'];
 
 // Tile index of a map cell for each layout (4x1, 2x2, 1x4 screens), for 16x16 and 8x8 tiles.
 const SCAN16 = [
@@ -49,14 +53,17 @@ const SCAN8 = [
 const SHAPES = [[64, 16], [32, 32], [16, 64]];      // map size in tiles for 16x16; double each for 8x8
 
 export class Dec0 {
-  saveState() { return capture(this, STATE); }
-  loadState(s) { apply(this, STATE, s); for (let i = 0; i < 1024; i++) this.setColor(i); }
+  saveState() { return capture(this, this.mcu ? [...STATE, ...STATE_MCU] : STATE); }
+  loadState(s) { apply(this, this.mcu ? [...STATE, ...STATE_MCU] : STATE, s); for (let i = 0; i < 1024; i++) this.setColor(i); }
 
   // roms: { main (68000, big-endian bytes), sound (6502, 32K at 8000), sub (HuC6280, 64K) or null,
   //         chars, tiles2, tiles3, sprites, samples }
-  constructor(roms) {
-    this.width = W;
-    this.height = H;
+  // cfg: { rotate: ROT270 monitor, mcu: an 8751 simulation (write(value) -> reply) }
+  constructor(roms, cfg = {}) {
+    this.rotated = !!cfg.rotate;
+    this.mcu = cfg.mcu || null;
+    this.width = this.rotated ? H : W;
+    this.height = this.rotated ? W : H;
     this.refresh = REFRESH;
     this.controls = 'eight-way';
     this.buttons = 2;
@@ -81,7 +88,11 @@ export class Dec0 {
       read8: (a) => this.read8(a), read16: (a) => this.read16(a),
       write8: (a, v) => this.write8(a, v), write16: (a, v) => this.write16(a, v),
     });
-    this.cpu.onIrqAck = () => { this.cpu.irq = 0; };
+    this.cpu.onIrqAck = () => {
+      // Pending levels as a bit mask: taking one clears it and leaves the rest waiting.
+      this.irqs &= ~(1 << this.cpu.irq);
+      this.cpu.irq = this.irqs ? 31 - Math.clz32(this.irqs) : 0;
+    };
     this.snd = new CPU6502({ read: (a) => this.soundRead(a), write: (a, v) => this.soundWrite(a, v) });
     this.sub = roms.sub ? new H6280({ read: (a) => this.subRead(a), write: (a, v) => this.subWrite(a, v) }) : null;
     if (this.sub) this.sub.onIrqAck = (line) => { if (line === 0) this.sub.setIrq(0, false); };
@@ -105,7 +116,8 @@ export class Dec0 {
     this.spritePix = tiles(roms.sprites);
     this.spriteCount = roms.sprites.length / 128;
 
-    this.frame = new Uint32Array(W * H);
+    this.native = new Uint32Array(W * H);
+    this.frame = this.rotated ? new Uint32Array(W * H) : this.native;
     this.applySwitches(defaultSwitches(this.constructor.switches));
     this.in0 = 0xFFFF; this.in2 = 0xFF;
     this.reset();
@@ -116,6 +128,7 @@ export class Dec0 {
       ...this.rowScroll, ...this.colScroll, this.extraRam, this.soundRam, this.subRam, this.shared]) r.fill(0);
     this.palette.fill(0xFF000000);
     this.latch = 0; this.pri = 0; this.frameCount = 0;
+    this.irqs = 0; this.mcuPending = 0; this.mcuReturn = 0; this.mcuLevel = 0; this.mcuTitle = 0; this.rot = 0;
     this.cycleCarry = this.soundCarry = this.subCarry = this.sampleCarry = 0;
     this.cpu.reset(); this.snd.reset(); if (this.sub) this.sub.reset();
     this.ym2203.reset(); this.ym3812.reset(); this.oki.reset();
@@ -164,8 +177,10 @@ export class Dec0 {
         case 0: return this.in0;
         case 2: return this.in2 | (this.line >= TOP + H ? 0x80 : 0);
         case 4: return this.dsw0 | (this.dsw1 << 8);
+        case 8: return this.mcuReturn;
       }
     }
+    if (a >= 0x300000 && a < 0x300020 && this.mcu) return (a & 0x1E) === 0 ? 0xFFFF & ~(1 << this.rot) : 0xFFFF;
     return 0xFFFF;
   }
   read8(a) { const w = this.read16(a & ~1); return a & 1 ? w & 0xFF : w >> 8; }
@@ -186,7 +201,8 @@ export class Dec0 {
         case 0x0: this.pri = v; break;
         case 0x2: this.spriteBuf.set(this.spriteRam); break;   // sprite DMA
         case 0x4: this.latch = v & 0xFF; this.snd.nmi(); break;
-        // 6 the 8751 (not on RoboCop), 8 IRQ acknowledge, C coin lockout, E 8751 reset.
+        case 0x6: if (this.mcu) { this.mcuReturn = this.mcu.call(this, v); this.mcuPending = 1; } break;
+        // 8 IRQ acknowledge, C coin lockout, E 8751 reset.
       }
     }
   }
@@ -256,7 +272,9 @@ export class Dec0 {
     const samples = RATE / REFRESH / LINES, dt = 1 / REFRESH / LINES;
     for (let line = 0; line < LINES; line++) {
       this.line = line;
-      if (line === TOP + H) { this.render(); this.cpu.irq = 6; this.frameCount = (this.frameCount + 1) >>> 0; }
+      if (line === TOP + H) { this.render(); this.finish(); this.raise(6); this.frameCount = (this.frameCount + 1) >>> 0; }
+      // The 8751 answers a command with IRQ 5 a little later (the game needs that delay).
+      if (this.mcuPending) { this.mcuPending = 0; this.raise(5); }
       this.cycleCarry += mainLine;
       this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
       if (this.sub) { this.subCarry += subLine; this.subCarry -= this.sub.run(Math.floor(this.subCarry)); }
@@ -269,12 +287,14 @@ export class Dec0 {
     }
   }
 
+  raise(level) { this.irqs |= 1 << level; this.cpu.irq = 31 - Math.clz32(this.irqs); }
+
   // ---------------------------------------------------------------- video
 
   // Draw playfield n (0 text, 1 and 2 tiles): mode 'opaque', 'trans' (pen 0
   // see-through) or 'front' (only colors 8-15 / pens 8-15: what goes over sprites).
   playfield(n, mode) {
-    const out = this.frame, pal = this.palette, c0 = this.ctl0[n], c1 = this.ctl1[n], data = this.pf[n];
+    const out = this.native, pal = this.palette, c0 = this.ctl0[n], c1 = this.ctl1[n], data = this.pf[n];
     const pix = this.tilePix[n], count = this.tileCount[n], base = [0, 512, 768][n];
     const size = n === 0 ? 8 : 16, shift = n === 0 ? 3 : 4, shape = Math.min(2, c0[3] & 3);
     const [tw, th] = SHAPES[shape], mapW = (n === 0 ? tw * 2 : tw) * size, mapH = (n === 0 ? th * 2 : th) * size;
@@ -296,7 +316,7 @@ export class Dec0 {
 
   // Sprites whose color matches (color & mask) === val, in table order (later on top).
   drawSprites(mask, val) {
-    const out = this.frame, pal = this.palette, spr = this.spriteBuf, pix = this.spritePix;
+    const out = this.native, pal = this.palette, spr = this.spriteBuf, pix = this.spritePix;
     for (let offs = 0; offs < 0x400; offs += 4) {
       let y = spr[offs];
       if (!(y & 0x8000)) continue;
@@ -344,6 +364,7 @@ export class Dec0 {
     if (pri & 2) this.drawSprites(8, trans ^ 8); else this.drawSprites(0, 0);
     this.playfield(0, 'trans');
   }
+  finish() { if (this.rotated) rotate270(this.native, W, H, this.frame); }
 }
 
 // ---------------------------------------------------------------- RoboCop
@@ -359,4 +380,80 @@ RoboCop.switches = [
   { id: 'energy', label: 'Player energy', options: [['Low', 0x01], ['Medium', 0x03], ['High', 0x02], ['Very high', 0x00]], default: 0x03 },
   { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x08], ['Normal', 0x0C], ['Hard', 0x04], ['Hardest', 0x00]], default: 0x0C },
   { id: 'demoSounds', label: 'Demo sounds', options: [['On', 0x20], ['Off', 0x00]], default: 0x20 },
+];
+
+// ---------------------------------------------------------------- Heavy Barrel
+
+// The 8751's replies, as documented by MAME: the order title-screen pieces
+// are drawn in, and per level where the weapon crates appear.
+const HB_TITLE = [1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 21, 22, 25, 26, 29, 30, 33, 34, 37, 38, 41, 42, 0,
+  3, 4, 7, 8, 11, 12, 15, 16, 19, 20, 23, 24, 27, 28, 31, 32, 35, 36, 39, 40, 43, 44, 0,
+  45, 46, 49, 50, 53, 54, 57, 58, 61, 62, 65, 66, 69, 70, 73, 74, 77, 78, 81, 82, 0,
+  47, 48, 51, 52, 55, 56, 59, 60, 63, 64, 67, 68, 71, 72, 75, 76, 79, 80, 83, 84, 0,
+  85, 86, 89, 90, 93, 94, 97, 98, 101, 102, 105, 106, 109, 110, 113, 114, 117, 118, 121, 122, 125, 126, 0,
+  87, 88, 91, 92, 95, 96, 99, 100, 103, 104, 107, 108, 111, 112, 115, 116, 119, 120, 123, 124, 127, 128, 0,
+  129, 130, 133, 134, 137, 138, 141, 142, 145, 146, 149, 150, 153, 154, 157, 158, 161, 162, 165, 166, 169, 170, 173, 174, 0,
+  131, 132, 135, 136, 139, 140, 143, 144, 147, 148, 151, 152, 155, 156, 159, 160, 163, 164, 167, 168, 171, 172, 175, 176, 0,
+  0x10B1, 0x10B2, 0, 0x10B3, 0x10B4, -1];
+const HB_WEAPONS = [
+  [0x558, 0x520, 0x5C0, 0x600, 0x520, 0x540, 0x560, 0x5C0, 0x688, 0x688, 0x7A8, 0x850, 0x880, 0x880, 0x990, 0x9B0, 0x9B0, 0x9E0, 0xFFFF],
+  [0x330, 0x370, 0x3D8, 0x580, 0x5B0, 0x640, 0x6A0, 0x8E0, 0x8E0, 0x940, 0x9F0, 0xA20, 0xA50, 0xA80, 0xFFFF],
+  [0xB20, 0xBD0, 0xB20, 0xB20, 0xBD8, 0xB50, 0xBD8, 0xB20, 0xBE0, 0xB40, 0xB80, 0xA18, 0xA08, 0xA08, 0x980, 0x8E0, 0x780, 0x790, 0x650, 0x600, 0x5D0, 0x5A0, 0x570, 0x590, 0x5E0, 0xFFFF],
+  [0x530, 0x5D0, 0x5E0, 0x5C8, 0x528, 0x520, 0x5D8, 0x5E0, 0x5D8, 0x540, 0x570, 0x5A0, 0x658, 0x698, 0x710, 0x7B8, 0x8E0, 0x8E0, 0x8D8, 0x818, 0x8E8, 0x820, 0x8E0, 0x848, 0x848, 0xFFFF],
+  [0x230, 0x280, 0x700, 0x790, 0x790, 0x7E8, 0x7E8, 0x8D0, 0x920, 0x950, 0xAD0, 0xB90, 0xB50, 0xB10, 0xBE0, 0xBE0, 0xFFFF],
+  [0xD20, 0xDE0, 0xD20, 0xDE0, 0xD80, 0xD80, 0xD90, 0xDD0, 0xDB0, 0xB20, 0xA40, 0x9E0, 0x960, 0x8A0, 0x870, 0x840, 0x7E0, 0x7B0, 0x780, 0xFFFF],
+  [0x730, 0x7E0, 0x720, 0x7E0, 0x740, 0x7C0, 0x730, 0x7D0, 0x740, 0x7C0, 0x730, 0x7D0, 0x720, 0x7E0, 0x720, 0x7E0, 0x720, 0x7E0, 0x720, 0x7E0, 0x730, 0x7D0, 0xFFFF],
+];
+function hbarrelMcu(v) {
+  let r = 0;
+  switch (v >> 8) {
+    case 0x2: r = this.mcuLevel; break;                          // which level
+    case 0x3: this.mcuLevel++; r = 0x301; break;                 // next level
+    case 0x5: this.mcuLevel = 0; r = 0xB3B; break;               // back to level 1
+    case 0x6: r = (HB_WEAPONS[this.mcuLevel] || [])[v & 0x1F] ?? 0; break;   // weapon crates
+  }
+  if (v === 0x007) r = 0xC000;                                   // stack pointer
+  if (v === 0x175) r = 0x68B;                                    // ID check (US)
+  if (v === 0x4FF) this.mcuTitle = 0;
+  if (v > 0x3FF && v < 0x4FF) {                                  // title screen pieces
+    const t = HB_TITLE[this.mcuTitle++] ?? -1;
+    r = t === 0 ? 0xFFFE : t === -1 ? 0xFFFF : t > 0x1000 ? (t & 0xFFF) + 143 : t + 143 + 0x2000;
+  }
+  return r & 0xFFFF;
+}
+
+// Heavy Barrel (1987): a vertical overhead shooter with a rotary joystick.
+// The gun turns to face the way the stick (or the aim keys / right stick) points.
+export class HeavyBarrel extends Dec0 {
+  constructor(roms) { super(roms, { rotate: true, mcu: hbarrelMcu }); this.button2 = 'Grenade'; }
+  render() {
+    this.playfield(2, 'opaque');
+    this.drawSprites(8, 8);
+    this.playfield(1, 'trans');
+    this.drawSprites(8, 0);
+    this.playfield(0, 'trans');
+  }
+  // The rotary joystick is read as relative clicks (each one turns the gun 45 degrees
+  // anticlockwise), so turn it a click at a time until the gun, whose direction the
+  // game keeps at FF8066 (0 up, 4 per 45 degrees clockwise), points the chosen way.
+  setInputs(s) {
+    super.setInputs(s);
+    const a = s.aim || {};
+    const d = a.up || a.down || a.left || a.right ? a : s;
+    const dx = (d.right ? 1 : 0) - (d.left ? 1 : 0), dy = (d.down ? 1 : 0) - (d.up ? 1 : 0);
+    if (!(dx || dy) || (this.frameCount & 1)) return;
+    const want = Math.round(((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360) / 45) & 7;
+    const have = ((this.ram[0x66] + 2) >> 2) & 7;
+    const diff = (want - have) & 7;
+    if (diff) this.rot = (this.rot + (diff <= 4 ? 11 : 1)) % 12;
+  }
+  // DSW0: 1 coin 1 credit, no service, demo sounds, no flip. DSW1: lives, difficulty, bonus, continues.
+  applySwitches(v) { this.dsw0 = 0xFF; this.dsw1 = 0x80 | v.lives | v.difficulty | v.bonus; }
+}
+HeavyBarrel.id = 'hbarrel';
+HeavyBarrel.title = 'Heavy Barrel';
+HeavyBarrel.switches = [
+  { id: 'lives', label: 'Lives', options: [['1', 0x01], ['3', 0x03], ['5', 0x02], ['Infinite (cheat)', 0x00]], default: 0x03 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x08], ['Normal', 0x0C], ['Hard', 0x04], ['Hardest', 0x00]], default: 0x0C },
+  { id: 'bonus', label: 'Bonus life', options: [['30K 80K 160K', 0x30], ['50K 120K 190K', 0x10], ['100K 200K 300K', 0x20], ['150K 300K 450K', 0x00]], default: 0x30 },
 ];

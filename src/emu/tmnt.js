@@ -128,7 +128,7 @@ export class KonamiTMNT {
     this.sound = new SoundMix([this.ym, k, ...(tmnt ? [this.upd, this.title] : [])], 1);
     this.frame = new Uint32Array(WIN.w * WIN.h);
     this.pri = new Uint8Array(WIN.w * WIN.h);
-    this.in = new Uint8Array(4).fill(0xFF);
+    this.in = new Uint8Array(5).fill(0xFF);
     this.applySwitches(defaultSwitches(this.constructor.switches));
     this.reset();
   }
@@ -290,14 +290,23 @@ MissingInAction.switches = [
 // ---------------------------------------------------------------- TMNT
 
 // Teenage Mutant Ninja Turtles (1989, 4 players): each coin slot belongs to
-// a turtle; insert a coin and that player joins. Attack and jump.
+// a turtle; insert a coin and that player joins. Attack and jump. A button
+// per turtle drops a coin in that slot and hands the controls to that player.
 export class TMNT extends KonamiTMNT {
-  constructor(roms) { super(roms); this.button2 = 'Jump'; }
+  constructor(roms) {
+    super(roms);
+    this.button2 = 'Jump';
+    this.startLabels = ['Leo', 'Mike', 'Don', 'Raph'];
+    this.startsCoin = true;
+    this.slot = 0;
+  }
   ioRead(o) {
     switch (o) {
       case 0x00: return this.in[0];
       case 0x02: return this.in[1];
-      case 0x04: case 0x06: case 0x14: return 0xFF;
+      case 0x04: return this.in[2];
+      case 0x06: return this.in[3];
+      case 0x14: return this.in[4];
       case 0x10: return this.dsw1;
       case 0x12: return this.dsw2;
       case 0x18: return this.dsw3;
@@ -308,10 +317,13 @@ export class TMNT extends KonamiTMNT {
     return { code: code | ((color & 0x03) << 8) | ((color & 0x10) << 6) | ((color & 0x0C) << 9) | (bank << 13), color: [0, 32, 40][layer] + ((color & 0xE0) >> 5) };
   }
   spriteCallback(code, color) { return { code: code | ((color & 0x10) << 9), color: 16 + (color & 0x0F) }; }
-  // Coin 1 / the start button: player 1's coin slot.
+  // Coins 1-4 (bits 0-3) and players 1-4 (Leonardo, Michelangelo, Donatello, Raphael).
+  // Coin alone goes in the slot of the turtle last picked.
   setInputs(s) {
-    this.in[0] = 0xFF & ~(s.coin || s.start1 ? 0x01 : 0);
-    this.in[1] = this.player(s);
+    const picked = [s.start1, s.start2, s.start3, s.start4].findIndex(Boolean);
+    if (picked >= 0) this.slot = picked;
+    this.in[0] = 0xFF & ~(s.coin || picked >= 0 ? 1 << this.slot : 0);
+    for (let i = 0; i < 4; i++) this.in[[1, 2, 3, 4][i]] = i === this.slot ? this.player(s) : 0xFF;
   }
   applySwitches(v) { this.dsw1 = 0xFF; this.dsw2 = 0x1C | v.lives | v.difficulty; this.dsw3 = 0xFF; }
 }

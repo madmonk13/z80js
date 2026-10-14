@@ -1,6 +1,9 @@
-// Sega System 16B (1987-91): Shinobi. A 68000 at 10 MHz behind Sega's
-// 315-5195 memory mapper (the game programs where each area appears), a Z80
-// at 5 MHz with a YM2151 and a uPD7759 ADPCM speech chip fed by the Z80.
+// Sega System 16B (1987-91): Shinobi, Altered Beast, Golden Axe. A 68000 at
+// 10 MHz behind Sega's 315-5195 memory mapper (the game programs where each
+// area appears), a Z80 at 5 MHz with a YM2151 and a uPD7759 ADPCM speech chip
+// fed by the Z80. The ROM board differs between games: it decides what sits
+// in the mapper's last few areas (more ROM, tile bank latches, a multiplier
+// and a compare/timer chip) and how the Z80's sample bank is decoded.
 //
 // Video: two scrolling tile layers built from 16 pages of 64x32 tiles (8x8,
 // 3 bits per pixel; each layer shows a 2x2 arrangement of pages, with row and
@@ -22,32 +25,56 @@ const W = 320, H = 224, LINES = 262, REFRESH = 60;
 const CPU_CLOCK = 10000000, Z80_CLOCK = 5000000;
 const SIZES = [0xFFFF, 0x1FFFF, 0x7FFFF, 0x1FFFFF];
 
-// The mapper's regions for the 171-5358 ROM board: [register, offset, length, mirror, kind].
+// The mapper's regions per ROM board: [register, offset, length, mirror, kind].
 // Later entries win where they overlap.
-const REGIONS = [
+const COMMON = [
   [0x1E, 0x00000, 0x04000, 0xFFC000, 'io'],
   [0x1C, 0x00000, 0x01000, 0xFFF000, 'palette'],
   [0x1A, 0x00000, 0x10000, 0xFE0000, 'tile'],
   [0x1A, 0x10000, 0x01000, 0xFEF000, 'text'],
   [0x18, 0x00000, 0x00800, 0xFFF800, 'sprite'],
   [0x16, 0x00000, 0x04000, 0xFFC000, 'work'],
-  [0x14, 0x00000, 0x20000, 0xFE0000, 'rom'],
-  [0x12, 0x00000, 0x20000, 0xFE0000, 'rom'],
-  [0x10, 0x00000, 0x20000, 0xFE0000, 'rom'],
 ];
-const KINDS = ['io', 'palette', 'tile', 'text', 'sprite', 'work', 'rom'];
-// Sprite bank numbers on this ROM board (others don't exist: 255).
-const SPRITE_BANKS = [0, 255, 255, 255, 255, 255, 255, 3, 255, 255, 255, 2, 255, 1, 0, 255];
+const BOARDS = {
+  // 171-5358 (Shinobi): three 128K ROM areas.
+  5358: [...COMMON,
+    [0x14, 0x00000, 0x20000, 0xFE0000, 'rom'],
+    [0x12, 0x00000, 0x20000, 0xFE0000, 'rom'],
+    [0x10, 0x00000, 0x20000, 0xFE0000, 'rom']],
+  // 171-5521 / 5704 (Altered Beast): two 512K ROM areas and the tile bank latches.
+  5521: [...COMMON,
+    [0x14, 0x00000, 0x10000, 0xFF0000, 'tilebank'],
+    [0x12, 0x00000, 0x80000, 0xFC0000, 'rom'],
+    [0x10, 0x00000, 0x80000, 0xFC0000, 'rom']],
+  // 171-5797 (Golden Axe): one 512K ROM area, the multiplier / compare chip / tile banks, and a second compare chip.
+  5797: [...COMMON,
+    [0x14, 0x00000, 0x10000, 0xFF0000, 'timer1'],
+    [0x12, 0x00000, 0x04000, 0xFFC000, 'math'],
+    [0x10, 0x00000, 0x80000, 0xF80000, 'rom']],
+};
+BOARDS[5704] = BOARDS[5521];
+const KINDS = ['io', 'palette', 'tile', 'text', 'sprite', 'work', 'rom', 'tilebank', 'math', 'timer1'];
+// Sprite bank numbers on the 171-5358 board (others don't exist: 255); later boards number them straight.
+const SPRITE_BANKS_5358 = [0, 255, 255, 255, 255, 255, 255, 3, 255, 255, 255, 2, 255, 1, 0, 255];
+const SPRITE_BANKS = Array.from({ length: 16 }, (_, i) => i);
 
 const STATE = ['mapRegs', 'palRam', 'tileRam', 'textRam', 'spriteRam', 'workRam', 'soundRam', 'latch', 'soundBank', 'videoCtl',
   'latched', 'cycleCarry', 'zCarry', 'sampleCarry', 'svc', 'p1', 'cpu', 'snd', 'ym', 'upd'];
+// Extra state for the later ROM boards.
+const STATE_X = ['tileBanks', 'mult', 'cmp', 'cmpBit', 'p2'];
 
 export class System16B {
-  saveState() { return capture(this, STATE); }
-  loadState(s) { apply(this, STATE, s); this.remap(); for (let i = 0; i < 2048; i++) this.setColor(i); }
+  saveState() { return capture(this, this.board === 5358 ? STATE : [...STATE, ...STATE_X]); }
+  loadState(s) { apply(this, this.board === 5358 ? STATE : [...STATE, ...STATE_X], s); this.remap(); for (let i = 0; i < 2048; i++) this.setColor(i); }
 
-  // roms: { main (68000, big-endian), tiles (3 planes), sprites (big-endian words), sound (Z80), samples: [ROMs by chip select] }
-  constructor(roms) {
+  // roms: { main (68000, big-endian), tiles (3 planes), sprites (big-endian words), sound (Z80),
+  //   samples: [ROMs by chip select] on the 5358 board, or one sample region on the others }
+  // board: the ROM board number; mcuConfig: mapper registers 10-1F as an 8751 MCU leaves them (when it's simulated).
+  constructor(roms, board = 5358, mcuConfig = null) {
+    this.board = board;
+    this.regions = BOARDS[board];
+    this.spriteBanks = board === 5358 ? SPRITE_BANKS_5358 : SPRITE_BANKS;
+    this.mcuConfig = mcuConfig;
     this.width = W;
     this.height = H;
     this.refresh = REFRESH;
@@ -65,6 +92,11 @@ export class System16B {
     this.workRam = new Uint8Array(0x4000);
     this.soundRam = new Uint8Array(0x800);
     this.latched = new Uint16Array(12);         // page selects, y scrolls, x scrolls (4 each), latched at the end of each frame
+    this.tileBanks = new Uint8Array([0, 1]);      // 4096-tile banks for tile codes 0-FFF and 1000-1FFF
+    this.mult = new Uint16Array(2);
+    this.cmp = [new Uint16Array(16), new Uint16Array(16)];
+    this.cmpBit = new Uint8Array(2);
+    this.p2 = 0xFF;
     this.blockMap = new Int8Array(0x2000);       // 2K blocks of the address space -> region index (-1: the mapper itself)
     this.remap();
     this.palette = new Uint32Array(2048 * 3).fill(0xFF000000);
@@ -74,6 +106,7 @@ export class System16B {
 
     const third = roms.tiles.length / 3 * 8;
     this.tilePix = decodeTiles(roms.tiles, { count: roms.tiles.length / 24, width: 8, height: 8, planes: [2 * third, third, 0], xs: run(0, 8), ys: run(0, 8, 8), size: 64 });
+    this.sampleSize = roms.sampleSize || 0;
     this.spriteWords = new Uint16Array(roms.sprites.length / 2);
     for (let i = 0; i < this.spriteWords.length; i++) this.spriteWords[i] = (roms.sprites[i * 2] << 8) | roms.sprites[i * 2 + 1];
 
@@ -93,7 +126,10 @@ export class System16B {
   }
 
   reset() {
-    for (const a of [this.mapRegs, this.palRam, this.tileRam, this.textRam, this.spriteRam, this.workRam, this.soundRam, this.latched]) a.fill(0);
+    for (const a of [this.mapRegs, this.palRam, this.tileRam, this.textRam, this.spriteRam, this.workRam, this.soundRam, this.latched,
+      this.mult, this.cmp[0], this.cmp[1], this.cmpBit]) a.fill(0);
+    this.tileBanks[0] = 0; this.tileBanks[1] = 1;
+    if (this.mcuConfig) this.mapRegs.set(this.mcuConfig, 0x10);
     this.palette.fill(0xFF000000);
     this.latch = 0; this.soundBank = 0; this.videoCtl = 0;
     this.cycleCarry = this.zCarry = this.sampleCarry = 0;
@@ -105,7 +141,7 @@ export class System16B {
 
   remap() {
     const map = this.blockMap, regs = this.mapRegs, rom = this.roms.main.length;
-    this.ranges = REGIONS.map(([reg, offs, len, mirror, kind]) => {
+    this.ranges = this.regions.map(([reg, offs, len, mirror, kind]) => {
       const size = SIZES[regs[reg] & 3];
       const base = (regs[reg + 1] << 16) & ~size;
       const start = base + (offs & size);
@@ -171,8 +207,16 @@ export class System16B {
       case 3: return word(this.textRam, o & 0xFFE);
       case 4: return word(this.spriteRam, o & 0x7FE);
       case 5: return word(this.workRam, o & 0x3FFE);
-      default: return word(this.roms.main, abs);
+      case 6: return word(this.roms.main, abs);
+      case 8: {                                   // 5797: multiplier, compare chip 0
+        const w = (o >> 1) & 0x1FFF;
+        if ((w & 0x1800) === 0) return this.multRead(w & 3);
+        if ((w & 0x1800) === 0x800) return this.cmpRead(0, w & 7);
+        return 0xFFFF;
+      }
+      case 9: return this.cmpRead(1, (o >> 1) & 7);
     }
+    return 0xFFFF;
   }
   read8(a) { const w = this.read16(a & ~1); return a & 1 ? w & 0xFF : w >> 8; }
 
@@ -192,13 +236,60 @@ export class System16B {
       case 3: put(this.textRam, o & 0xFFE); return;
       case 4: put(this.spriteRam, o & 0x7FE); return;
       case 5: put(this.workRam, o & 0x3FFE); return;
+      case 7: if (mask & 1) this.setTileBank((o >> 1) & 1, v & 7); return;
+      case 8: {
+        const w = (o >> 1) & 0x1FFF;
+        if ((w & 0x1800) === 0) this.multWrite(w & 3, v, mask);
+        else if ((w & 0x1800) === 0x800) this.cmpWrite(0, w & 7, v, mask);
+        else if ((w & 0x1800) === 0x1000 && (mask & 1)) this.setTileBank(w & 1, v & 7);
+        return;
+      }
+      case 9: this.cmpWrite(1, (o >> 1) & 7, v, mask); return;
+    }
+  }
+
+  // ---------------------------------------------------------------- ROM board chips
+
+  setTileBank(which, bank) { this.tileBanks[which] = bank; }
+  static merge(old, v, mask) { return ((mask & 2 ? v : old) & 0xFF00) | ((mask & 1 ? v : old) & 0xFF); }
+  multRead(o) {
+    const r = this.mult, p = ((r[0] << 16) >> 16) * ((r[1] << 16) >> 16);
+    return [r[0], r[1], (p >> 16) & 0xFFFF, p & 0xFFFF][o];
+  }
+  multWrite(o, v, mask) { this.mult[o & 1] = System16B.merge(this.mult[o & 1], v, mask); }
+  // The compare chip clamps a value between two bounds and keeps a history of in-range results.
+  cmpUpdate(n, history) {
+    const r = this.cmp[n], s = (x) => (x << 16) >> 16;
+    const b1 = s(r[0]), b2 = s(r[1]), value = s(r[2]), min = Math.min(b1, b2), max = Math.max(b1, b2);
+    if (value < min) { r[7] = min; r[3] = 0x8000; }
+    else if (value > max) { r[7] = max; r[3] = 0x4000; }
+    else { r[7] = value; r[3] = 0; }
+    if (history) { if (r[3] === 0 && this.cmpBit[n] < 16) r[4] |= 1 << this.cmpBit[n]; this.cmpBit[n]++; }
+  }
+  cmpRead(n, o) {
+    const r = this.cmp[n];
+    switch (o) {
+      case 0: case 1: case 2: case 3: case 4: case 7: return r[o];
+      case 5: return r[1];
+      case 6: return r[2];
+    }
+    return 0xFFFF;
+  }
+  cmpWrite(n, o, v, mask) {
+    const r = this.cmp[n], m = (i) => { r[i] = System16B.merge(r[i], v, mask); };
+    switch (o) {
+      case 0: m(0); this.cmpUpdate(n, false); return;
+      case 1: m(1); this.cmpUpdate(n, false); return;
+      case 2: m(2); this.cmpUpdate(n, true); return;
+      case 4: r[4] = 0; this.cmpBit[n] = 0; return;
+      case 6: m(2); this.cmpUpdate(n, false); return;
     }
   }
 
   // I/O: 1000 inputs (service, P1, -, P2), 2000 switches (game, coinage).
   io(w) {
     switch (w & 0x1800) {
-      case 0x0800: return [this.svc, this.p1, 0xFF, 0xFF][w & 3];
+      case 0x0800: return [this.svc, this.p1, 0xFF, this.p2][w & 3];
       case 0x1000: return w & 1 ? 0xFF : this.dsw;
     }
     return 0xFFFF;
@@ -226,6 +317,12 @@ export class System16B {
   // The banked window: chip-select bits pick a sample ROM, bits 0-1 a 16K bank in it.
   bankByte(o) {
     const d = this.soundBank, s = this.roms.samples;
+    if (this.board !== 5358) {
+      // 5521: bit 3 picks the ROM, bits 0-2 a 16K bank; 5797 adds bit 4 (A17).
+      let off = ((d & 8) >> 3) * (this.board === 5797 ? 0x40000 : 0x20000) + (d & 7) * 0x4000;
+      if (this.board === 5797) off += ((d & 0x10) >> 4) * 0x20000;
+      return s[(off % this.sampleSize) + o] ?? 0;
+    }
     let chip = -1;
     if (!(d & 0x04)) chip = 0; else if (!(d & 0x08)) chip = 1; else if (!(d & 0x10)) chip = 2; else if (!(d & 0x20)) chip = 3;
     const rom = s[chip];
@@ -264,7 +361,7 @@ export class System16B {
   runFrame() {
     const cyc = CPU_CLOCK / REFRESH / LINES, zc = Z80_CLOCK / REFRESH / LINES / 4, samples = 48000 / REFRESH / LINES / 4, dt = 1 / REFRESH / LINES;
     for (let line = 0; line < LINES; line++) {
-      if (line === H) { this.render(); this.cpu.irq = 4; }      // vertical blank: IRQ 4
+      if (line === H) { this.render(); this.vblank(); }
       if (line === LINES - 1) this.latchScroll();
       this.cycleCarry += cyc;
       this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
@@ -278,6 +375,9 @@ export class System16B {
       this.ym.timers(dt);
     }
   }
+
+  // Vertical blank: IRQ 4 (games with a protection MCU replace this with a simulation of its vblank work).
+  vblank() { this.cpu.irq = 4; }
 
   tw(o) { return (this.textRam[o] << 8) | this.textRam[o + 1]; }
   latchScroll() {
@@ -318,7 +418,7 @@ export class System16B {
         const page = (pages >> (4 * ((vx >> 9) | ((vy >> 8) << 1)))) & 15;
         const o = (page * 2048 + ((vy & 255) >> 3) * 64 + ((vx & 511) >> 3)) * 2;
         const data = (ram[o] << 8) | ram[o + 1];
-        const code = (data & 0x1FFF) % count, color = (data >> 6) & 0x7F, cat = data >> 15;
+        const raw = data & 0x1FFF, code = (this.tileBanks[raw >> 12] * 0x1000 + (raw & 0xFFF)) % count, color = (data >> 6) & 0x7F, cat = data >> 15;
         const p = pix[code * 64 + (vy & 7) * 8 + (vx & 7)];
         const i = y * W + x;
         if (opaque) { idx[i] = color * 8 + p; if (p) pri[i] = cat ? 2 : 1; }
@@ -328,13 +428,13 @@ export class System16B {
   }
 
   drawText() {
-    const idx = this.index, pri = this.pri, pix = this.tilePix, t = this.textRam;
+    const idx = this.index, pri = this.pri, pix = this.tilePix, t = this.textRam, count = pix.length / 64;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const tx = (x + 192) & 511;
         const o = ((y >> 3) * 64 + (tx >> 3)) * 2;
         const data = (t[o] << 8) | t[o + 1];
-        const p = pix[(data & 0x1FF) * 64 + (y & 7) * 8 + (tx & 7)];
+        const p = pix[((this.tileBanks[0] * 0x1000 + (data & 0x1FF)) % count) * 64 + (y & 7) * 8 + (tx & 7)];
         if (!p) continue;
         const i = y * W + x;
         idx[i] = ((data >> 9) & 7) * 8 + p;
@@ -357,7 +457,7 @@ export class System16B {
       const a2 = wd(d + 2), hide = a2 & 0x4000, flip = a2 & 0x100, pitch = (a2 << 24) >> 24;
       let addr = wd(d + 3);
       const a4 = wd(d + 4);
-      let bank = SPRITE_BANKS[(a4 >> 8) & 15];
+      let bank = this.spriteBanks[(a4 >> 8) & 15];
       const sprpri = 1 << ((a4 >> 6) & 3), color = 0x400 + ((a4 & 0x3F) << 4);
       const zoom = wd(d + 5), vzoom = (zoom >> 5) & 0x1F, hzoom = zoom & 0x1F;
       if (hide || top >= bottom || bank === 255) continue;
@@ -402,4 +502,59 @@ Shinobi.title = 'Shinobi';
 Shinobi.switches = [
   { id: 'lives', label: 'Lives', options: [['2', 0x08], ['3', 0x0C], ['5', 0x04], ['240 (cheat)', 0x00]], default: 0x0C },
   { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x20], ['Normal', 0x30], ['Hard', 0x10], ['Hardest', 0x00]], default: 0x30 },
+];
+
+// Altered Beast (1988), 171-5521 ROM board: punch, kick, jump.
+export class AlteredBeast extends System16B {
+  constructor(roms) {
+    super(roms, 5521);
+    this.button2 = 'Kick';
+    this.button3 = 'Jump';
+  }
+  // 1 credit to start and continue, demo sounds on.
+  applySwitches(v) { this.dsw = 0x01 | v.lives | v.energy | v.difficulty; }
+}
+AlteredBeast.id = 'altbeast';
+AlteredBeast.title = 'Altered Beast';
+AlteredBeast.switches = [
+  { id: 'lives', label: 'Lives', options: [['2', 0x08], ['3', 0x0C], ['4', 0x04], ['240 (cheat)', 0x00]], default: 0x0C },
+  { id: 'energy', label: 'Energy meter', options: [['2', 0x20], ['3', 0x30], ['4', 0x10], ['5', 0x00]], default: 0x30 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x80], ['Normal', 0xC0], ['Hard', 0x40], ['Hardest', 0x00]], default: 0xC0 },
+];
+
+// Golden Axe (1989) with an 8751 MCU: on the 171-5797 ROM board (317-123A) or
+// the 171-5704 board (317-0112, Altered Beast's), as roms.board says. The
+// MCU's dump is missing, so its jobs are done here: it sets up the mapper, and
+// each vblank raises IRQ 4, refills a table the game clears, passes the sound
+// command along and copies the joysticks into work RAM.
+const GOLDNAXE_MAPPER = {
+  5797: [0x02, 0x00, 0x00, 0x1F, 0x00, 0x1E, 0x00, 0xFF, 0x00, 0x20, 0x01, 0x10, 0x00, 0x14, 0x00, 0xC4],
+  5704: [0x02, 0x00, 0x02, 0x08, 0x00, 0x1F, 0x00, 0xFF, 0x00, 0x20, 0x01, 0x10, 0x00, 0x14, 0x00, 0xC4],
+};
+export class GoldenAxe extends System16B {
+  constructor(roms) {
+    const board = roms.board ?? 5797;
+    super(roms, board, GOLDNAXE_MAPPER[board]);
+    this.button2 = 'Jump';
+    this.button3 = 'Magic';
+  }
+  ww(o) { return (this.workRam[o] << 8) | this.workRam[o + 1]; }
+  setW(o, v) { this.workRam[o] = v >> 8; this.workRam[o + 1] = v & 0xFF; }
+  vblank() {
+    this.cpu.irq = 4;
+    if (!this.ww(0x2CD8) && !this.ww(0x2CDA) && !this.ww(0x2CDC) && !this.ww(0x2CDE)) {
+      this.setW(0x2CD8, 0x048C); this.setW(0x2CDA, 0x159D); this.setW(0x2CDC, 0x26AE); this.setW(0x2CDE, 0x37BF);
+    }
+    const snd = this.ww(0x2CFC);
+    if (snd & 0xFF00) { this.mapperWrite(0x03, snd >> 8); this.setW(0x2CFC, snd & 0xFF); }
+    this.setW(0x2CD0, (this.p1 << 8) | this.p2);
+    this.setW(0x2C96, this.svc << 8);
+  }
+  applySwitches(v) { this.dsw = 0xC1 | v.lives | v.energy; }
+}
+GoldenAxe.id = 'goldnaxe';
+GoldenAxe.title = 'Golden Axe';
+GoldenAxe.switches = [
+  { id: 'lives', label: 'Lives', options: [['1', 0x08], ['2', 0x0C], ['3', 0x04], ['5', 0x00]], default: 0x0C },
+  { id: 'energy', label: 'Energy meter', options: [['2', 0x20], ['3', 0x30], ['4', 0x10], ['5', 0x00]], default: 0x30 },
 ];

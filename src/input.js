@@ -6,7 +6,7 @@
 // two-button games), Q / E (or the mouse wheel) to turn
 // a dial, I / J / K / L to aim in twin-stick games (Robotron), H for
 // hyperspace and V for inviso (Defender, Stargate), 5 or C for a
-// coin, 1 or Return to start (2 for a two-player start).
+// coin, 1 or Return to start (2-4 for the other starts, in games that name them).
 
 const LEFT = new Set(['ArrowLeft', 'KeyA']);
 const RIGHT = new Set(['ArrowRight', 'KeyD']);
@@ -23,7 +23,9 @@ const AIM_UP = new Set(['KeyI']), AIM_DOWN = new Set(['KeyK']), AIM_LEFT = new S
 const COIN = new Set(['Digit5', 'KeyC', 'Tab']);
 const START1 = new Set(['Digit1', 'Enter', 'NumpadEnter']);
 const START2 = new Set(['Digit2']);
-const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...FIRE3, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...HYPER, ...INVISO, ...COIN, ...START1, ...START2]);
+const START3 = new Set(['Digit3']);
+const START4 = new Set(['Digit4']);
+const GAME_KEYS = new Set([...LEFT, ...RIGHT, ...UP, ...DOWN, ...FIRE, ...FIRE2, ...FIRE3, ...SPIN_LEFT, ...SPIN_RIGHT, ...AIM_UP, ...AIM_DOWN, ...AIM_LEFT, ...AIM_RIGHT, ...HYPER, ...INVISO, ...COIN, ...START1, ...START2, ...START3, ...START4]);
 
 export class Input {
   constructor() {
@@ -31,6 +33,8 @@ export class Input {
     this.uiCoin = false;      // on-screen Coin / Start buttons
     this.uiStart = false;
     this.uiStart2 = false;
+    this.uiStart3 = false;
+    this.uiStart4 = false;
     this.onActivity = null;   // called on keyboard or gamepad input
     // Extra sources (touch controls): objects with dir() -> 0x10 up / 0x20 down
     // / 0x40 left / 0x80 right bits, fire() and fire2() -> bool, spin() ->
@@ -62,6 +66,7 @@ export class Input {
     let spin = (any(SPIN_RIGHT) ? KEY_SPIN : 0) - (any(SPIN_LEFT) ? KEY_SPIN : 0) + this.wheel;
     this.wheel = 0;
     let coin = this.uiCoin || any(COIN), start1 = this.uiStart || any(START1), start2 = this.uiStart2 || any(START2);
+    const start3 = this.uiStart3 || any(START3), start4 = this.uiStart4 || any(START4);
     const aim = { up: any(AIM_UP), down: any(AIM_DOWN), left: any(AIM_LEFT), right: any(AIM_RIGHT) };
     let hyper = any(HYPER), inviso = any(INVISO);
     let analog = null;          // { x, y } in -1..1 when a source has a real stick position
@@ -103,6 +108,6 @@ export class Input {
       break;                      // one player
     }
 
-    return { left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2, aim, hyper, inviso, analog };
+    return { left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2, start3, start4, aim, hyper, inviso, analog };
   }
 }

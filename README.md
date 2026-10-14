@@ -5,6 +5,8 @@ phones and desktop. Plain HTML, CSS and JavaScript modules, with no dependencies
 build step. It shares its app shell (touch controls, settings, game library, audio) with
 [6502js](https://github.com/madmonk13/6502js), the Atari 2600 emulator it was forked from.
 
+**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **186 games supported**
+
 No ROMs are included: add your own ROM sets, the zips used by MAME. A set is recognized
 by its chips' file names, so the zip's own name doesn't matter.
 
@@ -188,6 +190,21 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Mad Planets (1983) | Gottlieb System 80, dial | `mplanets` | **Tested:** boots, attract mode, coin, start and play |
 | Krull (1983) | Gottlieb System 80, twin sticks, tiles in RAM | `krull` | **Tested:** boots, attract mode, coin, start and play |
 | Q*bert's Qubes (1983) | Gottlieb System 80, sprite bank | `qbertqub` | **Tested:** boots, attract mode, coin, start and play |
+| Altered Beast (1988) | Sega System 16B (171-5521 board): punch, kick, jump | `altbeast` | **Tested:** boots, attract mode, coin, start and play |
+| Golden Axe (1989) | Sega System 16B (171-5797 board) with the multiplier and timer chips; the 8751 MCU is simulated | `goldnaxa` | **Tested:** boots, attract mode, coin, start and play |
+| Heavy Barrel (1987) | Data East 8-bit-era 68000 board (dec0) with rotary joystick and protection MCU (simulated) | `hbarrel` | **Tested:** boots, attract mode, coin, start and play |
+| Tutankham (1982) | Konami: 6809, a 4bpp bitmap, Time Pilot sound board | `tutankhm` | **Tested:** boots, attract mode, coin, start and play |
+| Juno First (1983) | Konami: Tutankham's board with an encrypted 6809 (Konami-1), a blitter, an 8039 DAC | `junofrst` | **Tested:** boots, attract mode, coin, start and play |
+| Roc'n Rope (1983) | Konami: encrypted 6809 (Konami-1), Time Pilot sound board | `rocnrope` | **Tested:** boots, attract mode, coin, start and play |
+| Shao-lin's Road (1985) | Konami: 6809, two SN76489s | `shaolins` | **Tested:** boots, attract mode, coin, start and play |
+| NARC (1988) | Williams Z-unit: TMS34010, 8-bit graphics; a two-6809 sound board with YM2151, two DACs and CVSD speech | `narc` | **Tested:** boots, attract mode with music and speech, coin, start and play |
+| Trog (1990) | Midway Y-unit (4-bit graphics); four players | `trog` | **Tested:** boots, attract mode, coin, start and play |
+| Parodius Da! (1990) | Konami: 052001 CPU, K052109, K053245/K053251, YM2151, K053260 | `parodius` | **Tested:** boots, attract mode, coin, start and play |
+| The Simpsons (1991) | Konami: 053248 CPU, K052109, K053247/K053251, YM2151, K053260, serial EEPROM; four players | `simpsons` | **Tested:** boots, attract mode, coin, start and play |
+| Splatterhouse (1988) | Namco System 1: three 6809s behind a page MMU, HD63701 MCU, CUS30 + YM2151 + DAC | `splatter` | **Tested:** boots, attract mode, coin, start and play |
+| Galaga '88 (1987) | Namco System 1, vertical monitor | `galaga88` | **Tested:** boots, attract mode, coin, start and play |
+| Gauntlet (1985) | Atari: 68010 with the 104 Slapstic, motion objects, a 6502 with YM2151, POKEY and TMS5220 speech; four players | `gauntlet` | **Tested:** boots, attract mode, coin, start and play with music and speech |
+| Space Odyssey (1981) | Sega G-80 raster with the 315-0063 security chip and the background board | `spaceod` | **Tested:** boots, attract mode, coin, start and play (effects synthesized) |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -308,6 +325,15 @@ The touch layout follows the game:
   sight; shoot and grenade. **Bottom of the Ninth:** the stick and two buttons (swing/pitch, run/throw).
   **M.I.A.:** fire, weapon, knife. Crime Fighters and TMNT start a player from their coin slot (Coin or
   Start both work).
+- **Four-player games** (TMNT, Trog, The Simpsons, Gauntlet) show one start button per character in
+  the top bar (Leo/Mike/Don/Raph, Red/Blue/Yellow/Pink, Marge/Homer/Bart/Lisa,
+  Warrior/Valkyrie/Wizard/Elf); keyboard 1-4 press them. Where the cabinet starts a player from a coin
+  slot (TMNT, Simpsons, Gauntlet), each button drops that slot's coin and starts, so there's no Coin
+  button. Gauntlet has no start buttons on the cabinet: Magic doubles as start.
+- **Heavy Barrel:** the rotary stick aims by itself toward the direction you push; fire at the bottom,
+  grenade on top. **Tutankham:** fire shoots left or right (the way you last moved); the top button is
+  the flash bomb. **Altered Beast:** punch, kick, jump. **Golden Axe:** attack, jump, magic. **NARC:** fire,
+  jump, rocket. **Galaga '88:** fire. **Splatterhouse:** attack, jump. **Juno First, Space Odyssey:** fire (Juno First adds warp, Space Odyssey a bomb).
 - **Coin / Start** sit in the top bar. Drop a coin, then press Start.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
   for a second button (fire in one-button games), F for a third, Q/E or the mouse wheel (or the
@@ -578,6 +604,9 @@ flowchart LR
 
 ## Known gaps
 
+- **Space Odyssey's sound** is recorded samples on the cabinet, not in the ROM set; z80js synthesizes the effects.
+- **Golden Axe and Heavy Barrel's MCUs** are simulated from what the games expect, not run from their programs.
+- **Parodius sequels** (Gokujyou, Jikkyou Oshaberi, Sexy Parodius) are on Konami GX (68020) hardware, not yet supported.
 - **Galaga explosions:** the 54xx sound chip runs its own program, which isn't part of the
   game ROMs, so a short burst of noise stands in.
 - **Galaga starfield:** generated by z80js, not the arcade's exact star pattern.

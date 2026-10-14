@@ -224,6 +224,8 @@ body.two-way #dpad .knob, .dpad.dial .knob { height: 76%; }
 /* Two start buttons (games where each start picks a side): tighter targets so the bar fits a phone. */
 body.two-starts #bar > button { padding: 0 3px; }
 body.two-starts #bar .pill .face { padding: 8px 10px; }
+body.many-starts #bar .pill .face { padding: 8px 8px; }
+body.coinless #bar #startBtn { margin-left: auto; }
 #bar .face {
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.07);

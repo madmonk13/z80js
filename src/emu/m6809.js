@@ -37,6 +37,8 @@ export class M6809 {
   read16(a) { return (this.read(a & 0xFFFF) << 8) | this.read((a + 1) & 0xFFFF); }
   write16(a, v) { this.write(a & 0xFFFF, (v >> 8) & 0xFF); this.write((a + 1) & 0xFFFF, v & 0xFF); }
   fetch() { const v = this.read(this.pc); this.pc = (this.pc + 1) & 0xFFFF; return v; }
+  // Opcode bytes (including the byte after a 10/11 prefix): Konami1 overrides this to decrypt them.
+  fetchOp() { return this.fetch(); }
   fetch16() { const v = this.read16(this.pc); this.pc = (this.pc + 2) & 0xFFFF; return v; }
 
   pushS(v) { this.s = (this.s - 1) & 0xFFFF; this.write(this.s, v & 0xFF); }
@@ -95,7 +97,7 @@ export class M6809 {
       if (this.waiting && (this.irq || this.firq)) this.waiting = false;   // SYNC ends on any interrupt line
     }
     if (this.waiting) { this.cycles += 4; return; }
-    this.exec(this.fetch());
+    this.exec(this.fetchOp());
   }
 
   // ---------------------------------------------------------------- flags
@@ -286,8 +288,8 @@ export class M6809 {
     }
 
     switch (op) {
-      case 0x10: return this.page2(this.fetch());
-      case 0x11: return this.page3(this.fetch());
+      case 0x10: return this.page2(this.fetchOp());
+      case 0x11: return this.page3(this.fetchOp());
       case 0x12: this.cycles += 2; return;                              // NOP
       case 0x13: this.waiting = true; this.cycles += 4; return;         // SYNC
       case 0x16: { const o = this.fetch16(); this.pc = (this.pc + o) & 0xFFFF; this.cycles += 5; return; }   // LBRA
@@ -420,5 +422,15 @@ export class M6809 {
       if (lo === 0xC) { this.sub16(this.s, operand16()); return; }                 // CMPS
     }
     this.cycles += 2;
+  }
+}
+
+// Konami's encrypted 6809 ("Konami-1", used in Roc'n Rope and Juno First):
+// opcode bytes are stored with bits flipped by a mask picked by address bits
+// 1 and 3; operands are plain.
+export class Konami1 extends M6809 {
+  fetchOp() {
+    const a = this.pc, v = this.fetch();
+    return v ^ ((a & 0x02 ? 0x80 : 0x20) | (a & 0x08 ? 0x08 : 0x02));
   }
 }

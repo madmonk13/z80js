@@ -105,6 +105,7 @@ export class M68000 {
         continue;
       }
       if (this.stopped) { this.cycles = end; break; }
+      this.opPc = this.pc;                 // the current instruction's address (for boards that peek at it)
       const op = this.fetch();
       this.table[op](this, op);
     }

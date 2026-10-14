@@ -324,3 +324,234 @@ export class K051316 {
     }
   }
 }
+
+// ---------------------------------------------------------------- K053245 / K053244
+
+// K053245 (with the 053244): 128 zoomable sprites of up to 8x8 16x16 cells,
+// eight words each in 2K of RAM, drawn from a buffer the game copies the RAM
+// into (by touching register 6). Higher "priority order" values are in front;
+// the color byte goes to the board's callback for color and layer priority;
+// a shadow bit makes pen 15 darken. The 053244 also reads the sprite ROM back.
+const K53_STATE = ['ram', 'buffer', 'regs'];
+export class K053245 {
+  saveState() { return capture(this, K53_STATE); }
+  loadState(s) { apply(this, K53_STATE, s); }
+
+  // rom: the sprite ROM (deinterleaved); callback(code, color) -> { code, color, priority (a mask) }
+  constructor(rom, callback) {
+    this.rom = rom;
+    this.callback = callback;
+    this.count = rom.length / 128;
+    this.pix = decodeTiles(rom, {
+      count: this.count, width: 16, height: 16, planes: [0, 8, 16, 24],
+      xs: [...run(0, 8), ...run(256, 8)], ys: [...run(0, 8, 32), ...run(512, 8, 32)], size: 1024,
+    });
+    this.reset();
+  }
+  reset() { this.ram = new Uint16Array(0x400); this.buffer = new Uint16Array(0x400); this.regs = new Uint8Array(16); }
+
+  // Byte access: even bytes are each word's high half.
+  read(o) { const w = this.ram[(o >> 1) & 0x3FF]; return o & 1 ? w & 0xFF : w >> 8; }
+  write(o, v) { const i = (o >> 1) & 0x3FF; this.ram[i] = o & 1 ? (this.ram[i] & 0xFF00) | v : (this.ram[i] & 0xFF) | (v << 8); }
+  readReg(o) {
+    const r = this.regs;
+    if ((r[5] & 0x10) && o >= 0x0C && o < 0x10) {
+      const addr = ((r[11] & 7) << 18) | (r[8] << 10) | (r[9] << 2) | ((o & 3) ^ 1);
+      return this.rom[addr & (this.rom.length - 1)];
+    }
+    if (o === 6) this.buffer.set(this.ram);
+    return 0;
+  }
+  writeReg(o, v) { this.regs[o] = v; if (o === 6) this.buffer.set(this.ram); }
+
+  // Front to back: a sprite pixel hidden by the layers (its mask bit for the
+  // pri-buffer value is set) still blocks the sprites behind it.
+  draw(frame, pri, palette, win) {
+    const b = this.buffer, list = new Int32Array(128).fill(-1);
+    for (let offs = 0; offs < 0x400; offs += 8) {
+      if (b[offs] & 0x8000) { const p = b[offs] & 0x7F; if (list[p] < 0) list[p] = offs; }
+    }
+    const r = this.regs, offX = (r[0] << 8) | r[1], offY = (r[2] << 8) | r[3], pix = this.pix, cnt = this.count;
+    for (let k = 127; k >= 0; k--) {                 // the highest priority order is in front
+      const offs = list[k];
+      if (offs < 0) continue;
+      let code = b[offs + 1];
+      code = (code & 0xFFE1) + ((code & 0x10) >> 2) + ((code & 8) << 1) + ((code & 4) >> 1) + ((code & 2) << 2);
+      const t = this.callback(code, b[offs + 6] & 0xFF);
+      code = t.code;
+      const mask = t.priority || 0, colorBase = t.color * 16;
+      const size = (b[offs] & 0x0F00) >> 8, w = 1 << (size & 3), h = 1 << ((size >> 2) & 3);
+      const zy0 = b[offs + 4];
+      if (zy0 > 0x2000) continue;
+      const zoomy = zy0 ? Math.floor((0x400000 + (zy0 >> 1)) / zy0) : 0x800000;
+      let zoomx = zoomy;
+      if (!(b[offs] & 0x4000)) {
+        const zx0 = b[offs + 5];
+        if (zx0 > 0x2000) continue;
+        zoomx = zx0 ? Math.floor((0x400000 + (zx0 >> 1)) / zx0) : 0x800000;
+      }
+      let flipX = b[offs] & 0x1000, flipY = b[offs] & 0x2000;
+      const mirrorX = b[offs + 6] & 0x100, mirrorY = b[offs + 6] & 0x200, shadow = b[offs + 6] & 0x80;
+      if (mirrorX) flipX = 0;
+      // Register 5: flip the whole sprite layer horizontally (bit 0) or vertically (bit 1).
+      let ox = b[offs + 3] + offX, oy = b[offs + 2];
+      if (r[5] & 1) { ox = 512 - ox; if (!mirrorX) flipX = !flipX; }
+      if (r[5] & 2) { oy = -oy; if (!mirrorY) flipY = !flipY; }
+      ox = (ox + 0x5D) & 0x3FF; if (ox >= 768) ox -= 1024;
+      oy = (-(oy + offY + 7)) & 0x3FF; if (oy >= 640) oy -= 1024;
+      ox -= (zoomx * w) >> 13; oy -= (zoomy * h) >> 13;
+      for (let cy = 0; cy < h; cy++) {
+        const sy = oy + ((zoomy * cy + 0x800) >> 12), ch = oy + ((zoomy * (cy + 1) + 0x800) >> 12) - sy;
+        for (let cx = 0; cx < w; cx++) {
+          const sx = ox + ((zoomx * cx + 0x800) >> 12), cw = ox + ((zoomx * (cx + 1) + 0x800) >> 12) - sx;
+          let c = code, fx, fy;
+          if (mirrorX) { if (!flipX ^ (2 * cx < w)) { c += w - cx - 1; fx = 1; } else { c += cx; fx = 0; } }
+          else { c += flipX ? w - 1 - cx : cx; fx = flipX; }
+          if (mirrorY) { if (!flipY ^ (2 * cy >= h)) { c += 8 * (h - cy - 1); fy = 1; } else { c += 8 * cy; fy = 0; } }
+          else { c += 8 * (flipY ? h - 1 - cy : cy); fy = flipY; }
+          c = ((c & 0x3F) | (code & ~0x3F)) % cnt;
+          for (let y = 0; y < ch; y++) {
+            const py = sy + y - win.y;
+            if (py < 0 || py >= win.h) continue;
+            let srcY = Math.floor((y * 16) / ch); if (fy) srcY = 15 - srcY;
+            for (let x = 0; x < cw; x++) {
+              const px = sx + x - win.x;
+              if (px < 0 || px >= win.w) continue;
+              let srcX = Math.floor((x * 16) / cw); if (fx) srcX = 15 - srcX;
+              const pen = pix[c * 256 + srcY * 16 + srcX];
+              if (!pen) continue;
+              const o = py * win.w + px;
+              if (pri[o] & 0x80) continue;
+              const hidden = (mask >> (pri[o] & 0x1F)) & 1;
+              pri[o] |= 0x80;
+              if (hidden) continue;
+              frame[o] = shadow && pen === 15 ? darken(frame[o]) : palette[colorBase + pen];
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- K053251
+
+// K053251: the priority and palette-bank mixer. Registers 0-8 hold each
+// input's priority; 9 and 10 the palette bases of the five inputs (CI0-CI4).
+export class K053251 {
+  saveState() { return { ram: Array.from(this.ram) }; }
+  loadState(s) { this.ram.set(s.ram); }
+  constructor() { this.ram = new Uint8Array(16); }
+  reset() { this.ram.fill(0); }
+  write(o, v) { this.ram[o & 15] = v & 0x3F; }
+  priority(ci) { return this.ram[ci]; }
+  paletteIndex(ci) {
+    const r = this.ram;
+    return ci < 3 ? 32 * ((r[9] >> (2 * ci)) & 3) : 16 * ((r[10] >> (3 * (ci - 3))) & 7);
+  }
+}
+
+// ---------------------------------------------------------------- K053246 / K053247
+
+// K053247 (with the 053246): 256 zoomable sprites of up to 8x8 16x16 cells
+// at 4 bits per pixel (packed nibbles), eight words each. They're drawn in
+// order of an 8-bit z code (smaller in front); word 6 is the "color" the
+// board interprets, plus mirror bits and a shadow code that makes the last
+// pen darken. Positions wrap at 1024 and are offset by the board's dx/dy.
+// The 053246's registers hold the global offsets, flips, the DMA enable
+// (5 bit 4) and the ROM read address.
+const K47_STATE = ['ram', 'regs'];
+const XO47 = [0, 1, 4, 5, 16, 17, 20, 21], YO47 = [0, 2, 8, 10, 32, 34, 40, 42];
+export class K053247 {
+  saveState() { return capture(this, K47_STATE); }
+  loadState(s) { apply(this, K47_STATE, s); }
+
+  // rom: the sprite ROM (deinterleaved by 4); callback(code, color word) -> { code, color, priority (a mask) }
+  constructor(rom, callback, dx, dy) {
+    this.rom = rom;
+    this.callback = callback;
+    this.dx = dx; this.dy = dy;
+    this.count = rom.length / 128;
+    this.pix = decodeTiles(rom, {
+      count: this.count, width: 16, height: 16, planes: [3, 2, 1, 0],
+      xs: [8, 12, 0, 4, 24, 28, 16, 20, 40, 44, 32, 36, 56, 60, 48, 52], ys: run(0, 16, 64), size: 1024,
+    });
+    this.reset();
+  }
+  reset() { this.ram = new Uint16Array(0x800); this.regs = new Uint8Array(8); }
+
+  writeReg(o, v) { this.regs[o & 7] = v; }
+  get dmaEnabled() { return this.regs[5] & 0x10; }
+  // ROM read-back (when the board raises OBJCHA).
+  readRom(o) {
+    const r = this.regs, addr = (r[6] << 17) | (r[7] << 9) | (r[4] << 1) | ((o & 1) ^ 1);
+    return this.rom[addr & (this.rom.length - 1)];
+  }
+
+  draw(frame, pri, palette, win) {
+    const ram = this.ram, r = this.regs, s16 = (v) => (v << 16) >> 16;
+    const list = [];
+    for (let offs = 0; offs < 0x800; offs += 8) if (ram[offs] & 0x8000) list.push(offs);
+    // Smallest z code in front; we draw front to back (the first sprite at a pixel wins).
+    list.sort((a, b) => (ram[a] & 0xFF) - (ram[b] & 0xFF));
+    const offx = s16((r[0] << 8) | r[1]) & 0x3FF, offy = s16((r[2] << 8) | r[3]) & 0x3FF, pix = this.pix, cnt = this.count;
+    for (const offs of list) {
+      const attr = ram[offs], word6 = ram[offs + 6];
+      const t = this.callback(ram[offs + 1], word6);
+      let code = t.code;
+      const mask = t.priority || 0, colorBase = t.color * 16;
+      const size = (attr & 0x0F00) >> 8, w = 1 << (size & 3), h = 1 << ((size >> 2) & 3);
+      let xa = 0, ya = 0;
+      if (code & 1) xa += 1; if (code & 2) ya += 1; if (code & 4) xa += 2;
+      if (code & 8) ya += 2; if (code & 0x10) xa += 4; if (code & 0x20) ya += 4;
+      code &= ~0x3F;
+      let oy = ram[offs + 2] & 0x3FF, ox = ram[offs + 3] & 0x3FF;
+      const zy0 = ram[offs + 4] & 0x3FF, zoomy = zy0 ? Math.floor((0x400000 + (zy0 >> 1)) / zy0) : 0x800000;
+      let zoomx = zoomy;
+      if (!(attr & 0x4000)) { const zx0 = ram[offs + 5] & 0x3FF; zoomx = zx0 ? Math.floor((0x400000 + (zx0 >> 1)) / zx0) : 0x800000; }
+      let flipX = attr & 0x1000, flipY = attr & 0x2000;
+      const mirrorX = word6 & 0x4000, mirrorY = word6 & 0x8000, shadow = (word6 >> 10) & 3;
+      if (mirrorX) flipX = 0;
+      if (r[5] & 1) { ox = -ox; if (!mirrorX) flipX = !flipX; }
+      if (r[5] & 2) { oy = -oy; if (!mirrorY) flipY = !flipY; }
+      ox = (ox - offx) & 0x3FF; oy = (-oy - offy) & 0x3FF;
+      if (ox >= 0x300) ox -= 0x400; if (oy >= 0x280) oy -= 0x400;
+      ox += this.dx; oy -= this.dy;
+      ox -= (zoomx * w) >> 13; oy -= (zoomy * h) >> 13;
+      const cell = (c, fx, fy, sx, sy, cw, ch) => {
+        for (let y = 0; y < ch; y++) {
+          const py = sy + y - win.y;
+          if (py < 0 || py >= win.h) continue;
+          let srcY = Math.floor((y * 16) / ch); if (fy) srcY = 15 - srcY;
+          for (let x = 0; x < cw; x++) {
+            const px = sx + x - win.x;
+            if (px < 0 || px >= win.w) continue;
+            let srcX = Math.floor((x * 16) / cw); if (fx) srcX = 15 - srcX;
+            const pen = pix[c * 256 + srcY * 16 + srcX];
+            if (!pen) continue;
+            const o = py * win.w + px;
+            if (pri[o] & 0x80) continue;
+            const hidden = (mask >> (pri[o] & 0x1F)) & 1;
+            pri[o] |= 0x80;
+            if (hidden) continue;
+            frame[o] = shadow && pen === 15 ? darken(frame[o]) : palette[colorBase + pen];
+          }
+        }
+      };
+      for (let cy = 0; cy < h; cy++) {
+        const sy = oy + ((zoomy * cy + 0x800) >> 12), ch = oy + ((zoomy * (cy + 1) + 0x800) >> 12) - sy;
+        for (let cx = 0; cx < w; cx++) {
+          const sx = ox + ((zoomx * cx + 0x800) >> 12), cw = ox + ((zoomx * (cx + 1) + 0x800) >> 12) - sx;
+          let c = code, fx, fy;
+          if (mirrorX) { if (!flipX ^ (2 * cx < w)) { c += XO47[(w - 1 - cx + xa) & 7]; fx = 1; } else { c += XO47[(cx + xa) & 7]; fx = 0; } }
+          else { c += XO47[(flipX ? w - 1 - cx : cx) + xa & 7]; fx = flipX; }
+          if (mirrorY) { if (!flipY ^ (2 * cy >= h)) { c += YO47[(h - 1 - cy + ya) & 7]; fy = 1; } else { c += YO47[(cy + ya) & 7]; fy = 0; } }
+          else { c += YO47[(flipY ? h - 1 - cy : cy) + ya & 7]; fy = flipY; }
+          c %= cnt;
+          cell(c, fx, fy, sx, sy, cw, ch);
+          if (mirrorY && h === 1) cell(c, fx, !fy, sx, sy, cw, ch);   // (the Simpsons' shadows)
+        }
+      }
+    }
+  }
+}

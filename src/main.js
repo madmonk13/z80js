@@ -33,7 +33,7 @@ const audio = new AudioOut(SOUND_RATE);
 let screen2d = null;
 const touch = new TouchControls({
   surface: $('surface'), dpad: $('dpad'), aimPad: $('aimpad'), ripples: $('ripples'),
-  buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn'), $('start2Btn')],
+  buttons: [$('menuBtn'), $('pauseBtn'), $('cartBtn'), $('coinBtn'), $('startBtn'), $('start2Btn'), $('start3Btn'), $('start4Btn')],
 });
 input.sources.push(touch);
 
@@ -209,12 +209,17 @@ async function loadSet(bytes, name, id, keep = true) {
     $('fireHintTitle').textContent = 'Fire';
     $('fireHintText').textContent = 'Drag on this side to shoot that way';
   }
-  // Games where each start button picks a side (Silkworm's helicopter or jeep) name both.
+  // Games where each start button picks a side (Silkworm's helicopter or jeep, TMNT's
+  // turtles) name them all; where each also drops that player's coin, there's no Coin button.
   const starts = board.startLabels;
-  $('startBtn').querySelector('.face').textContent = starts ? starts[0] : 'Start';
-  $('start2Btn').querySelector('.face').textContent = starts ? starts[1] : 'Start 2';
-  $('start2Btn').hidden = !starts;
+  ['startBtn', 'start2Btn', 'start3Btn', 'start4Btn'].forEach((id, i) => {
+    $(id).querySelector('.face').textContent = starts ? starts[i] || '' : i ? `Start ${i + 1}` : 'Start';
+    $(id).hidden = i > 0 && !(starts && starts[i]);
+  });
+  $('coinBtn').hidden = !!board.startsCoin;
+  document.body.classList.toggle('coinless', !!board.startsCoin);
   document.body.classList.toggle('two-starts', !!starts);
+  document.body.classList.toggle('many-starts', !!starts && starts.length > 2);
   $('fire2ZoneTitle').textContent = board.button2 || '';
   $('fire3ZoneTitle').textContent = board.button3 || '';
   renderSwitches();
@@ -491,6 +496,8 @@ function holdButton(el, key) {
 holdButton($('coinBtn'), 'uiCoin');
 holdButton($('startBtn'), 'uiStart');
 holdButton($('start2Btn'), 'uiStart2');
+holdButton($('start3Btn'), 'uiStart3');
+holdButton($('start4Btn'), 'uiStart4');
 
 // The touch-zone hints fade once the player starts playing, whether by touch,
 // mouse, keyboard or gamepad.

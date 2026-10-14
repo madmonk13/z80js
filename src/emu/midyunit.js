@@ -27,7 +27,8 @@ import { rgba } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
 
-const W = 400, H = 254, REFRESH = 54.71;
+// Y-unit: 400x254 at 54.71 Hz. Z-unit (NARC): medium resolution, 512x400 at 54.9 Hz.
+const Y_SCREEN = [400, 254, 54.71], Z_SCREEN = [512, 400, 54.9];
 
 class DAC {
   constructor(gain) { this.gain = gain; this.reset(); }
@@ -172,6 +173,94 @@ class CvsdSound {
   }
 }
 
+// Williams NARC sound board: two 6809s at 2 MHz. The master plays music on a
+// YM2151 and a DAC and passes a second command to the slave, which has its
+// own DAC and a CVSD speech chip. Each banks 32K windows of its four ROM
+// sockets (two on the master) in at 4000, with the last 16K fixed at C000.
+// rom / rom2: the master's and slave's 512K regions (sockets 128K apart, each 64K ROM twice).
+class NarcSound {
+  constructor(rom, rom2, prot) {
+    this.rom = rom.slice();
+    this.rom2 = rom2;
+    this.prot = prot;
+    this.ram = new Uint8Array(0x2000);
+    this.ram2 = new Uint8Array(0x2000);
+    this.ym = new YM2151(3579545, 0.2);
+    this.dac = new DAC(0.5);
+    this.dac2 = new DAC(0.5);
+    this.cvsd = new HC55516(0.6);
+    this.mix = new SoundMix([this.ym, this.dac, this.dac2, this.cvsd], 0.7);
+    this.cpu = new M6809({ read: (a) => this.read(a), write: (a, v) => this.write(a, v) });
+    this.cpu2 = new M6809({ read: (a) => this.read2(a), write: (a, v) => this.write2(a, v) });
+    this.reset();
+  }
+  saveState() { return capture(this, ['ram', 'ram2', 'bank', 'bank2', 'latch', 'latch2', 'nmiLine', 'cpu', 'cpu2', 'mix', 'protRam']); }
+  loadState(s) { apply(this, ['ram', 'ram2', 'bank', 'bank2', 'latch', 'latch2', 'nmiLine', 'cpu', 'cpu2', 'mix', 'protRam'], s); this.restoreProt(); }
+
+  reset() {
+    this.ram.fill(0); this.ram2.fill(0);
+    this.bank = 0; this.bank2 = 0; this.latch = 0; this.latch2 = 0; this.nmiLine = false;
+    this.protRam = this.rom.slice(this.fixed(this.prot[0]), this.fixed(this.prot[1]) + 1);
+    this.restoreProt();
+    this.mix.reset(); this.cpu.reset(); this.cpu2.reset();
+  }
+  fixed(a) { return 0x7C000 + a - 0xC000; }
+  restoreProt() { this.rom.set(this.protRam, this.fixed(this.prot[0])); }
+  // Bank bits: 0 = A15, 1-2 = socket, 3 = A16.
+  banked(rom, b, a) { return rom[0x8000 * (b & 1) + 0x10000 * ((b >> 3) & 1) + 0x20000 * ((b >> 1) & 3) + a - 0x4000]; }
+
+  // From the main board: the byte, NMI while bit 8 is low, IRQ when bit 9 is low.
+  command(v) {
+    this.latch = v & 0xFF;
+    const nmi = !(v & 0x100);
+    if (nmi && !this.nmiLine) this.cpu.nmi();
+    this.nmiLine = nmi;
+    if (!(v & 0x200)) this.cpu.irq = true;
+  }
+
+  read(a) {
+    if (a < 0x2000) return this.ram[a];
+    if (a >= 0xC000) return this.rom[this.fixed(a)];
+    if (a >= 0x4000) return this.banked(this.rom, this.bank, a);
+    if ((a & 0xFC00) === 0x2000) return a & 1 ? this.ym.read() : 0xFF;
+    if ((a & 0xFC00) === 0x3400) { this.cpu.irq = false; return this.latch; }
+    return 0xFF;
+  }
+  write(a, v) {
+    if (a < 0x2000) { this.ram[a] = v; return; }
+    if (a >= this.prot[0] && a <= this.prot[1]) { this.rom[this.fixed(a)] = v; this.protRam[a - this.prot[0]] = v; return; }
+    switch (a & 0xFC00) {
+      case 0x2000: if (a & 1) this.ym.write(v); else this.ym.select(v); return;
+      case 0x2C00: this.latch2 = v; this.cpu2.firq = true; return;
+      case 0x3000: this.dac.write(v); return;
+      case 0x3800: this.bank = v & 15; return;
+    }
+  }
+  read2(a) {
+    if (a < 0x2000) return this.ram2[a];
+    if (a >= 0xC000) return this.rom2[this.fixed(a)];
+    if (a >= 0x4000) return this.banked(this.rom2, this.bank2, a);
+    if ((a & 0xFC00) === 0x3400) { this.cpu2.firq = false; return this.latch2; }
+    return 0xFF;
+  }
+  write2(a, v) {
+    if (a < 0x2000) { this.ram2[a] = v; return; }
+    switch (a & 0xFC00) {
+      case 0x2000: this.cvsd.clock(1); return;
+      case 0x2400: this.cvsd.digit(v); this.cvsd.clock(0); return;
+      case 0x3000: this.dac2.write(v); return;
+      case 0x3800: this.bank2 = v & 15; return;
+    }
+  }
+
+  run(cycles, dt) {
+    this.cpu.firq = this.ym.irq;
+    this.cpu.run(cycles);
+    this.cpu2.run(cycles);
+    this.ym.timers(dt);
+  }
+}
+
 // ---------------------------------------------------------------- the board
 
 const STATE = ['vram', 'ram', 'cmos', 'pal', 'dma', 'cmosPage', 'videoBank', 'autoErase', 'protSeq', 'protIndex', 'protResult',
@@ -188,9 +277,10 @@ export class MidwayYUnit {
   // roms: { program (1MB, little-endian words), gfx (the graphics ROM region, 8MB), sound, samples? }
   constructor(roms) {
     const k = this.constructor;
-    this.width = W;
-    this.height = H;
-    this.refresh = REFRESH;
+    [this.W, this.H, this.REFRESH] = k.zunit ? Z_SCREEN : Y_SCREEN;
+    this.width = this.W;
+    this.height = this.H;
+    this.refresh = this.REFRESH;
     this.controls = 'eight-way';
     this.buttons = k.buttons ?? 0;
     this.roms = roms;
@@ -200,10 +290,10 @@ export class MidwayYUnit {
     this.cmos = new Uint16Array(0x8000);
     this.nvram = this.cmos;                        // kept between sessions (settings, high scores)
     this.pal = new Uint16Array(0x2000);
-    this.palette = new Uint32Array(0x1000).fill(0xFF000000);
+    this.palette = new Uint32Array(0x2000).fill(0xFF000000);
     this.dma = new Uint16Array(16);
-    this.frame = new Uint32Array(W * H);
-    this.gfx = decodeGfx(roms.gfx);
+    this.frame = new Uint32Array(this.W * this.H);
+    this.gfx = decodeGfx(roms.gfx, k.zunit ? 8 : 6);
 
     this.cpu = new TMS34010({
       read16: (a) => this.read(a), write16: (a, v, m) => this.write(a, v, m),
@@ -211,7 +301,8 @@ export class MidwayYUnit {
       fromShiftReg: (a, sr) => this.vram.set(sr.subarray(0, Math.min(1024, 0x40000 - ((a >>> 3) & 0x3FFFF))), (a >>> 3) & 0x3FFFF),
     });
     this.cpu.onEvent = () => this.dmaFinished();
-    this.snd = k.sound === 'cvsd' ? new CvsdSound(roms.sound, k.soundProt) : new AdpcmSound(roms.sound, roms.samples, k.soundProt);
+    this.snd = k.sound === 'cvsd' ? new CvsdSound(roms.sound, k.soundProt) : k.sound === 'narc' ? new NarcSound(roms.sound, roms.sound2, k.soundProt)
+      : new AdpcmSound(roms.sound, roms.samples, k.soundProt);
     this.sound = this.snd.mix;
     this.in0 = this.in1 = 0xFFFF;
     this.applySwitches(defaultSwitches(k.switches));
@@ -237,7 +328,10 @@ export class MidwayYUnit {
       return this.videoBank ? (this.vram[o] & 0xFF) | ((this.vram[o + 1] & 0xFF) << 8) : (this.vram[o] >> 8) | (this.vram[o + 1] & 0xFF00);
     }
     if (a >= 0xFF80000) { const o = (a - 0xFF80000) * 2; return this.roms.program[o] | (this.roms.program[o + 1] << 8); }
-    if (a >= 0x200000 && a < 0x600000) { const o = (a - 0x200000) * 2; return this.gfx[o] | (this.gfx[o + 1] << 8); }
+    if (a >= 0x200000 && a < 0x600000) {
+      const o = (a - 0x200000) * 2, g = this.gfx;
+      return this.constructor.fourBit ? g[o] | (g[o] << 4) | (g[o + 1] << 8) | (g[o + 1] << 12) : g[o] | (g[o + 1] << 8);
+    }
     if (a >= 0x100000 && a < 0x110000) return this.ram[a - 0x100000];
     if (a >= 0x140000 && a < 0x141000) return this.cmos[a - 0x140000 + this.cmosPage];
     if (a >= 0x180000 && a < 0x182000) return this.pal[a - 0x180000];
@@ -275,7 +369,7 @@ export class MidwayYUnit {
 
   setColor(i) {
     const v = this.pal[i], c = (x) => (x << 3) | (x >> 2);
-    this.palette[i & 0xFFF] = rgba(c((v >> 10) & 31), c((v >> 5) & 31), c(v & 31));
+    this.palette[i & (this.constructor.fourBit ? 0xFF : this.constructor.zunit ? 0x1FFF : 0xFFF)] = rgba(c((v >> 10) & 31), c((v >> 5) & 31), c(v & 31));
   }
 
   // ---------------------------------------------------------------- protection
@@ -358,6 +452,7 @@ export class MidwayYUnit {
     switch (n) {
       case 0: return this.in0;
       case 1: return this.in1;
+      case 2: return this.in2 ?? 0xFFFF;
       case 3: return this.dsw;
     }
     return 0xFFFF;
@@ -368,7 +463,7 @@ export class MidwayYUnit {
 
   runFrame() {
     const lines = (this.cpu.vtotal || 288) + 1;
-    const per = this.clock / REFRESH / lines, sper = SOUND_CLOCK / REFRESH / lines, samples = RATE / REFRESH / lines, dt = 1 / REFRESH / lines;
+    const R = this.REFRESH, per = this.clock / R / lines, sper = SOUND_CLOCK / R / lines, samples = RATE / R / lines, dt = 1 / R / lines;
     for (let line = 0; line < lines; line++) {
       const params = this.cpu.scanline(line);
       if (params) this.scanout(line, params);
@@ -389,8 +484,9 @@ export class MidwayYUnit {
   // bitmap row and column; auto-erase clears the row shown before it.
   scanout(line, p) {
     const y = line - p.veblnk;
+    const W = this.W, H = this.H, k = this.constructor;
     if (y >= 0 && y < H) {
-      const out = this.frame, o = y * W, pal = this.palette, vr = this.vram;
+      const out = this.frame, o = y * W, pal = this.palette, vr = this.vram, four = k.fourBit, eight = k.zunit;
       const row = (p.rowaddr & 0x1FF) * 512;
       let col = p.coladdr << 1;
       const x0 = Math.max(0, p.heblnk), x1 = Math.min(p.hsblnk, p.heblnk + W);
@@ -398,7 +494,7 @@ export class MidwayYUnit {
       else {
         for (let x = x0; x < x1; x++) {
           const v = vr[row + (col++ & 0x1FF)];
-          out[o + x - p.heblnk] = pal[((v & 0xC000) >> 8) | (v & 0x0F3F)];
+          out[o + x - p.heblnk] = pal[eight ? v & 0x1FFF : four ? ((v & 0xF000) >> 8) | (v & 0x000F) : ((v & 0xC000) >> 8) | (v & 0x0F3F)];
         }
         for (let x = x1 - p.heblnk; x < W; x++) out[o + x] = 0xFF000000;
       }
@@ -417,8 +513,14 @@ export class MidwayYUnit {
 }
 
 // The graphics ROMs hold 2-bit slices of each pixel in three (6-bit) chunks.
-function decodeGfx(src) {
+// The graphics ROMs are four chunks. 6 (and 4) bits per pixel: 2 bits from each of
+// the first three chunks; 8 bits: a whole byte from each chunk in turn.
+function decodeGfx(src, bpp) {
   const size = src.length, chunk = size / 4, out = new Uint8Array(size);
+  if (bpp === 8) {
+    for (let i = 0; i < size; i++) out[i] = src[(i & 3) * chunk + (i >> 2)];
+    return out;
+  }
   for (let i = 0; i < size; i++) {
     const b = i >> 2, sh = 2 * (i & 3);
     out[i] = ((src[b] >> sh) & 3) | (((src[chunk + b] >> sh) & 3) << 2) | (((src[2 * chunk + b] >> sh) & 3) << 4);
@@ -468,3 +570,58 @@ MortalKombat.switches = [
 ];
 // Free play: coinage from the switches (bit 15) set to USA free play.
 MortalKombat.dsw = (v) => (v.free ? 0x8D3F : 0x7D3F) | (v.blood ?? 0x40) | (v.violence ?? 0x80);
+
+// Trog (1990): up to four cavemen-hunting dinosaurs, each its own start
+// button; one button (punch, and eat when it's a power-up). 4-bit graphics.
+export class Trog extends MidwayYUnit {
+  constructor(roms) {
+    super(roms);
+    this.buttons = 1;
+    this.startLabels = ['Red', 'Blue', 'Yellow', 'Pink'];       // the four dinosaurs' colors
+    this.slot = 0;
+  }
+  // P1 in IN0's low byte, P2 its high; IN1 coins, starts 1-4 and P3; IN2 P4 (and coin 3).
+  setInputs(s) {
+    const picked = [s.start1, s.start2, s.start3, s.start4].findIndex(Boolean);
+    if (picked >= 0) this.slot = picked;
+    const p = (s.up ? 1 : 0) | (s.down ? 2 : 0) | (s.left ? 4 : 0) | (s.right ? 8 : 0) | (s.fire ? 0x10 : 0);
+    const starts = (s.start1 ? 0x4 : 0) | (s.start2 ? 0x20 : 0) | (s.start3 ? 0x200 : 0) | (s.start4 ? 0x400 : 0);
+    this.in0 = 0xFFFF & ~(this.slot === 0 ? p : this.slot === 1 ? p << 8 : 0);
+    this.in1 = 0xFFFF & ~((s.coin ? 1 : 0) | starts | (this.slot === 2 ? p << 11 : 0));
+    this.in2 = 0xFFFF & ~(this.slot === 3 ? p : 0);
+  }
+}
+Trog.id = 'trog'; Trog.title = 'Trog';
+Trog.slowCpu = true; Trog.fourBit = true; Trog.sound = 'cvsd'; Trog.soundProt = [0x9EAF, 0x9ED9];
+Trog.protection = { reset: [0x0F00, 0x0F00, 0x0F00], data: [0x3000, 0x1000, 0x2000, 0x0000, 0x2000, 0x3000, 0x3000, 0x1000,
+  0x0000, 0x0000, 0x2000, 0x3000, 0x1000, 0x1000, 0x2000] };
+// Coinage 1 from CMOS, upright, 4 players, two coin counters, USA.
+Trog.dsw = () => 0xCFBF;
+
+// NARC (1988), the Z-unit: medium resolution and 8-bit graphics.
+// With blank CMOS it restores its defaults and then waits for a reset (the
+// operator's, or the watchdog's), so on that first boot the board resets
+// itself once the defaults are written.
+export class Narc extends MidwayYUnit {
+  constructor(roms) {
+    super(roms);
+    this.buttons = 3;
+    this.button2 = 'Jump';
+    this.button3 = 'Rocket';
+    this.frames = 0;
+  }
+  runFrame() {
+    if (this.frames === 0) this.blankCmos = this.cmos.every((w) => w === 0);
+    if (++this.frames === 1000 && this.blankCmos) this.reset();
+    super.runFrame();
+  }
+  // IN0: P1 up, down, left, right, button 4, fire, jump, rocket. IN1: coins, starts (8, 9), language (English).
+  setInputs(s) {
+    this.in0 = 0xFFFF & ~((s.up ? 1 : 0) | (s.down ? 2 : 0) | (s.left ? 4 : 0) | (s.right ? 8 : 0)
+      | (s.fire ? 0x20 : 0) | (s.fire2 ? 0x40 : 0) | (s.fire3 ? 0x80 : 0));
+    this.in1 = 0xFFFF & ~((s.coin ? 1 : 0) | (s.start1 ? 0x100 : 0) | (s.start2 ? 0x200 : 0));
+  }
+}
+Narc.id = 'narc'; Narc.title = 'NARC';
+Narc.zunit = true; Narc.sound = 'narc'; Narc.soundProt = [0xCDFF, 0xCE29];
+Narc.dsw = () => 0xFFFF;
