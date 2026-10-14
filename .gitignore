@@ -6,3 +6,5 @@ out/
 roms/
 # Audio samples recorded for listening checks.
 *-sample.wav
+# Claude Code tool settings (kept local)
+.claude/
