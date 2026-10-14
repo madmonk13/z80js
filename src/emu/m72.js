@@ -117,15 +117,30 @@ export class M72 {
   // ---------------------------------------------------------------- main CPU memory
 
   // The memory map differs by board; cfg.map lists [start, end, area] ranges.
+  // Which region of the memory map an address falls in (-1: ROM). A table per 256-byte page
+  // answers most addresses directly; pages split between regions fall back to a search.
   area(a) {
-    for (const [s, e, name] of this.cfg.map) if (a >= s && a < e) return [name, a - s];
-    return null;
+    if (!this.pageArea) {
+      const map = this.cfg.map, pages = new Int16Array(0x1000).fill(-1);
+      for (let pg = 0; pg < 0x1000; pg++) {
+        const lo = pg << 8, hi = lo + 0x100;
+        const hits = map.map(([s, e], i) => (s < hi && e > lo ? i : -1)).filter((i) => i >= 0);
+        if (hits.length === 1 && map[hits[0]][0] <= lo && map[hits[0]][1] >= hi) pages[pg] = hits[0];
+        else if (hits.length) pages[pg] = -2;
+      }
+      this.pageArea = pages;
+    }
+    const i = this.pageArea[a >> 8];
+    if (i !== -2) return i;
+    const map = this.cfg.map;
+    for (let k = 0; k < map.length; k++) if (a >= map[k][0] && a < map[k][1]) return k;
+    return -1;
   }
 
   read(a) {
-    const hit = this.area(a);
-    if (!hit) return this.roms.main[a];
-    const [name, o] = hit;
+    const i = this.area(a);
+    if (i < 0) return this.roms.main[a];
+    const m = this.cfg.map[i], name = m[2], o = a - m[0];
     switch (name) {
       case 'ram': return this.ram[o];
       case 'sprites': return this.spriteRam[o];
@@ -158,9 +173,9 @@ export class M72 {
   }
 
   write(a, v) {
-    const hit = this.area(a);
-    if (!hit) return;
-    const [name, o] = hit;
+    const i = this.area(a);
+    if (i < 0) return;
+    const m = this.cfg.map[i], name = m[2], o = a - m[0];
     switch (name) {
       case 'ram': this.ram[o] = v; return;
       case 'sprites': this.spriteRam[o] = v; return;
@@ -348,6 +363,9 @@ export class M72 {
     this.tPen = pix[code * 64 + py * 8 + px];
     this.tCol = 256 + (color & 15) * 16;
     this.tGroup = group;
+    this.tBase = code * 64 + py * 8;             // the tile's row on this line, for runs of pixels
+    this.tFx = fx;
+    this.tPix = pix;
   }
 
   // Which pens of a group draw under the sprites (low) and which over them (high).
@@ -375,14 +393,20 @@ export class M72 {
     const hasHigh = this.hasHigh || (this.hasHigh = new Uint8Array(W));
     hasHigh.fill(0);
     // Lower halves of bg then fg; remember upper halves to draw over the sprites.
-    for (const layer of [2, 1]) {
+    for (let layer = 2; layer >= 1; layer--) {
       const scx = layer === 1 ? sx1 : sx2, scy = layer === 1 ? sy1 : sy2;
       const my = (sy + scy) & 511, span = layer === 1 ? 511 : bgSpan;
-      for (let x = 0; x < W; x++) {
-        this.tileAt(layer, (x + LEFT + scx) & span, my);
-        const s = this.split(layer, this.tPen, this.tGroup);
-        if (s === 1) out[o + x] = pal[this.tCol + this.tPen];
-        else if (s === 2) { high[x] = pal[this.tCol + this.tPen]; hasHigh[x] = 1; if (layer === 2) out[o + x] = pal[this.tCol]; }
+      // A tile's entry is decoded once for the run of its pixels on this line.
+      for (let x = 0; x < W;) {
+        const mx = (x + LEFT + scx) & span;
+        this.tileAt(layer, mx, my);
+        const run = Math.min(8 - (mx & 7), W - x), base = this.tBase, fx = this.tFx, col = this.tCol, group = this.tGroup, pix = this.tPix;
+        for (let k = 0; k < run; k++, x++) {
+          const px = (mx + k) & 7, pen = pix[base + (fx ? 7 - px : px)];
+          const s = this.split(layer, pen, group);
+          if (s === 1) out[o + x] = pal[col + pen];
+          else if (s === 2) { high[x] = pal[col + pen]; hasHigh[x] = 1; if (layer === 2) out[o + x] = pal[col]; }
+        }
       }
     }
     // Sprites (Major Title's second sprite list first).

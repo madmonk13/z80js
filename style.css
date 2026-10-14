@@ -100,8 +100,12 @@ body.show-hints .zone .hint { opacity: 1; }
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.55);
   text-shadow: 0 0 2px #000, 0 0 4px #000;
   opacity: var(--zone-opacity, 0.25);
+  background-color: transparent;
+  transition: opacity 0.6s ease, background-color 0.6s ease;
   pointer-events: none;
 }
+/* Just after a game loads: full strength on a dark backing, until the first touch fades them. */
+body.zones-intro .zone .box { opacity: 1; background-color: rgba(0, 0, 0, 0.5); }
 .zone .box b {
   white-space: nowrap;
   font: 800 12px/1 ui-monospace, "SF Mono", Menlo, monospace;

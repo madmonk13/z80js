@@ -28,7 +28,9 @@ const ATTACK = 1, DECAY = 2, SUSTAIN = 3, RELEASE = 4, OFF = 0;
 
 // Seconds for an envelope to fall by the full 96 dB at a rate of 0-63 (each
 // 4 steps doubles the speed; rates below 4 hardly move).
-const FALL_TIME = (r) => (r < 4 ? Infinity : 10.6 / Math.pow(2, (r - 4) / 4));
+const FALL_TABLE = Float64Array.from({ length: 64 }, (_, r) => (r < 4 ? Infinity : 10.6 / Math.pow(2, (r - 4) / 4)));
+const FALL_TIME = (r) => FALL_TABLE[r];
+const LN10_20 = Math.LN10 / 20;
 
 function makeOp() {
   return { dt: 0, mul: 1, tl: 0, ks: 0, ar: 0, dr: 0, sr: 0, sl: 0, rr: 0, phase: 0, att: 96, stage: OFF, out: 0 };
@@ -138,7 +140,7 @@ export class YM2203 {
         const p = o[k];
         p.phase = (p.phase + base * p.mul * dt) % 1;
         if (p.stage === OFF) return 0;
-        const amp = Math.pow(10, -(p.att + p.tl * 0.75) / 20);
+        const amp = Math.exp(-(p.att + p.tl * 0.75) * LN10_20);
         if (amp < 1e-4) return 0;
         return SINE[((p.phase * 4096 + (mod / TWO_PI) * 4096) & 4095)] * amp;
       };

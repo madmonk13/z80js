@@ -18,7 +18,9 @@ import { capture, apply } from './state.js';
 
 const SINE = Float32Array.from({ length: 4096 }, (_, i) => Math.sin((i / 4096) * Math.PI * 2));
 const ATTACK = 1, DECAY = 2, SUSTAIN = 3, RELEASE = 4, OFF = 0;
-const FALL_TIME = (r) => (r < 4 ? Infinity : 10.6 / Math.pow(2, (r - 4) / 4));
+const FALL_TABLE = Float64Array.from({ length: 64 }, (_, r) => (r < 4 ? Infinity : 10.6 / Math.pow(2, (r - 4) / 4)));
+const FALL_TIME = (r) => FALL_TABLE[r];
+const LN10_20 = Math.LN10 / 20;
 const SLOT_OF = [0, 2, 1, 3];                 // register offset 0/4/8/C -> operators 1, 3, 2, 4
 const LFO_HZ = [3.98, 5.56, 6.02, 6.37, 6.88, 9.63, 48.1, 72.2];
 const PMS_CENTS = [0, 3.4, 6.7, 10, 14, 20, 40, 80];
@@ -272,7 +274,7 @@ export class YM2610 {
         if (p.stage === OFF) return 0;
         const att = p.att + p.tl * 0.75 + (p.am ? amDb : 0);
         if (att > 90) return 0;
-        return SINE[((p.phase * 4096 + mod * 652) & 4095)] * Math.pow(10, -att / 20);
+        return SINE[((p.phase * 4096 + mod * 652) & 4095)] * Math.exp(-att * LN10_20);
       };
       const fbIn = c.fb ? (c.fb1 + c.fb2) * Math.PI * Math.pow(2, c.fb - 7) : 0;
       const o1 = op(0, fbIn);

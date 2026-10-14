@@ -42,8 +42,11 @@ const SLOT = Array.from({ length: 0x16 }, (_, o) => {
 });
 const ATTACK = 1, DECAY = 2, SUSTAIN = 3, RELEASE = 4, OFF = 0;
 // Seconds for a full 96 dB fall, and for a full attack, at envelope rate r (0-63).
-const FALL = (r) => (r < 4 ? Infinity : 39.28 / Math.pow(2, (r - 4) / 4));
-const RISE = (r) => (r < 4 ? Infinity : 2.826 / Math.pow(2, (r - 4) / 4));
+const FALL_TABLE = Float64Array.from({ length: 64 }, (_, r) => (r < 4 ? Infinity : 39.28 / Math.pow(2, (r - 4) / 4)));
+const FALL = (r) => FALL_TABLE[r];
+const RISE_TABLE = Float64Array.from({ length: 64 }, (_, r) => (r < 4 ? Infinity : 2.826 / Math.pow(2, (r - 4) / 4)));
+const RISE = (r) => RISE_TABLE[r];
+const LN10_20 = Math.LN10 / 20;
 
 function makeOp() {
   return { am: 0, vib: 0, egt: 0, ksr: 0, mul: 1, ksl: 0, tl: 0, ar: 0, dr: 0, sl: 0, rr: 0, wave: 0,
@@ -179,7 +182,7 @@ export class YM3812 {
       const level = (op) => {
         if (op.stage === OFF) return 0;
         const db = op.att + op.tl * 0.75 + Math.max(0, kslDb) * KSL_SCALE[op.ksl] + (op.am ? tremDb : 0);
-        return db >= 96 ? 0 : Math.pow(10, -db / 20);
+        return db >= 96 ? 0 : Math.exp(-db * LN10_20);
       };
       const wave = (op, mod) => WAVES[this.waveEnable ? op.wave : 0][(op.phase * N + (mod / TWO_PI) * N) & (N - 1)];
       const a1 = level(o[0]);
@@ -198,7 +201,7 @@ export class YM3812 {
   // borrow channel 7 and 8's operators, mixing in noise and square tones.
   drumMix(white) {
     const c6 = this.ch[6], c7 = this.ch[7], c8 = this.ch[8];
-    const lvl = (op) => (op.stage === OFF || op.att + op.tl * 0.75 >= 96 ? 0 : Math.pow(10, -(op.att + op.tl * 0.75) / 20));
+    const lvl = (op) => (op.stage === OFF || op.att + op.tl * 0.75 >= 96 ? 0 : Math.exp(-(op.att + op.tl * 0.75) * LN10_20));
     let s = 0;
     const b1 = lvl(c6.ops[0]), b2 = lvl(c6.ops[1]);
     if (b2) {

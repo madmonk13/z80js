@@ -20,6 +20,8 @@ import { capture, apply } from './state.js';
 const SINE = Float32Array.from({ length: 4096 }, (_, i) => Math.sin((i / 4096) * Math.PI * 2));
 const ATTACK = 1, DECAY = 2, SUSTAIN = 3, RELEASE = 4, OFF = 0;
 const FALL_TIME = (r) => (r < 4 ? Infinity : 10.6 / Math.pow(2, (r - 4) / 4));
+const FALL = Float64Array.from({ length: 64 }, (_, r) => FALL_TIME(r));
+const LN10_20 = Math.LN10 / 20;
 // Note codes (0-15, four unused) in semitones above the octave's C#.
 const NOTE = [0, 1, 2, 2, 3, 4, 5, 5, 6, 7, 8, 8, 9, 10, 11, 11];
 const DT2_CENTS = [0, 600, 781, 950];
@@ -43,9 +45,11 @@ export class YM2151 {
   }
 
   saveState() { return capture(this, STATE); }
-  loadState(s) { apply(this, STATE, s); }
+  loadState(s) { apply(this, STATE, s); this.stale = 0xFF; }
 
   reset() {
+    this.inc = new Float64Array(32);             // each operator's phase step per sample, before vibrato
+    this.stale = 0xFF;                           // channels whose steps need recomputing
     this.addr = 0;
     this.ch = Array.from({ length: 8 }, () => ({ kc: 0, kf: 0, fb: 0, alg: 0, out: 0, pms: 0, ams: 0, ops: [makeOp(), makeOp(), makeOp(), makeOp()], fb1: 0, fb2: 0 }));
     this.lfoRate = 0; this.pmd = 0; this.amd = 0; this.wave = 0; this.lfoPhase = 0;
@@ -95,13 +99,14 @@ export class YM2151 {
     if (r < 0x40) {
       switch (r & 0xF8) {
         case 0x20: c.out = v >> 6; c.fb = (v >> 3) & 7; c.alg = v & 7; break;
-        case 0x28: c.kc = v & 0x7F; break;
-        case 0x30: c.kf = v >> 2; break;
+        case 0x28: c.kc = v & 0x7F; this.stale |= 1 << (r & 7); break;
+        case 0x30: c.kf = v >> 2; this.stale |= 1 << (r & 7); break;
         case 0x38: c.pms = (v >> 4) & 7; c.ams = v & 3; break;
       }
       return;
     }
     const op = c.ops[SLOT_POS[(r >> 3) & 3]];
+    if ((r & 0xE0) === 0x40 || (r & 0xE0) === 0xC0) this.stale |= 1 << (r & 7);
     switch (r & 0xE0) {
       case 0x40: op.dt1 = (v >> 4) & 7; op.mul = v & 15 ? v & 15 : 0.5; break;
       case 0x60: op.tl = v & 0x7F; break;
@@ -142,65 +147,80 @@ export class YM2151 {
       this.noisePhase -= 1;
       this.noise = (this.noise >>> 1) | ((((this.noise) ^ (this.noise >> 3)) & 1) << 16);
     }
+    if (this.stale) this.updateSteps(dt, scale);
     let mix = 0;
     for (let n = 0; n < 8; n++) {
-      const c = this.ch[n];
-      if (!c.out) { for (const o of c.ops) this.envelope(o, c.kc >> 2, dt); continue; }
-      const octave = (c.kc >> 4) & 7, semis = NOTE[c.kc & 15] + c.kf / 64;
+      const c = this.ch[n], o = c.ops, kcode = c.kc >> 2;
+      for (let i = 0; i < 4; i++) this.envelope(o[i], kcode, dt);
+      if (!c.out) continue;
+      // Vibrato scales every operator's frequency by the same factor.
       const pmCents = PMS_CENTS[c.pms] * pmWave * (this.pmd / 127);
+      const pm = pmCents ? Math.pow(2, pmCents / 1200) : 1;
       const amDb = AMS_DB[c.ams] * amWave * (this.amd / 127);
-      const o = c.ops;
-      for (let i = 0; i < 4; i++) this.envelope(o[i], c.kc >> 2, dt);
-      const op = (k, mod) => {
-        const q = o[k];
-        const cents = 100 * (semis - 8) + DT2_CENTS[q.dt2] + pmCents;
-        let f = 440 * Math.pow(2, octave - 4 + cents / 1200) * scale;
-        if (q.dt1 & 3) f += (q.dt1 & 4 ? -1 : 1) * (q.dt1 & 3) * 0.0015 * f;
-        q.phase = (q.phase + f * q.mul * dt) % 1;
-        if (q.stage === OFF) return 0;
-        const att = q.att + q.tl * 0.75 + (q.amOn ? amDb : 0);
-        if (att > 90) return 0;
-        const amp = Math.pow(10, -att / 20);
-        if (n === 7 && k === 3 && (this.noiseCtl & 0x80)) return (this.noise & 1 ? amp : -amp) * 0.5;
-        return SINE[((q.phase * 4096 + mod * 652) & 4095)] * amp;   // mod in radians
-      };
+      const base = n * 4, noise = n === 7 && (this.noiseCtl & 0x80);
       const fbIn = c.fb ? (c.fb1 + c.fb2) * Math.PI * Math.pow(2, c.fb - 7) : 0;
-      const m1 = op(0, fbIn);
+      const m1 = this.op(o[0], this.inc[base] * pm, fbIn, amDb, false);
       c.fb2 = c.fb1; c.fb1 = m1;
-      const M = 4 * Math.PI;
+      const M = 4 * Math.PI, i1 = this.inc[base + 1] * pm, i2 = this.inc[base + 2] * pm, i3 = this.inc[base + 3] * pm;
       let out;
       switch (c.alg) {
-        case 0: { const c1 = op(1, m1 * M), m2 = op(2, c1 * M); out = op(3, m2 * M); break; }
-        case 1: { const c1 = op(1, 0), m2 = op(2, (m1 + c1) * M); out = op(3, m2 * M); break; }
-        case 2: { const c1 = op(1, 0), m2 = op(2, c1 * M); out = op(3, (m1 + m2) * M); break; }
-        case 3: { const c1 = op(1, m1 * M), m2 = op(2, 0); out = op(3, (c1 + m2) * M); break; }
-        case 4: { const c1 = op(1, m1 * M), m2 = op(2, 0); out = c1 + op(3, m2 * M); break; }
-        case 5: out = op(1, m1 * M) + op(2, m1 * M) + op(3, m1 * M); break;
-        case 6: out = op(1, m1 * M) + op(2, 0) + op(3, 0); break;
-        default: out = m1 + op(1, 0) + op(2, 0) + op(3, 0);
+        case 0: { const c1 = this.op(o[1], i1, m1 * M, amDb, false), m2 = this.op(o[2], i2, c1 * M, amDb, false); out = this.op(o[3], i3, m2 * M, amDb, noise); break; }
+        case 1: { const c1 = this.op(o[1], i1, 0, amDb, false), m2 = this.op(o[2], i2, (m1 + c1) * M, amDb, false); out = this.op(o[3], i3, m2 * M, amDb, noise); break; }
+        case 2: { const c1 = this.op(o[1], i1, 0, amDb, false), m2 = this.op(o[2], i2, c1 * M, amDb, false); out = this.op(o[3], i3, (m1 + m2) * M, amDb, noise); break; }
+        case 3: { const c1 = this.op(o[1], i1, m1 * M, amDb, false), m2 = this.op(o[2], i2, 0, amDb, false); out = this.op(o[3], i3, (c1 + m2) * M, amDb, noise); break; }
+        case 4: { const c1 = this.op(o[1], i1, m1 * M, amDb, false), m2 = this.op(o[2], i2, 0, amDb, false); out = c1 + this.op(o[3], i3, m2 * M, amDb, noise); break; }
+        case 5: out = this.op(o[1], i1, m1 * M, amDb, false) + this.op(o[2], i2, m1 * M, amDb, false) + this.op(o[3], i3, m1 * M, amDb, noise); break;
+        case 6: out = this.op(o[1], i1, m1 * M, amDb, false) + this.op(o[2], i2, 0, amDb, false) + this.op(o[3], i3, 0, amDb, noise); break;
+        default: out = m1 + this.op(o[1], i1, 0, amDb, false) + this.op(o[2], i2, 0, amDb, false) + this.op(o[3], i3, 0, amDb, noise);
       }
       mix += out;
     }
     this.out = mix * 0.2 * this.gain;
   }
 
+  // One operator's output for this sample; mod is the phase modulation in radians.
+  op(q, step, mod, amDb, noise) {
+    q.phase = (q.phase + step) % 1;
+    if (q.stage === OFF) return 0;
+    const att = q.att + q.tl * 0.75 + (q.amOn ? amDb : 0);
+    if (att > 90) return 0;
+    const amp = Math.exp(-att * LN10_20);        // 10^(-att/20)
+    if (noise) return (this.noise & 1 ? amp : -amp) * 0.5;
+    return SINE[((q.phase * 4096 + mod * 652) & 4095)] * amp;
+  }
+
+  // Each operator's phase step from its channel's key code and fraction, detunes and multiple.
+  updateSteps(dt, scale) {
+    for (let n = 0; n < 8; n++) {
+      if (!((this.stale >> n) & 1)) continue;
+      const c = this.ch[n], octave = (c.kc >> 4) & 7, semis = NOTE[c.kc & 15] + c.kf / 64;
+      for (let k = 0; k < 4; k++) {
+        const q = c.ops[k];
+        let f = 440 * Math.pow(2, octave - 4 + (100 * (semis - 8) + DT2_CENTS[q.dt2]) / 1200) * scale;
+        if (q.dt1 & 3) f += (q.dt1 & 4 ? -1 : 1) * (q.dt1 & 3) * 0.0015 * f;
+        this.inc[n * 4 + k] = f * q.mul * dt;
+      }
+    }
+    this.stale = 0;
+  }
+
   // Attenuation in dB, moved along by the current stage's rate.
   envelope(p, keycode, dt) {
     if (p.stage === OFF) return;
     const ksr = keycode >> (3 - p.ks);
-    const rate = (r) => (r ? Math.min(63, 2 * r + ksr) : 0);
     if (p.stage === ATTACK) {
-      const r = rate(p.ar);
+      const r = p.ar ? Math.min(63, 2 * p.ar + ksr) : 0;
       if (r >= 62) { p.att = 0; p.stage = DECAY; return; }
-      const t = FALL_TIME(r) / 8;
+      const t = FALL[r] / 8;
       if (t === Infinity) return;
       p.att -= (p.att + 4) * (dt / t) * 4;
       if (p.att <= 0) { p.att = 0; p.stage = DECAY; }
       return;
     }
     const sl = p.d1l === 15 ? 93 : p.d1l * 3;
-    const r = p.stage === DECAY ? rate(p.d1r) : p.stage === SUSTAIN ? rate(p.d2r) : Math.min(63, 4 * p.rr + 2 + ksr);
-    const t = FALL_TIME(r);
+    const rr = p.stage === DECAY ? p.d1r : p.d2r;
+    const r = p.stage === RELEASE ? Math.min(63, 4 * p.rr + 2 + ksr) : rr ? Math.min(63, 2 * rr + ksr) : 0;
+    const t = FALL[r];
     if (t !== Infinity) p.att += (96 * dt) / t;
     if (p.stage === DECAY && p.att >= sl) { p.att = sl; p.stage = SUSTAIN; }
     if (p.att >= 96) { p.att = 96; if (p.stage === RELEASE) p.stage = OFF; }

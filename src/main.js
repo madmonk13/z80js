@@ -17,7 +17,7 @@ const DEFAULTS = {
   leftHanded: false,
   dpadSize: 140,
   haptics: true,
-  hints: true,
+  hints: false,      // the touch hints (Move / Fire cards); off by default
   zones: true,       // outline each control's area
   zoneOpacity: 25,   // percent
   zoneOverlap: 25,   // percent: how far the control zones reach over the picture
@@ -39,6 +39,9 @@ input.sources.push(touch);
 
 const settings = { ...DEFAULTS, ...(store.get('settings') || {}) };
 settings.switches = { ...settings.switches };
+// Touch hints became off by default (the zone outlines now introduce the controls); turn
+// them off once for settings saved before that.
+if (!settings.hintsOffByDefault) { settings.hints = false; settings.hintsOffByDefault = true; store.set('settings', settings); }
 const state = { romId: null, serverFile: null, menuOpen: false, paused: false };
 const LAST_SERVER = 'lastServerFile';
 let board = null;
@@ -103,11 +106,12 @@ function renderSwitches() {
 
 // ---------------------------------------------------------------- resume
 
-// The game in progress is saved when the page is hidden or closed, and every
-// few seconds while playing, so a refresh or relaunch picks up where it was.
+// The game in progress is saved whenever play stops: on pause, when a menu opens, when
+// another game loads, and when the page is hidden or closed (switching apps, locking the
+// phone), so a refresh or relaunch picks up where it was. Nothing is saved mid-play, so
+// the save never costs a frame.
 const RESUME = 'resume:';
 const RESUME_VERSION = 1;              // bump when saved state stops being compatible
-const RESUME_EVERY_MS = 5000;
 
 // Battery-backed RAM (a board's `nvram`: settings and high scores) is kept
 // per ROM set, whether or not resume is on.
@@ -227,6 +231,7 @@ async function loadSet(bytes, name, id, keep = true) {
   loadNvram(state.romId);
   state.resumed = restoreResume(state.romId);
   if (!state.resumed) showBooting(Board.title);
+  introduceZones();
   if (res.stored) { library.setLast(state.romId); store.remove(LAST_SERVER); }
   refreshLibrary();
   return Board;
@@ -337,6 +342,7 @@ const SHEETS = { menu: 'closeMenu', cartsMenu: 'closeCarts' }; // backdrop id â†
 function openSheet(id) {
   for (const other of Object.keys(SHEETS)) $(other).hidden = other !== id;
   if (id === 'cartsMenu') server.refresh().then(refreshLibrary);   // pick up sets added to roms/
+  if (!state.menuOpen) saveResume();
   state.menuOpen = true;
   touch.releaseAll();
   touch.enabled = false;
@@ -356,6 +362,8 @@ function closeMenu() {
 function setPaused(paused) {
   state.paused = paused;
   if (paused) { hideBooting(); closeStartChooser(); }
+  // The control zones come back up to full strength while paused and fade down again on resume.
+  document.body.classList.toggle('zones-intro', paused);
   $('pausedGame').textContent = board ? board.constructor.title : '';
   document.body.classList.toggle('paused', paused);
   $('paused').hidden = !paused;
@@ -545,9 +553,14 @@ holdButton($('start2Btn'), 'uiStart2');
 holdButton($('start3Btn'), 'uiStart3');
 holdButton($('start4Btn'), 'uiStart4');
 
-// The touch-zone hints fade once the player starts playing, whether by touch,
-// mouse, keyboard or gamepad.
+// When a game loads, the control zones show at full strength over a dark backing; the
+// first touch (or key / gamepad press) fades them to the chosen opacity and the backing away.
+function introduceZones() { document.body.classList.add('zones-intro'); }
+
+// The touch-zone hints and the zone introduction fade once the player starts playing,
+// whether by touch, mouse, keyboard or gamepad.
 function dismissHints() {
+  document.body.classList.remove('zones-intro');
   if (document.body.classList.contains('show-hints')) {
     clearTimeout(hintTimer);
     hintTimer = setTimeout(() => document.body.classList.remove('show-hints'), 600);
@@ -659,7 +672,7 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', onRo
 
 // ---------------------------------------------------------------- loop
 
-let acc = 0, lastTime = performance.now(), lastSave = performance.now();
+let acc = 0, lastTime = performance.now();
 function tick(now) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
@@ -684,7 +697,6 @@ function tick(now) {
     if (ran === 4) acc = 0;
     audio.flush();
     if (ran) screen2d.draw(board.frame, board);
-    if (now - lastSave > RESUME_EVERY_MS) { lastSave = now; saveResume(); }
   } else {
     acc = 0;
   }

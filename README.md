@@ -367,7 +367,9 @@ The touch layout follows the game:
 - **Left-handed** mode in settings swaps the halves.
 - **Show control zones** (settings, on by default): a faint outline of each control's area
   with its name (Move, Fire, and the second button such as Blaster or Shield, which takes
-  the top half of the fire side). **Zone opacity** sets how faint.
+  the top half of the fire side). **Zone opacity** sets how faint. When a game loads the zones
+  show at full strength on a dark backing, and the first touch (or key / gamepad press) fades
+  them to that opacity. Pausing brings them back up; resuming fades them down again. The older **touch hints** cards are still in settings, off by default.
 - **Zone overlap** (settings, 0-100%, 25% by default): the control zones keep mostly clear
   of the picture, reaching over it by this much: up from the band below it in portrait (a
   share of its height), in from the side margins in landscape (a share of the way to its
@@ -396,9 +398,11 @@ The touch layout follows the game:
   games by their MAME set name (or by what loading one reveals). Saves, high scores and switches are
   kept on the device either way and are shared between the server and device copies of a set.
 - **Controls, Sound and volume**, as in 6502js.
-- **Resume where I left off** (on by default): the game in progress is saved when the
-  page is hidden or closed, and every few seconds while playing, so a refresh or relaunch
-  picks up exactly where you were. Restart / Power cycle starts over.
+- **Resume where I left off** (on by default): the game in progress is saved whenever play
+  stops (pause, opening a menu, switching games, or the page being hidden or closed, as when you
+  switch apps or lock the phone), so a refresh or relaunch picks up exactly where you were. It
+  isn't saved during play, so a crash loses what happened since the last stop. Restart / Power
+  cycle starts over.
 - **Battery RAM:** boards with battery-backed settings and high scores (the Midway Y-unit
   games' CMOS) keep it per ROM set, so the first launch's "factory settings restored"
   message (press any button) appears only once.
