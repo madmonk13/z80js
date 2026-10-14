@@ -88,6 +88,7 @@ export class Z80 {
   step() {
     if (this.nmiPending) {
       this.nmiPending = false;
+      this.opPc = -1;           // no instruction: the push mustn't look like the last one's write
       this.wake();
       this.iff2 = this.iff1; this.iff1 = 0;
       this.push(this.pc); this.pc = 0x66;
@@ -95,6 +96,7 @@ export class Z80 {
       return;
     }
     if (this.irq && this.iff1 && !this.eiDelay) {
+      this.opPc = -1;
       this.wake();
       this.iff1 = this.iff2 = 0;
       if (this.onIrqAck) this.onIrqAck();

@@ -5,7 +5,7 @@ phones and desktop. Plain HTML, CSS and JavaScript modules, with no dependencies
 build step. It shares its app shell (touch controls, settings, game library, audio) with
 [6502js](https://github.com/madmonk13/6502js), the Atari 2600 emulator it was forked from.
 
-**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **186 games supported**
+**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **193 games supported**
 
 No ROMs are included: add your own ROM sets, the zips used by MAME. A set is recognized
 by its chips' file names, so the zip's own name doesn't matter.
@@ -205,6 +205,13 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Galaga '88 (1987) | Namco System 1, vertical monitor | `galaga88` | **Tested:** boots, attract mode, coin, start and play |
 | Gauntlet (1985) | Atari: 68010 with the 104 Slapstic, motion objects, a 6502 with YM2151, POKEY and TMS5220 speech; four players | `gauntlet` | **Tested:** boots, attract mode, coin, start and play with music and speech |
 | Space Odyssey (1981) | Sega G-80 raster with the 315-0063 security chip and the background board | `spaceod` | **Tested:** boots, attract mode, coin, start and play (effects synthesized) |
+| Pac-Mania (1987) | Namco System 1, vertical monitor | `pacmania` | **Tested:** boots, attract mode, coin, start and play |
+| Time Pilot '84 (1984) | Konami: two 6809s (the second multiplexes the sprites line by line), a Z80 with three SN76489s | `tp84` | **Tested:** boots, attract mode, coin, start and play |
+| BurgerTime (1982) | Data East: 6502 with opcode encryption that applies only after a memory write, a second 6502 with two AY-3-8910s | `btime` | **Tested:** boots, attract mode, coin, start and play |
+| Gyruss (1983) | Konami: Z80, an opcode-encrypted 6809 multiplexing the sprites, a Z80 with five AY-3-8910s and an 8039 DAC | `gyruss` | **Tested:** boots, attract mode, coin, start and play |
+| Qix (1981) | Taito: two 6809s (game and a 256x256 8-bit bitmap), 6821 PIAs, a 6802 playing samples through a DAC; battery-backed CMOS | `qix` | **Tested:** boots (runs the operator setup on first power-on), attract mode, coin, start and play |
+| Salamander (1986) | Konami Nemesis: 68000 with all graphics uploaded into RAM, per-line and per-column scrolling, zoomable sprites; Z80 with YM2151, K007232 and VLM5030 speech | `salamand` | **Tested:** boots, attract mode with speech, coin, start and play |
+| Blades of Steel (1987) | Konami: HD6309 (run on the 6809 core; the game uses no 6309-only instructions), K007342 tilemaps, K007420 sprites, K051733 protection; 6809 with YM2203 and uPD7759 speech | `bladstle` (version E, joystick) | **Tested:** boots, attract mode with speech, coin, start and play |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's
@@ -214,6 +221,10 @@ Not supported: **Gatsbee** (Galaga hack with switchable graphics) and the many o
 Galaxian-board clones and conversions, each of which changes the hardware a little.
 
 ## Controls
+
+z80js is meant as a single-player experience, so the cabinets' 2-player start button has been left off
+the screen (a keyboard's 2 still presses it). Games where the start buttons pick a character or side
+keep that choice, behind the one Start button.
 
 The touch layout follows the game:
 
@@ -316,7 +327,7 @@ The touch layout follows the game:
   stick and fire.
 - **Colony 7:** 8-way stick; fire, bomb and shield. **Mayday:** 8-way stick (left fires behind);
   fire, Mayday bomb, back fire.
-- **Silkworm:** the top bar's start buttons read **Heli** and **Jeep**: the one you press picks your
+- **Silkworm:** Start offers **Heli** and **Jeep**: the one you pick chooses your
   vehicle (as on the cabinet, where player 1 flies the helicopter and player 2 drives the jeep). Fire at
   the bottom of the right half; the top makes the jeep jump.
 - **RoboCop:** 8-way stick; fire at the bottom, jump on top.
@@ -325,16 +336,24 @@ The touch layout follows the game:
   sight; shoot and grenade. **Bottom of the Ninth:** the stick and two buttons (swing/pitch, run/throw).
   **M.I.A.:** fire, weapon, knife. Crime Fighters and TMNT start a player from their coin slot (Coin or
   Start both work).
-- **Four-player games** (TMNT, Trog, The Simpsons, Gauntlet) show one start button per character in
-  the top bar (Leo/Mike/Don/Raph, Red/Blue/Yellow/Pink, Marge/Homer/Bart/Lisa,
-  Warrior/Valkyrie/Wizard/Elf); keyboard 1-4 press them. Where the cabinet starts a player from a coin
-  slot (TMNT, Simpsons, Gauntlet), each button drops that slot's coin and starts, so there's no Coin
-  button. Gauntlet has no start buttons on the cabinet: Magic doubles as start.
+- **Time Pilot '84:** 8-way stick; fire at the bottom, missile on top. **Gyruss:** 8-way stick (it moves the ship around
+  the ring) and fire. **BurgerTime:** 4-way stick, the button throws pepper. **Pac-Mania:** the stick and jump.
+- **Qix:** 4-way stick; the bottom button draws fast (blue), the top slow (red, worth double).
+- **Salamander:** 8-way stick; fire at the bottom, missile on top. **Blades of Steel:** 8-way stick; shoot at the
+  bottom, pass in the middle, check on top.
+- **Four-player games** (TMNT, Trog, The Simpsons, Gauntlet): Start opens a choice of character
+  (Leo/Mike/Don/Raph, Red/Blue/Yellow/Pink, Marge/Homer/Bart/Lisa, Warrior/Valkyrie/Wizard/Elf);
+  picking one starts as that character and closes the choice (keyboard 1-4 pick directly). Where each
+  character has a coin slot of their own (TMNT, Simpsons, Gauntlet), picking a character drops a coin in
+  their slot and starts them, so there's no Coin button. Gauntlet has no start buttons on the cabinet:
+  Magic doubles as start.
 - **Heavy Barrel:** the rotary stick aims by itself toward the direction you push; fire at the bottom,
   grenade on top. **Tutankham:** fire shoots left or right (the way you last moved); the top button is
   the flash bomb. **Altered Beast:** punch, kick, jump. **Golden Axe:** attack, jump, magic. **NARC:** fire,
   jump, rocket. **Galaga '88:** fire. **Splatterhouse:** attack, jump. **Juno First, Space Odyssey:** fire (Juno First adds warp, Space Odyssey a bomb).
-- **Coin / Start** sit in the top bar. Drop a coin, then press Start.
+- **Coin / Start** sit in the top bar. Drop a coin, then press Start. A game started from power-on
+  (not resumed from where you left it) shows a **Booting** card with its name for a few seconds, and
+  the pause card names the game too.
 - Keyboards and gamepads also work: arrows or WASD to move, Space/Z to fire, X or Shift
   for a second button (fire in one-button games), F for a third, Q/E or the mouse wheel (or the
   gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
@@ -604,6 +623,9 @@ flowchart LR
 
 ## Known gaps
 
+- **Qix** keeps its settings in battery-backed CMOS. On the very first power-on (no saved CMOS) the board shows the
+  operator's setup pages; z80js steps through them with the factory settings, which takes about eight seconds.
+- **Blades of Steel:** only the joystick version (`bladstle`) is supported; the trackball version (`bladestl`) isn't.
 - **Space Odyssey's sound** is recorded samples on the cabinet, not in the ROM set; z80js synthesizes the effects.
 - **Golden Axe and Heavy Barrel's MCUs** are simulated from what the games expect, not run from their programs.
 - **Parodius sequels** (Gokujyou, Jikkyou Oshaberi, Sexy Parodius) are on Konami GX (68020) hardware, not yet supported.

@@ -4,7 +4,7 @@
 // the current app) and falls back to the cache when offline. ROM sets under
 // roms/ aren't cached here: games kept on the device live in IndexedDB.
 
-const CACHE = 'z80js-c16909aad0b4';
+const CACHE = 'z80js-f38257b2d44b';
 const FILES = [
   "./",
   "favicon-32.png",
@@ -22,9 +22,11 @@ const FILES = [
   "src/emu/avg.js",
   "src/emu/ay8910.js",
   "src/emu/berzerk.js",
+  "src/emu/bladestl.js",
   "src/emu/boards.js",
   "src/emu/bombjack.js",
   "src/emu/bosco.js",
+  "src/emu/btime.js",
   "src/emu/bwidow.js",
   "src/emu/bzone.js",
   "src/emu/c1942.js",
@@ -49,6 +51,7 @@ const FILES = [
   "src/emu/gberet.js",
   "src/emu/gng.js",
   "src/emu/gottlieb.js",
+  "src/emu/gyruss.js",
   "src/emu/h6280.js",
   "src/emu/hc55516.js",
   "src/emu/i8035.js",
@@ -77,6 +80,7 @@ const FILES = [
   "src/emu/msm5205.js",
   "src/emu/namcos1.js",
   "src/emu/namcos86.js",
+  "src/emu/nemesis.js",
   "src/emu/neogeo.js",
   "src/emu/okim6295.js",
   "src/emu/pacman.js",
@@ -86,6 +90,7 @@ const FILES = [
   "src/emu/pia6821.js",
   "src/emu/pokey.js",
   "src/emu/popeye.js",
+  "src/emu/qix.js",
   "src/emu/rallyx.js",
   "src/emu/rocnrope.js",
   "src/emu/scramble.js",
@@ -103,6 +108,7 @@ const FILES = [
   "src/emu/tmnt.js",
   "src/emu/tms34010.js",
   "src/emu/tms5220.js",
+  "src/emu/tp84.js",
   "src/emu/tpsound.js",
   "src/emu/tutankhm.js",
   "src/emu/upd7759.js",

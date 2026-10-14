@@ -20,7 +20,8 @@ import { capture, apply } from './state.js';
 const WIN = { x: 112, y: 16, w: 288, h: 224 };
 const LINES = 256, VBLANK = 240, REFRESH = 60;
 const CPU_CLOCK = 3000000, SOUND_CLOCK = 3579545;
-const STATE = ['ram', 'palRam', 'soundRam', 'bank', 'videoBank', 'nmiPending', 'in', 'cycleCarry', 'soundCarry', 'sampleCarry',
+const NMI_DELAY = Math.round(SOUND_CLOCK * 50e-6);
+const STATE = ['ram', 'palRam', 'soundRam', 'bank', 'videoBank', 'nmiAt', 'in', 'cycleCarry', 'soundCarry', 'sampleCarry',
   'cpu', 'snd', 'tiles', 'sprites', 'mixer', 'ym', 'k053260'];
 
 export class Parodius {
@@ -62,7 +63,7 @@ export class Parodius {
 
   reset() {
     this.ram.fill(0); this.palRam.fill(0); this.soundRam.fill(0); this.palette.fill(0xFF000000);
-    this.bank = 0x10000; this.videoBank = 0; this.nmiPending = 0;
+    this.bank = 0x10000; this.videoBank = 0; this.nmiAt = -1;
     this.cycleCarry = this.soundCarry = this.sampleCarry = 0;
     this.tiles.reset(); this.sprites.reset(); this.mixer.reset();
     this.cpu.reset(); this.snd.reset(); this.ym.reset(); this.k053260.reset();
@@ -133,7 +134,7 @@ export class Parodius {
     if (a >= 0xF000 && a < 0xF800) this.soundRam[a - 0xF000] = v;
     else if (a === 0xF800) this.ym.select(v);
     else if (a === 0xF801) this.ym.write(v);
-    else if (a === 0xFA00) this.nmiPending = 1;                    // an NMI follows shortly (50 us)
+    else if (a === 0xFA00) this.nmiAt = this.snd.cycles + NMI_DELAY;   // an NMI follows 50 us later (after the HALT that waits for it)
     else if (a >= 0xFC00 && a < 0xFC30) this.k053260.write(a - 0xFC00, v);
   }
 
@@ -167,10 +168,17 @@ export class Parodius {
       if (line === VBLANK) { if (this.tiles.irqEnabled) this.cpu.irq = true; this.render(); }
       this.cycleCarry += mainLine;
       this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
-      if (this.nmiPending) { this.nmiPending = 0; this.snd.nmi(); }
       this.ym.timers(dt);
       this.soundCarry += soundLine;
-      this.soundCarry -= this.snd.run(Math.floor(this.soundCarry));
+      // Run the sound CPU in pieces so an armed NMI lands on its cycle.
+      const budget = Math.floor(this.soundCarry);
+      let done = 0;
+      while (done < budget) {
+        const step = this.nmiAt >= 0 ? Math.min(budget - done, Math.max(1, this.nmiAt - this.snd.cycles)) : budget - done;
+        done += this.snd.run(step);
+        if (this.nmiAt >= 0 && this.snd.cycles >= this.nmiAt) { this.nmiAt = -1; this.snd.nmi(); }
+      }
+      this.soundCarry -= done;
       this.sampleCarry += samples;
       while (this.sampleCarry >= 1) { this.sampleCarry -= 1; this.sound.sample(); }
     }

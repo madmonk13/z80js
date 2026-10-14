@@ -21,7 +21,7 @@ import { capture, apply } from './state.js';
 
 const W = 256, H = 224, LINES = 262, REFRESH = 60, CLOCK = 15468000 / 4;
 const STATE = ['ram', 'vram', 'palRam', 'videoCtl', 'vblankLatch', 'hcounter', 'vcounter', 'fixedColor', 'bgControl', 'bgDetect',
-  'bgEnable', 'soundLines', 'in', 'cycleCarry', 'sampleCarry', 'cpu', 'sound'];
+  'bgEnable', 'soundLines', 'in', 'startHeld', 'cycleCarry', 'sampleCarry', 'cpu', 'sound'];
 
 // The 315-0063 security chip's address scramble (which of four rules depends on bits 0 and 3 of the instruction's address).
 function decrypt63(pc, b) {
@@ -103,6 +103,7 @@ export class SpaceOdyssey {
     this.fg = new Uint8Array(W * H);           // palette index of each foreground pixel
     this.frame = new Uint32Array(W * H);
     this.in = { d76: 0xFF, d54: 0xFF, fc: 0 };
+    this.startHeld = [0, 0];
     this.applySwitches();
     this.reset();
   }
@@ -197,6 +198,7 @@ export class SpaceOdyssey {
   }
 
   runFrame() {
+    this.startHeld = this.startHeld.map((n) => Math.max(0, n - 1));
     const cyc = CLOCK / REFRESH / LINES, samples = RATE / REFRESH / LINES;
     for (let line = 0; line < LINES; line++) {
       if (line === H) {
@@ -247,7 +249,11 @@ export class SpaceOdyssey {
   setInputs(s) {
     this.in.fc = (s.left ? 1 : 0) | (s.right ? 2 : 0) | (s.down ? 4 : 0) | (s.up ? 8 : 0) | (s.fire ? 0x10 : 0) | (s.fire2 ? 0x20 : 0);
     this.in.d76 = 0xFF & ~(s.coin ? 0x01 : 0);
-    this.in.d54 = 0xFF & ~((s.start1 ? 0x02 : 0) | (s.start2 ? 0x20 : 0));
+    // The game looks at the start buttons only every 24 frames or so; hold a press long enough to be seen.
+    if (s.start1) this.startHeld = [60, this.startHeld[1]];
+    if (s.start2) this.startHeld = [this.startHeld[0], 60];
+    const [h1, h2] = this.startHeld;
+    this.in.d54 = 0xFF & ~((h1 ? 0x02 : 0) | (h2 ? 0x20 : 0));
   }
   // Switch bank 1: lives, upright, bonus, no infinite lives; bank 2: 1 coin 1 credit.
   applySwitches() { this.dsw = 0xE4; this.coinage = 0x33; }

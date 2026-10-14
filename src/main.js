@@ -209,17 +209,13 @@ async function loadSet(bytes, name, id, keep = true) {
     $('fireHintTitle').textContent = 'Fire';
     $('fireHintText').textContent = 'Drag on this side to shoot that way';
   }
-  // Games where each start button picks a side (Silkworm's helicopter or jeep, TMNT's
-  // turtles) name them all; where each also drops that player's coin, there's no Coin button.
-  const starts = board.startLabels;
-  ['startBtn', 'start2Btn', 'start3Btn', 'start4Btn'].forEach((id, i) => {
-    $(id).querySelector('.face').textContent = starts ? starts[i] || '' : i ? `Start ${i + 1}` : 'Start';
-    $(id).hidden = i > 0 && !(starts && starts[i]);
-  });
+  // One Start button for every game. Where each start picks a side (Silkworm's helicopter or
+  // jeep, TMNT's turtles) it opens a choice of them; where each also drops that player's coin
+  // (each character has a coin slot of their own), there's no Coin button.
+  closeStartChooser();
+  for (const id of ['start2Btn', 'start3Btn', 'start4Btn']) $(id).hidden = true;
   $('coinBtn').hidden = !!board.startsCoin;
   document.body.classList.toggle('coinless', !!board.startsCoin);
-  document.body.classList.toggle('two-starts', !!starts);
-  document.body.classList.toggle('many-starts', !!starts && starts.length > 2);
   $('fire2ZoneTitle').textContent = board.button2 || '';
   $('fire3ZoneTitle').textContent = board.button3 || '';
   renderSwitches();
@@ -229,7 +225,8 @@ async function loadSet(bytes, name, id, keep = true) {
   state.romId = id || res.id;
   state.serverFile = null;
   loadNvram(state.romId);
-  restoreResume(state.romId);
+  state.resumed = restoreResume(state.romId);
+  if (!state.resumed) showBooting(Board.title);
   if (res.stored) { library.setLast(state.romId); store.remove(LAST_SERVER); }
   refreshLibrary();
   return Board;
@@ -358,6 +355,8 @@ function closeMenu() {
 // the veil over the game, or P on a keyboard. The game is saved for resume.
 function setPaused(paused) {
   state.paused = paused;
+  if (paused) { hideBooting(); closeStartChooser(); }
+  $('pausedGame').textContent = board ? board.constructor.title : '';
   document.body.classList.toggle('paused', paused);
   $('paused').hidden = !paused;
   $('pauseBtn').setAttribute('aria-pressed', String(paused));
@@ -473,11 +472,58 @@ $('powerBtn').addEventListener('click', () => {
   closeMenu();
 });
 
+// Booting: a card naming the game while it starts from power-on; it fades after 3 seconds, or on a tap.
+let bootTimer = 0;
+function showBooting(title) {
+  $('bootingGame').textContent = title;
+  const el = $('booting');
+  el.hidden = true; void el.offsetWidth; el.hidden = false;      // restart the fade
+  clearTimeout(bootTimer);
+  bootTimer = setTimeout(hideBooting, 3000);
+}
+function hideBooting() { clearTimeout(bootTimer); $('booting').hidden = true; }
+$('booting').addEventListener('pointerdown', hideBooting);
+
+// The start chooser (games with a start per player or side): picking one presses that start.
+function openStartChooser() {
+  const labels = board.startLabels, list = $('startChoices');
+  list.replaceChildren(...labels.map((label, i) => {
+    const b = document.createElement('button');
+    b.className = 'pill';
+    b.textContent = label;
+    b.addEventListener('pointerup', (e) => { e.preventDefault(); e.stopPropagation(); chooseStart(i); });
+    b.addEventListener('click', (e) => { if (e.detail === 0) chooseStart(i); });   // keyboard
+    return b;
+  }));
+  $('startChooserTitle').textContent = board.startsCoin ? 'Who\'s playing?' : 'Start as';
+  $('startChooser').hidden = false;
+  touch.releaseAll();
+  touch.enabled = false;
+  list.firstChild?.focus();
+}
+function closeStartChooser() {
+  if ($('startChooser').hidden) return;
+  $('startChooser').hidden = true;
+  touch.enabled = !state.paused && !state.menuOpen;
+}
+function chooseStart(i) {
+  const key = i ? `uiStart${i + 1}` : 'uiStart';
+  closeStartChooser();
+  input[key] = true;
+  setTimeout(() => { input[key] = false; }, Math.max(MIN_BUTTON_MS, 200));
+}
+// A tap on the backdrop closes it (only one that starts there: the tap that opened it ends here too).
+let chooserDown = false;
+$('startChooser').addEventListener('pointerdown', (e) => { chooserDown = e.target === e.currentTarget; });
+$('startChooser').addEventListener('pointerup', (e) => { if (chooserDown && e.target === e.currentTarget) closeStartChooser(); chooserDown = false; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeStartChooser(); });
+
 // Coin and Start: held while pressed, but never shorter than a few frames.
 function holdButton(el, key) {
   let downAt = 0, timer = 0;
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    if (key === 'uiStart' && board?.startLabels) { openStartChooser(); return; }
     clearTimeout(timer);
     downAt = performance.now();
     input[key] = true;
@@ -670,7 +716,7 @@ function tick(now) {
     $('loading').classList.remove('show');
   }
   if (!board) openSheet('cartsMenu');   // first run: ask for a ROM set
-  else {
+  else if (state.resumed) {
     // A reload resumes paused, so play starts when the player is ready; one
     // frame shows where the game was left.
     setPaused(true);

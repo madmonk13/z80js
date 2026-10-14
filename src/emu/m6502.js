@@ -236,9 +236,11 @@ export class CPU6502 {
   step() {
     if (this.jammed) { this.cycles += 2; return 2; }
     if (this.nmiPending) { this.nmiPending = false; this.interrupt(0xFFFA); return 7; }
-    if (this.irq && !this.i) { this.interrupt(0xFFFE); return 7; }
+    if (this.irq && !this.i) { if (this.onIrqAck) this.onIrqAck(); this.interrupt(0xFFFE); return 7; }
     this.start = this.cycles;
-    const opcode = this.bus.read(this.pc);
+    // Boards with encrypted opcodes supply bus.fetch; opPc is where this instruction starts.
+    this.opPc = this.pc;
+    const opcode = this.bus.fetch ? this.bus.fetch(this.pc) : this.bus.read(this.pc);
     this.pc = (this.pc + 1) & 0xFFFF;
     const [m, mode, cyc, pen] = OPS[opcode];
     this.cyc = cyc;

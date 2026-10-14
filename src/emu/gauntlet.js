@@ -77,7 +77,7 @@ export class Gauntlet {
     this.eeprom.fill(0xFF);
 
     const q = roms.tiles.length / 4 * 8;
-    this.tilePix = decodeTiles(roms.tiles, { count: roms.tiles.length / 32, width: 8, height: 8, planes: [0, q, 2 * q, 3 * q], xs: run(0, 8), ys: run(0, 8, 8), size: 64 });
+    this.tilePix = decodeTiles(roms.tiles, { count: roms.tiles.length / 32, width: 8, height: 8, planes: [3 * q, 2 * q, q, 0], xs: run(0, 8), ys: run(0, 8, 8), size: 64 });
     this.tileCount = roms.tiles.length / 32;
     this.alphaPix = decodeTiles(roms.alpha, { count: roms.alpha.length / 16, width: 8, height: 8, planes: [4, 0], xs: [0, 1, 2, 3, 8, 9, 10, 11], ys: run(0, 8, 16), size: 128 });
     this.alphaCount = roms.alpha.length / 16;

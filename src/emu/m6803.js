@@ -15,7 +15,7 @@
 import { capture, apply } from './state.js';
 
 const C = 1, V = 2, Z = 4, N = 8, I = 16, H = 32;
-const STATE = ['a', 'b', 'x', 'sp', 'pc', 'cc', 'cycles', 'irq', 'nmiPending', 'waiting', 'sleeping', 'ram',
+const STATE = ['a', 'b', 'x', 'sp', 'pc', 'cc', 'cycles', 'irq', 'nmiPending', 'waiting', 'sleeping', 'irqDelay', 'ram',
   'ddr1', 'ddr2', 'port1', 'port2', 'tcsr', 'counter', 'ocr', 'timerCarry', 'ramcr'];
 
 // Base cycle counts (6801 timings) for each opcode; 0 marks an illegal one.
@@ -82,7 +82,7 @@ export class M6803 {
     this.a = 0; this.b = 0; this.x = 0; this.sp = 0;
     this.cc = I | 0xC0;
     this.cycles = 0;
-    this.irq = false; this.nmiPending = false; this.waiting = false; this.sleeping = false;
+    this.irq = false; this.nmiPending = false; this.waiting = false; this.sleeping = false; this.irqDelay = false;
     this.ddr1 = 0; this.ddr2 = 0; this.port1 = 0xFF; this.port2 = 0xFF;
     this.tcsr = 0; this.counter = 0; this.ocr = 0xFFFF; this.timerCarry = 0;
     this.ramcr = 0x40;                       // RAM control (register $14): bit 6 RAM enable, bit 7 standby flag
@@ -253,7 +253,9 @@ export class M6803 {
       this.cycles += 12;
       return;
     }
-    if (!(this.cc & I)) {
+    // After CLI (or TAP clearing I) one more instruction runs before a pending IRQ is taken.
+    if (this.irqDelay) this.irqDelay = false;
+    else if (!(this.cc & I)) {
       if (this.irq) { if (this.holdIrq) this.irq = false; this.interrupt(0xFFF8); this.cycles += 12; return; }
       if ((this.tcsr & 0x48) === 0x48) { this.interrupt(0xFFF4); this.cycles += 12; return; }   // output compare
       if ((this.tcsr & 0x24) === 0x24) { this.interrupt(0xFFF2); this.cycles += 12; return; }   // overflow
@@ -347,7 +349,7 @@ export class M6803 {
       case 0x01: return;                                                         // NOP
       case 0x04: { const d = this.d; this.flag(C, d & 1); this.d = d >> 1; this.setNZ16(d >> 1); this.flag(V, (this.cc & C) ? 1 : 0); return; }   // LSRD
       case 0x05: { const d = this.d; const r = (d << 1) & 0xFFFF; this.flag(C, d & 0x8000); this.d = r; this.setNZ16(r); this.flag(V, ((r >> 15) ^ (d >> 15)) & 1); return; }   // ASLD
-      case 0x06: this.cc = this.a | 0xC0; return;                                // TAP
+      case 0x06: if (this.cc & I && !(this.a & I)) this.irqDelay = true; this.cc = this.a | 0xC0; return;   // TAP
       case 0x07: this.a = this.cc | 0xC0; return;                                // TPA
       case 0x08: this.x = (this.x + 1) & 0xFFFF; this.flag(Z, !this.x); return;  // INX
       case 0x09: this.x = (this.x - 1) & 0xFFFF; this.flag(Z, !this.x); return;  // DEX
@@ -355,7 +357,7 @@ export class M6803 {
       case 0x0B: this.cc |= V; return;
       case 0x0C: this.cc &= ~C; return;
       case 0x0D: this.cc |= C; return;
-      case 0x0E: this.cc &= ~I; return;
+      case 0x0E: if (this.cc & I) this.irqDelay = true; this.cc &= ~I; return;                     // CLI
       case 0x0F: this.cc |= I; return;
       case 0x10: this.a = this.sub8(this.a, this.b, 0); return;                  // SBA
       case 0x11: this.sub8(this.a, this.b, 0); return;                           // CBA

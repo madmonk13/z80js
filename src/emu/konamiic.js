@@ -343,7 +343,7 @@ export class K053245 {
     this.callback = callback;
     this.count = rom.length / 128;
     this.pix = decodeTiles(rom, {
-      count: this.count, width: 16, height: 16, planes: [0, 8, 16, 24],
+      count: this.count, width: 16, height: 16, planes: [24, 16, 8, 0],
       xs: [...run(0, 8), ...run(256, 8)], ys: [...run(0, 8, 32), ...run(512, 8, 32)], size: 1024,
     });
     this.reset();
@@ -473,7 +473,7 @@ export class K053247 {
     this.dx = dx; this.dy = dy;
     this.count = rom.length / 128;
     this.pix = decodeTiles(rom, {
-      count: this.count, width: 16, height: 16, planes: [3, 2, 1, 0],
+      count: this.count, width: 16, height: 16, planes: [0, 1, 2, 3],
       xs: [8, 12, 0, 4, 24, 28, 16, 20, 40, 44, 32, 36, 56, 60, 48, 52], ys: run(0, 16, 64), size: 1024,
     });
     this.reset();

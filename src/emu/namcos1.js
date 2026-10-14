@@ -435,3 +435,10 @@ export class Galaga88 extends NamcoSystem1 {
 }
 Galaga88.id = 'galaga88';
 Galaga88.title = "Galaga '88";
+
+// Pac-Mania (1987): an 8-way stick and jump. Key chip CUS151; a vertical monitor.
+export class PacMania extends NamcoSystem1 {
+  constructor(roms) { super(roms, { key: 'type2', keyId: 0x12, rotate: 270 }); this.buttons = 1; }   // the button jumps
+}
+PacMania.id = 'pacmania';
+PacMania.title = 'Pac-Mania';

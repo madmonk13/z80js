@@ -61,7 +61,7 @@ import { Aliens, Ajax, CrimeFighters, SuperContra, GangBusters, BottomOfTheNinth
 import { TMNT, MissingInAction } from './tmnt.js';
 import { Parodius } from './parodius.js';
 import { Simpsons } from './simpsons.js';
-import { Splatterhouse, Galaga88 } from './namcos1.js';
+import { Splatterhouse, Galaga88, PacMania } from './namcos1.js';
 import { Gauntlet } from './gauntlet.js';
 import { SpaceOdyssey } from './segag80r.js';
 import { StarCastle, RipOff, ArmorAttack, SolarQuest } from './cinemat.js';
@@ -73,6 +73,12 @@ import { Shinobi, AlteredBeast, GoldenAxe } from './segas16b.js';
 import { Tutankham, JunoFirst } from './tutankhm.js';
 import { RocNRope } from './rocnrope.js';
 import { ShaolinsRoad } from './shaolins.js';
+import { TimePilot84 } from './tp84.js';
+import { BurgerTime } from './btime.js';
+import { Gyruss } from './gyruss.js';
+import { Qix } from './qix.js';
+import { Salamander } from './nemesis.js';
+import { BladesOfSteel } from './bladestl.js';
 import { RollingThunder, WonderMomo, Genpei, ReturnOfIshtar, HoppingMappy, SkyKidDeluxe } from './namcos86.js';
 import { SmashTV, TotalCarnage, MortalKombat, Trog, Narc } from './midyunit.js';
 import { RType, RType2, HammerinHarry, MajorTitle, BattleChopper, NinjaSpirit, ImageFight, HeroTonma, XMultiply, DragonBreed, AirDuel, Gallop } from './m72.js';
@@ -1698,6 +1704,72 @@ const BOARDS = [
     }),
   },
   {
+    // Blades of Steel (version E, joystick): the program ROM's first half is the banked area, the second the fixed 8000-FFFF.
+    Board: BladesOfSteel,
+    chips: [['prg', 0x10000, [/^797e01/]], ['snd', 0x8000, [/^797c02/]], ['t', 0x40000, [/^797a05/]], ['s', 0x40000, [/^797a06/]],
+      ['lut', 0x100, [/^797a07/]], ['v3', 0x80000, [/^797a03/]], ['v4', 0x40000, [/^797a04/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x18000);
+      main.set(c.prg.subarray(0x8000), 0x8000); main.set(c.prg.subarray(0, 0x8000), 0x10000);
+      return { main, sound: c.snd, tiles: c.t, sprites: c.s, spriteLut: c.lut, speech: cat(c.v3, c.v4) };
+    },
+  },
+  {
+    // Salamander (version D). MAME 2003 names the chips by board location ("18b.bin"), newer sets "587-d02.18b".
+    Board: Salamander,
+    chips: [['b18', 0x10000, [/^(587-d02\.)?18b(\.bin)?$/]], ['c18', 0x10000, [/^(587-d05\.)?18c(\.bin)?$/]],
+      ['b17', 0x20000, [/^(587-c03\.)?17b(\.bin)?$/]], ['c17', 0x20000, [/^(587-c06\.)?17c(\.bin)?$/]],
+      ['snd', 0x8000, [/^(587-d09\.)?11j(\.bin)?$/]], ['vlm', 0x4000, [/^(587-d08\.)?8g(\.bin)?$/]], ['pcm', 0x20000, [/^(587-c01\.)?10a(\.bin)?$/]]],
+    assemble: (c) => {
+      const main = new Uint8Array(0x80000);
+      main.set(interleave(c.b18, c.c18), 0); main.set(interleave(c.b17, c.c17), 0x40000);
+      return { main, sound: c.snd, speech: c.vlm, samples: c.pcm };
+    },
+  },
+  {
+    // Qix (set 1): the data CPU's ROMs u12-u19, the video CPU's u4-u10, the sound CPU's u27.
+    Board: Qix,
+    chips: [4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 27].map((n) => [`u${n}`, 0x800, [new RegExp(`^u${n}$`)]]),
+    assemble: (c) => ({
+      main: cat(...[12, 13, 14, 15, 16, 17, 18, 19].map((n) => c[`u${n}`])),
+      videoRom: cat(...[4, 5, 6, 7, 8, 9, 10].map((n) => c[`u${n}`])), sound: c.u27,
+    }),
+  },
+  {
+    // Gyruss (Konami): the sprite 6809's program is opcode-encrypted (decoded by the CPU core).
+    Board: Gyruss,
+    chips: [...['1', '2', '3', '9', '1a', '2a', '3a', '4', '6', '5', '8', '7', 'pr1', 'pr2', 'pr3']
+      .map((n) => [`r${n}`, null, [new RegExp(`^gyrussk\\.${n}$`)]])],
+    assemble: (c) => ({
+      main: cat(c.r1, c.r2, c.r3), sub: c.r9, sound: cat(c.r1a, c.r2a), mcu: c.r3a, chars: c.r4,
+      sprites: cat(c.r6, c.r5, c.r8, c.r7), palette: c.rpr3, spriteLut: c.rpr1, charLut: c.rpr2,
+    }),
+  },
+  {
+    // BurgerTime (Data East set 1).
+    Board: BurgerTime,
+    chips: [['b9', 0x1000, [/^aa04\.9b$/]], ['b13', 0x1000, [/^aa06\.13b$/]], ['b10', 0x1000, [/^aa05\.10b$/]], ['b15', 0x1000, [/^aa07\.15b$/]],
+      ['snd', 0x1000, [/^ab14\.12h$/]], ['k7', 0x1000, [/^aa12\.7k$/]], ['k9', 0x1000, [/^ab13\.9k$/]], ['k10', 0x1000, [/^ab10\.10k$/]],
+      ['k12', 0x1000, [/^ab11\.12k$/]], ['k13', 0x1000, [/^aa8\.13k$/]], ['k15', 0x1000, [/^ab9\.15k$/]],
+      ['t1', 0x800, [/^ab00\.1b$/]], ['t3', 0x800, [/^ab01\.3b$/]], ['t4', 0x800, [/^ab02\.4b$/]], ['map', 0x800, [/^ab03\.6b$/]]],
+    assemble: (c) => ({
+      main: cat(c.b9, c.b13, c.b10, c.b15), sound: c.snd, chars: cat(c.k7, c.k9, c.k10, c.k12, c.k13, c.k15),
+      tiles: cat(c.t1, c.t3, c.t4), tileMap: c.map,
+    }),
+  },
+  {
+    // Time Pilot '84 (set 1).
+    Board: TimePilot84,
+    chips: [['j7', 0x2000, [/^tp84_7j/]], ['j8', 0x2000, [/^tp84_8j/]], ['j9', 0x2000, [/^tp84_9j/]], ['j10', 0x2000, [/^tp84_10j/]],
+      ['d10', 0x2000, [/^tp84_10d/]], ['a6', 0x2000, [/^tp84s_6a/]], ['c2', 0x2000, [/^tp84_2j/]], ['c1', 0x2000, [/^tp84_1j/]],
+      ...[12, 13, 14, 15].map((n) => [`s${n}`, 0x2000, [new RegExp(`^tp84_${n}a`)]]),
+      ['r', 0x100, [/^tp84_2c/]], ['g', 0x100, [/^tp84_2d/]], ['b', 0x100, [/^tp84_1e/]], ['clut', 0x100, [/^tp84_1f/]], ['slut', 0x100, [/^tp84_16c/]]],
+    assemble: (c) => ({
+      main: cat(c.j7, c.j8, c.j9, c.j10), sub: c.d10, sound: c.a6, chars: cat(c.c2, c.c1), sprites: cat(c.s12, c.s13, c.s14, c.s15),
+      red: c.r, green: c.g, blue: c.b, charLut: c.clut, spriteLut: c.slut,
+    }),
+  },
+  {
     // Parodius Da! (World): 955l02's last 32K is the fixed ROM at 8000.
     Board: Parodius,
     chips: [['l01', 0x20000, [/^955[a-z]01/]], ['l02', 0x20000, [/^955[a-z]02/]], ['snd', 0x10000, [/^955e03/]],
@@ -1734,13 +1806,15 @@ const BOARDS = [
     [Galaga88, 'g8', [[0, 'g81_p0'], [1, 'g81_p1'], [5, 'g81_p5'], [6, 'g8x_p6'], [7, 'g8x_p7']],
       ['g81_s0', 'g81_s1'], ['g81_v0', 'g81_v1', 'g81_v2', 'g81_v3', 'g81_v4', 'g81_v5'], ['g8_chr-0', 'g8_chr-1', 'g8_chr-2', 'g8_chr-3'], 'g8_chr-8',
       ['g8_obj-0', 'g8_obj-1', 'g8_obj-2', 'g8_obj-3', 'g8_obj-4', 'g8_obj-5']],
+    [PacMania, 'pn', [[6, 'pn_prg-6'], [7, 'pnx_p7']],
+      ['pnx_s0', 'pnx_s1'], ['pnx_v0'], ['pn_chr-0', 'pn_chr-1', 'pn_chr-2', 'pn_chr-3'], 'pn1_c8', ['pn_obj-0', 'pnx_obj1']],
   ].map(([Board, , prg, snd, voice, chars, mask, objs]) => ({
     Board,
     chips: [...prg.map(([, n]) => n), ...snd, ...voice, ...chars, mask, ...objs].map((n) => [n, null, [new RegExp(`^${n.replace('-', '-')}\\.bin$`)]])
       .concat([['mcu', 0x1000, [/^ns1-mcu\.bin$|^cus64/]]]),
     assemble: (c) => {
       const prgRom = new Uint8Array(0x400000);
-      for (const [slot, n] of prg) for (let k = 0; k < 8; k++) prgRom.set(c[n].subarray(0, 0x10000), slot * 0x80000 + k * 0x10000);
+      for (const [slot, n] of prg) for (let o = 0; o < 0x80000; o += c[n].length) prgRom.set(c[n], slot * 0x80000 + o);   // repeated through its 512K slot
       const sound = new Uint8Array(0x2C000);
       sound.set(c[snd[0]], 0xC000); sound.set(c[snd[1]], 0x1C000);
       // Voice ROMs sit 128K apart; a 64K one appears twice.
