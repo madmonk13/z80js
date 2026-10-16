@@ -55,7 +55,9 @@ import { Asteroids, AsteroidsDeluxe, LunarLander } from './asteroids.js';
 import { Tempest } from './tempest.js';
 import { Battlezone, RedBaron } from './bzone.js';
 import { BlackWidow, Gravitar, SpaceDuel } from './bwidow.js';
-import { StarWars } from './starwars.js';
+import { StarWars, EmpireStrikesBack } from './starwars.js';
+import { ReturnOfTheJedi } from './jedi.js';
+import { Kangaroo } from './kangaroo.js';
 import { TailGunner } from './tailg.js';
 import { Silkworm } from './tecmo.js';
 import { RoboCop, HeavyBarrel } from './dec0.js';
@@ -1698,6 +1700,42 @@ const BOARDS = [
       main: cat(...['414', '413', '412', '411', '410', '409'].map((n) => c[`b${n}`])),
       vector: cat(c.b422, c.b421),
     }),
+  },
+  {
+    // Kangaroo (Sun Electronics): program tvg_75-80, sound tvg_81, the bitmap pictures tvg_83-86 (v0 v2 | v1 v3).
+    // tvg_82 is the MB8841 microcontroller, not emulated.
+    Board: Kangaroo,
+    chips: ['75', '76', '77', '78', '79', '80', '81', '83', '84', '85', '86'].map((n) => [`k${n}`, 0x1000, [new RegExp(`^tvg_${n}\\.`)]]),
+    assemble: (c) => ({
+      main: cat(c.k75, c.k76, c.k77, c.k78, c.k79, c.k80), sound: c.k81, gfx: cat(c.k83, c.k85, c.k84, c.k86),
+    }),
+  },
+  {
+    // Return of the Jedi: program 14f/13f, the banked 13d/13b/13a, sound 01c/01a, text 11t, background 06r/06n,
+    // motion objects 01h/01f/01m/01k and the two smoothing PROMs. (Named by board position, as in this ROM set.)
+    Board: ReturnOfTheJedi,
+    chips: ['14f', '13f', '13d', '13b', '13a', '01c', '01a', '11t', '06r', '06n', '01h', '01f', '01m', '01k']
+      .map((n) => [`j${n}`, null, [new RegExp(`^(136030-\\d+\\.)?${n}(_\\d+\\.bin)?$`)]])
+      .concat([['p117', 0x400, [/^136030[.-]117/]], ['p118', 0x400, [/^136030[.-]118/]]]),
+    assemble: (c) => ({
+      main: cat(c.j14f, c.j13f), banks: cat(c.j13d, c.j13b, c.j13a), sound: cat(c.j01c, c.j01a),
+      chars: c.j11t, tiles: cat(c.j06r, c.j06n), sprites: cat(c.j01h, c.j01f, c.j01m, c.j01k), smooth: cat(c.p117, c.p118),
+    }),
+  },
+  {
+    // The Empire Strikes Back: each 16K program chip holds two 8K pages; 105/106 are the slapstic's four pages.
+    Board: EmpireStrikesBack,
+    chips: ['101', '102', '203', '104', '105', '106', '107', '108', '109', '110', '111', '112', '113']
+      .map((n) => [`e${n}`, null, [new RegExp(`^136031[.-]${n}`)]]),
+    assemble: (c) => {
+      const lo = (r) => r.subarray(0, 0x2000), hi = (r) => r.subarray(0x2000, 0x4000);
+      return {
+        banked: c.e101, slap: cat(c.e105, c.e106), vector: c.e111,
+        hi: cat(lo(c.e102), lo(c.e203), lo(c.e104), hi(c.e102), hi(c.e203), hi(c.e104)),
+        sound: cat(lo(c.e113), lo(c.e112)), soundHi: cat(hi(c.e113), hi(c.e112)),
+        prom: cat(c.e110, c.e109, c.e108, c.e107),
+      };
+    },
   },
   {
     Board: StarWars,

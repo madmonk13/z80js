@@ -11,6 +11,7 @@ import { Pokey, PokeyVoice } from './pokey.js';
 import { TMS5220 } from './tms5220.js';
 import { SoundMix, RATE } from './mixer.js';
 import { capture, apply } from './state.js';
+import { defaultSwitches } from './pacman.js';
 
 const CPU_CLOCK = 12096000 / 8, IRQ_RATE = 12096000 / 4096 / 12, REFRESH = 40;
 const FRAME_CYCLES = CPU_CLOCK / REFRESH, SAMPLES_PER_FRAME = RATE / REFRESH;
@@ -318,3 +319,109 @@ export class StarWars {
 StarWars.id = 'starwars';
 StarWars.title = 'Star Wars';
 StarWars.switches = [];
+
+// The Empire Strikes Back (1985): the Star Wars board with more program behind
+// two kinds of banking. The bank bit that switches 6000-7FFF also switches
+// A000-FFFF, and 8000-9FFF is a window onto four 8K pages run by a slapstic
+// (137412-101): a chip that watches the addresses the CPU touches in its
+// window and changes page after particular sequences of them. As in MAME, it
+// sees data accesses, the target of a jump into the window and the address of
+// a jump out of it, but not the instruction stream in between (which ESB's
+// code depends on: it runs from the window).
+const SLAP101 = {
+  banks: [0x80, 0x90, 0xA0, 0xB0], start: 3,
+  // The alternate sequence's first step is unknown, so (as MAME does) the second one starts it.
+  alt2: [0x1FFF, 0x1DFE], alt3: [0x1FFC, 0x1B5C], alt4: [0x1FCF, 0x0080],
+  bit1: [0x1FF0, 0x1540], bit2c0: [0x1FF3, 0x1540], bit2s0: [0x1FF3, 0x1541], bit2c1: [0x1FF3, 0x1542], bit2s1: [0x1FF3, 0x1543],
+  bit3: [0x1FF8, 0x1550],
+};
+const S_DISABLED = 0, S_ENABLED = 1, S_BIT1 = 2, S_BIT2 = 3, S_BIT3 = 4, S_ALT2 = 5, S_ALT3 = 6;
+const hit = (v, [mask, value]) => (v & mask) === value;
+
+export class EmpireStrikesBack extends StarWars {
+  saveState() { return { ...super.saveState(), slap: Array.from(this.slap) }; }
+  loadState(s) { super.loadState(s); this.slap.set(s.slap); }
+
+  // roms: { banked 16K (6000-7FFF, two pages), slap 32K (8000-9FFF, four pages), hi 48K (A000-FFFF, two pages),
+  //         vector 4K, sound 16K (4000-7FFF), soundHi 16K (C000-FFFF), prom 4 x 1K }
+  constructor(roms) {
+    super(roms);
+    this.slap = new Int32Array(5);                 // state, page, bitwise page, bitwise xor, alternate page
+    this.lastFetch = -1;                           // the last instruction-stream address read
+    // After each instruction: a jump into the window shows the chip its target; a jump out of it
+    // shows the jump's own address (except the four bank-select addresses themselves).
+    const step = this.cpu.step.bind(this.cpu);
+    this.cpu.step = () => {
+      const prev = this.cpu.pc;
+      step();
+      const cur = this.cpu.pc;
+      if (cur === ((this.lastFetch + 1) & 0xFFFF)) return;           // straight on: not a jump
+      if ((cur & 0xE000) === 0x8000) this.slapTweak(cur & 0x1FFF);
+      else if ((prev & 0xE000) === 0x8000 && !SLAP101.banks.includes(prev & 0x1FFF)) this.slapTweak(prev & 0x1FFF);
+    };
+    this.applySwitches(defaultSwitches(EmpireStrikesBack.switches));
+    this.reset();
+  }
+
+  reset() {
+    super.reset();
+    if (this.slap) { this.slap.fill(0); this.slap[0] = S_DISABLED; this.slap[1] = SLAP101.start; }
+  }
+
+  read(a) {
+    // Reads at the program counter (and the byte after, for 16-bit operands) are the instruction stream.
+    const pc = this.cpu ? this.cpu.pc : -1, stream = a === pc || a === ((pc + 1) & 0xFFFF);
+    if (stream) this.lastFetch = a;
+    if (a >= 0xA000) return this.roms.hi[this.bank * 0x6000 + a - 0xA000];
+    if (a >= 0x8000) { const v = this.roms.slap[this.slap[1] * 0x2000 + (a & 0x1FFF)]; if (!stream) this.slapTweak(a & 0x1FFF); return v; }
+    return super.read(a);
+  }
+
+  write(a, v) {
+    if (a >= 0x8000 && a < 0xA000) { this.slapTweak(a & 0x1FFF); return; }
+    super.write(a, v);
+  }
+
+  soundRead(a) {
+    if (a >= 0xC000) return this.roms.soundHi[a - 0xC000];
+    return super.soundRead(a);
+  }
+
+  // The slapstic's state machine: offset 0 arms it; a bank address then picks a page, the
+  // alternate sequence picks one from its third address, or the bitwise sequence sets it a bit at a time.
+  slapTweak(o) {
+    const s = this.slap, S = SLAP101;
+    if (o === 0) { s[0] = S_ENABLED; return; }
+    const bankHit = S.banks.indexOf(o);
+    switch (s[0]) {
+      case S_ENABLED:
+        if (hit(o, S.bit1)) s[0] = S_BIT1;
+        else if (hit(o, S.alt2)) s[0] = S_ALT2;
+        else if (bankHit >= 0) { s[0] = S_DISABLED; s[1] = bankHit; }
+        break;
+      case S_ALT2:
+        if (hit(o, S.alt3)) { s[0] = S_ALT3; s[4] = o & 3; } else s[0] = S_ENABLED;
+        break;
+      case S_ALT3: if (hit(o, S.alt4)) { s[0] = S_DISABLED; s[1] = s[4]; } break;
+      case S_BIT1: if (bankHit >= 0) { s[0] = S_BIT2; s[2] = s[1]; s[3] = 0; } break;
+      case S_BIT2:
+        if (hit(o ^ s[3], S.bit2c0)) { s[2] &= ~1; s[3] ^= 3; }
+        else if (hit(o ^ s[3], S.bit2s0)) { s[2] |= 1; s[3] ^= 3; }
+        else if (hit(o ^ s[3], S.bit2c1)) { s[2] &= ~2; s[3] ^= 3; }
+        else if (hit(o ^ s[3], S.bit2s1)) { s[2] |= 2; s[3] ^= 3; }
+        else if (hit(o, S.bit3)) s[0] = S_BIT3;
+        break;
+      case S_BIT3: if (bankHit >= 0) { s[0] = S_DISABLED; s[1] = s[2]; } break;
+    }
+  }
+
+  // DSW0: 4 shields, moderate, Jedi letters "increment", demo sounds, no freeze. DSW1: 1 coin 1 credit.
+  applySwitches(v) { this.dsw0 = v.shields | v.difficulty | 0x30 | 0x40 | 0x80; this.dsw1 = 0xE2; }
+}
+
+EmpireStrikesBack.id = 'esb';
+EmpireStrikesBack.title = 'The Empire Strikes Back';
+EmpireStrikesBack.switches = [
+  { id: 'shields', label: 'Shields', options: [['2', 0x01], ['3', 0x00], ['4', 0x03], ['5', 0x02]], default: 0x03 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x08], ['Moderate', 0x0C], ['Hard', 0x00], ['Hardest', 0x04]], default: 0x0C },
+];

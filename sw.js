@@ -4,7 +4,7 @@
 // the current app) and falls back to the cache when offline. ROM sets under
 // roms/ aren't cached here: games kept on the device live in IndexedDB.
 
-const CACHE = 'z80js-99745c4c2d41';
+const CACHE = 'z80js-130128b70542';
 const FILES = [
   "./",
   "favicon-32.png",
@@ -64,8 +64,10 @@ const FILES = [
   "src/emu/hc55516.js",
   "src/emu/i8035.js",
   "src/emu/invaders.js",
+  "src/emu/jedi.js",
   "src/emu/k007232.js",
   "src/emu/k053260.js",
+  "src/emu/kangaroo.js",
   "src/emu/konami.js",
   "src/emu/konamiic.js",
   "src/emu/konamik.js",

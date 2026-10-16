@@ -9,7 +9,7 @@ z80js started out as an emulator for Z80-based arcade boards only, and grew from
 also runs boards built around the 6502, 6809, 68000, V30, ARM and other processors, from the
 late 1970s into the 1990s. The name may change in a future rebrand.
 
-**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **209 games supported**
+**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **212 games supported**
 
 No ROMs are included: add your own ROM sets, the zips used by MAME. A set is recognized
 by its chips' file names, so the zip's own name doesn't matter.
@@ -100,6 +100,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Jump Shot (1985) | Pac-Man board, encrypted program | `jumpshot` | **Tested:** boots, attract mode, coin, start and play |
 | Jungle King (1982) | Taito SJ (no MCU) | `junglek` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Juno First (1983) | Konami: Tutankham's board with an encrypted 6809 (Konami-1), a blitter, an 8039 DAC | `junofrst` | **Tested:** boots, attract mode, coin, start and play |
+| Kangaroo (1982) | Sun Electronics: Z80 drawing two 4-bit bitmap planes (one scrolls) through a ROM-to-bitmap DMA, colors at full or half strength by a mask register; a Z80 with an AY-3-8910. The MB8841 microcontroller isn't emulated (as in MAME); vertical monitor | `kangaroo` | **Tested:** boots, attract mode, coin, start and play with sound |
 | Kick (1981) | Bally Midway MCR (90009 CPU board), dial | `kick` (upright) | **Tested:** boots, attract mode, coin, start and play |
 | Kick Rider (1984) | Universal: Do! Run Run board, two kick buttons | `kickridr` | **Tested:** boots, attract mode, coin, start and play |
 | Knights of the Round (1991) | Capcom CPS-1 with the CPS-B-21 | `knights` (World) | **Tested:** boots, attract mode, coin, start and play |
@@ -162,6 +163,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Rally-X (1980) | Namco: 1 Z80, waveform sound, scrolling playfield, radar panel | `rallyx` | **Tested:** boots, attract mode, coin, start and play |
 | Rampage (1986) | Bally Midway MCR-III monoboard: 5 MHz Z80, the Sounds Good board (68000 and a 10-bit DAC). Start jumps (the game asks for Jump to start); fire punches | `rampage` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Red Baron (1980) | Atari: Battlezone board, flight stick, EAROM | `redbaron` | **Tested:** boots, attract mode, coin, start and play |
+| Return of the Jedi (1984) | Atari: two 6502s, a background doubled and smoothed through two PROMs, motion objects and text mixed through one 1024-color palette, four POKEYs and TMS5220 speech; analog yoke | `jedi` | **Tested:** boots, attract mode, coin, start and play with sound |
 | Rip Off (1980) | Cinematronics, 8K program; sound synthesized | `ripoff` | **Tested:** boots, attract mode, coin, start and play |
 | Robby Roto (1981) | Midway Astrocade like Wizard of Wor (no speech) | `robby` | **Tested:** boots, attract mode, coin, start and play |
 | RoboCop (1988) | Data East MEC-M1: 68000, 6502 sound CPU with YM2203 + YM3812 + OKI M6295, three BAC06 playfields with row/column scroll, MXC06 sprites; a HuC6280 (new core) runs the protection program | `robocop` | **Tested:** boots, attract mode, coin, start and play |
@@ -208,6 +210,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Tazz-Mania (1982) | Stern: Scramble board, twin sticks | `tazmania` | **Tested:** boots, attract mode, coin, start and play |
 | Teenage Mutant Ninja Turtles (1989) | Konami: 68000 with the K052109/K051960 pair, YM2151, K007232, uPD7759 speech (master mode) and the recorded title music | `tmnt` | **Tested:** boots, attract mode, coin, start and play with music and speech |
 | Tempest (1981) | Atari: 6502, color Analog Vector Generator, math box, two POKEYs (sound and the spinner) | `tempest` (rev 3) | **Tested:** boots, attract mode, coin, start and play |
+| The Empire Strikes Back (1985) | Atari: the Star Wars board plus a second program bank and a slapstic (137412-101) paging 8000-9FFF; analog yoke | `esb` | **Tested:** boots, attract mode, coin, start and play with sound |
 | The Legend of Kage (1984) | Taito: two Z80s, two YM2203s, and the 68705 MCU running its own (dumped) program; three tile layers | `lkage` | **Tested:** boots, attract mode with sound, coin, start and play |
 | The Return of Ishtar (1986) | Namco System 86; two sticks, one per character | `roishtar` | **Tested:** boots, attract, coin, start, name entry with music |
 | The Simpsons (1991) | Konami: 053248 CPU, K052109, K053247/K053251, YM2151, K053260, serial EEPROM; four players | `simpsons` | **Tested:** boots, attract mode, coin, start and play |
@@ -322,7 +325,7 @@ The touch layout follows the game:
   top is the Superzapper.
 - **Battlezone:** one stick drives both treads: up/down move, left/right turn on the spot,
   diagonals turn with one tread. Tap the right half to fire.
-- **Star Wars** and **Tail Gunner:** the stick is analog: on touch, how far the finger is
+- **Star Wars**, **The Empire Strikes Back**, **Return of the Jedi** and **Tail Gunner:** the stick is analog: on touch, how far the finger is
   from where it landed sets the yoke (up aims up); a gamepad's left stick works the same.
   Arrow keys steer it too, springing back to center. Tail Gunner's second button is the shield.
 - **Joust:** left/right, and fire flaps. **Bubbles:** an 8-way stick only.
@@ -535,7 +538,7 @@ right, up, down, fire) then holds a control.
 - `src/emu/tempest.js`: Tempest. `src/emu/bzone.js`: Battlezone. `src/emu/avg.js` is Atari's
   Analog Vector Generator (per instruction), `src/emu/mathbox.js` the math box for both.
 - `src/emu/starwars.js`: Star Wars (including the matrix processor, which runs the
-  microcode in the set's PROMs); `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/m6805.js` is a 68705 MCU core (Legend of Kage); `src/emu/segas16b.js` is Sega System 16B and `src/emu/upd7759.js` its uPD7759 ADPCM speech chip (slave mode); `src/emu/tms34010.js` is a TI TMS34010 graphics CPU core (bit-addressed fields, the X,Y instructions, PIXT, FILL and PIXBLT, the video timing and display interrupt) and `src/emu/midyunit.js` the Midway Y-unit board with its DMA blitter and the Williams CVSD and ADPCM sound boards; `src/emu/namcos86.js` is Namco System 86 and `src/emu/cus30.js` its CUS30 waveform chip (the HD63701 MCU runs on the 6803 core, which has its extra instructions); `src/emu/v30.js` is a NEC V30 (8086/80186 plus NEC's extensions) for the Irem boards. Most M72 games have an 8751 protection MCU whose program was never read out; `src/emu/m72.js` stands in for its start-up routine (leaving the bytes the games check for and jumping to their entry points) and supplies their sample start addresses; `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
+  microcode in the set's PROMs) and The Empire Strikes Back (with its slapstic); `src/emu/jedi.js`: Return of the Jedi; `src/emu/kangaroo.js`: Kangaroo; `src/emu/tms5220.js` is the TI TMS5220 speech chip and `src/emu/vlm5030.js` the Sanyo VLM5030 (Yie Ar Kung-Fu). `src/emu/m68000.js` is a Motorola 68000 core (CPS-1, Neo Geo); `src/emu/m6805.js` is a 68705 MCU core (Legend of Kage); `src/emu/segas16b.js` is Sega System 16B and `src/emu/upd7759.js` its uPD7759 ADPCM speech chip (slave mode); `src/emu/tms34010.js` is a TI TMS34010 graphics CPU core (bit-addressed fields, the X,Y instructions, PIXT, FILL and PIXBLT, the video timing and display interrupt) and `src/emu/midyunit.js` the Midway Y-unit board with its DMA blitter and the Williams CVSD and ADPCM sound boards; `src/emu/namcos86.js` is Namco System 86 and `src/emu/cus30.js` its CUS30 waveform chip (the HD63701 MCU runs on the 6803 core, which has its extra instructions); `src/emu/v30.js` is a NEC V30 (8086/80186 plus NEC's extensions) for the Irem boards. Most M72 games have an 8751 protection MCU whose program was never read out; `src/emu/m72.js` stands in for its start-up routine (leaving the bytes the games check for and jumping to their entry points) and supplies their sample start addresses; `src/emu/ym2610.js` is the Neo Geo's YM2610; `src/emu/ym2151.js` and `src/emu/okim6295.js` are the YM2151 FM chip and OKI ADPCM sample player. `src/emu/votrax.js` approximates the Votrax SC-01 (Gorf, Wizard of Wor) by formant synthesis: the vowel, glide and nasal formants and levels were measured from recordings of the real chip, its phoneme timings are the datasheet's, and the voice runs at the chip's measured 120 Hz.
 - `src/emu/tailg.js`: Tail Gunner; `src/emu/ccpu.js` is the Cinematronics CPU.
   `src/render/vector.js` draws vector games' display lists at the screen's own resolution,
   with a soft phosphor glow.
