@@ -36,6 +36,7 @@ export class Input {
     this.uiStart3 = false;
     this.uiStart4 = false;
     this.onActivity = null;   // called on keyboard or gamepad input
+    this.padStartHeld = false; // the gamepad's Start resumed the game: not a Start for it until let go
     // Extra sources (touch controls): objects with dir() -> 0x10 up / 0x20 down
     // / 0x40 left / 0x80 right bits, fire() and fire2() -> bool, spin() ->
     // dial counts turned since the last call, and optionally aim() -> the
@@ -103,11 +104,40 @@ export class Input {
       if (b(4)) spin -= KEY_SPIN;  // shoulder buttons turn a dial
       if (b(5)) spin += KEY_SPIN;
       if (b(8)) coin = true;      // Back / Select
-      if (b(9)) start1 = true;    // Start
+      if (b(9) && !this.padStartHeld) start1 = true;    // Start (not the press that just resumed from a pause)
+      if (!b(9)) this.padStartHeld = false;
       if (this.onActivity && (pl || pr || pu || pd || pf || pf2 || pf3 || b(8) || b(9))) this.onActivity();
       break;                      // one player
     }
 
     return { left, right, up, down, fire, fire2, fire3, spin, coin, start1, start2, start3, start4, aim, hyper, inviso, analog };
   }
+}
+
+// The controls a board uses, as [keys, what they do] rows for the keyboard or
+// gamepad hints (mode 'keys' or 'pad'). Built from the board's control layout,
+// the same one the touch zones use, so each game gets its own list.
+export function controlLegend(board, mode) {
+  const keys = mode === 'keys', rows = [];
+  const twoWay = board.controls === 'two-way';
+  const moveName = board.moveName ?? 'Move';
+  const dialMoves = board.dialControl && board.dialName === moveName;   // the dial moves too (Kick): one row
+  if (board.spinner) rows.push([keys ? '← →  ·  Q E  ·  wheel' : 'LB RB  ·  left stick', 'Spinner']);
+  else rows.push([keys ? (twoWay ? '← →  or  A D' : 'Arrows  or  W A S D') : (twoWay ? 'D-pad  ·  left stick (left / right)' : 'D-pad  ·  left stick'), moveName]);
+  if (dialMoves) rows[0][0] += keys ? '  ·  Q E  ·  wheel' : '  ·  LB RB';
+  if (board.twinStick) rows.push([keys ? 'I J K L' : 'Right stick', board.aimName ?? 'Fire (aim)']);
+  if (board.buttons >= 1) rows.push([keys ? 'Space  or  Z' : 'A', board.fireName ?? 'Fire']);
+  if (board.dialControl && !dialMoves) rows.push([keys ? 'Q E  ·  wheel' : 'LB RB', board.dialName ?? 'Aim']);
+  if (board.buttons >= 2) rows.push([keys ? 'X  or  Shift' : 'B', board.button2]);
+  if (board.buttons >= 3) rows.push([keys ? 'F' : 'Y', board.button3]);
+  for (const extra of board.extraControls || []) {
+    if (extra === 'hyper') rows.push([keys ? 'H' : 'LT', board.hyperName ?? 'Hyperspace']);
+    if (extra === 'inviso') rows.push([keys ? 'V' : 'RT', 'Inviso']);
+  }
+  if (!board.startsCoin) rows.push([keys ? '5  or  C' : 'Select', 'Coin']);
+  const start = board.startsCoin ? 'Coin & start' : 'Start';    // each start drops that player's coin too
+  if (board.startLabels && keys) rows.push([board.startLabels.map((_, i) => i + 1).join(' '), `${start}: ${board.startLabels.join(' · ')}`]);
+  else rows.push([keys ? '1  or  Return' : 'Start', start]);
+  if (keys) rows.push(['P', 'Pause']);
+  return rows;
 }

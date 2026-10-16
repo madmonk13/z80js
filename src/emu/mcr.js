@@ -446,6 +446,7 @@ export class Kick extends MCR {
     this.buttons = 1;
     this.dialControl = true;
     this.dialHint = ['Kick & move', 'Tap to kick; push left or right to move'];
+    this.fireName = 'Kick'; this.dialName = 'Move';
   }
   // IP0: coin, starts, kick. IP1: the dial (its low four bits); the stick also turns it.
   setInputs(s) {
@@ -573,6 +574,7 @@ export class DiscsOfTron extends Tapper {
     this.controls = 'eight-way';
     this.buttons = 0;
     this.twinStick = true;
+    this.aimName = 'Aim & throw';
   }
   // IP0: coin, starts, throw. IP1: the dial. IP2: left, right, up, down, aim down, aim up, deflect; upright cabinet.
   setInputs(s) {

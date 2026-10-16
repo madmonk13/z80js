@@ -77,6 +77,7 @@ export class CrazyClimber {
     this.controls = 'eight-way';
     this.buttons = 0;
     this.twinStick = true;                             // a stick for each arm
+    this.moveName = 'Left arm'; this.aimName = 'Right arm';
     this.roms = roms;
     this.ops = decryptOpcodes(roms.main);
     this.ram = new Uint8Array(0x400);                  // 8000-83FF

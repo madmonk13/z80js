@@ -65,7 +65,7 @@ export class CPS1 {
     this.controls = 'eight-way';
     this.buttons = cfg.buttons ?? 2;
     this.button2 = cfg.button2;
-    if (cfg.dial) { this.dialControl = true; this.dialHint = ['Fire & turn', 'Hold to fire; push left or right to turn the gun']; this.dialSpeed = 6; }
+    if (cfg.dial) { this.dialControl = true; this.dialHint = ['Fire & turn', 'Hold to fire; push left or right to turn the gun']; this.dialName = 'Turn the gun'; this.dialSpeed = 6; }
     this.roms = roms;
     this.clock = cfg.clock || 10000000;
 

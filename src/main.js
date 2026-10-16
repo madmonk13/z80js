@@ -3,7 +3,8 @@ import { extractAll } from './unzip.js';
 import { encode, decode } from './emu/state.js';
 import { Screen2D } from './render/screen2d.js';
 import { ScreenVector } from './render/vector.js';
-import { Input } from './input.js';
+import { Input, controlLegend } from './input.js';
+import { InputMode } from './input-mode.js';
 import { AudioOut } from './audio-out.js';
 import { store, readRomFile, withLoading, toast } from './shared.js';
 import { library, renderLibrary, server, romId } from './library.js';
@@ -28,6 +29,7 @@ const DEFAULTS = {
   resume: true,      // pick games up where they were left
   showAll: true,     // list every supported game, not just the ones with a ROM set added
   perf: false,       // the performance readout
+  hintsFor: 'auto',  // which controls' hints to show: 'auto' (the input last used), 'touch', 'keys' or 'pad'
 };
 
 const input = new Input();
@@ -44,6 +46,10 @@ settings.switches = { ...settings.switches };
 // Touch hints became off by default (the zone outlines now introduce the controls); turn
 // them off once for settings saved before that.
 if (!settings.hintsOffByDefault) { settings.hints = false; settings.hintsOffByDefault = true; store.set('settings', settings); }
+// Touch, keyboard or gamepad: which hints to show (the zone outlines, or a list of the keys or buttons).
+const inputMode = new InputMode({ storageKey: 'z80js.inputMode' });
+inputMode.override = settings.hintsFor;
+inputMode.onChange = () => renderControls();
 const state = { romId: null, serverFile: null, menuOpen: false, paused: false };
 const LAST_SERVER = 'lastServerFile';
 let board = null;
@@ -225,6 +231,7 @@ async function loadSet(bytes, name, id, keep = true) {
   $('fire2ZoneTitle').textContent = board.button2 || '';
   $('fire3ZoneTitle').textContent = board.button3 || '';
   renderSwitches();
+  renderControls();
   layout2D();
   const res = keep ? await library.add(name, bytes, Board.title) : { id: romId(bytes), stored: false };
   if (keep && !res.stored) toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.');
@@ -363,6 +370,7 @@ function closeMenu() {
 // the veil over the game, or P on a keyboard. The game is saved for resume.
 function setPaused(paused) {
   state.paused = paused;
+  padStartHeld = true;
   if (paused) { hideBooting(); closeStartChooser(); }
   // The control zones come back up to full strength while paused and fade down again on resume.
   document.body.classList.toggle('zones-intro', paused);
@@ -429,7 +437,35 @@ function syncMenu() {
   applySound();
   $('hapticsRow').hidden = !navigator.vibrate;
   applyControls();
+  renderControls();
 }
+
+// The game's controls for a keyboard or gamepad: the card shown as a game starts and while paused,
+// and the list in Settings. Touch players have the zone outlines instead.
+const MODE_NAMES = { touch: 'touch', keys: 'keyboard', pad: 'gamepad' };
+function renderControls() {
+  const mode = inputMode.mode;
+  const rows = board && mode !== 'touch' ? controlLegend(board, mode) : [];
+  for (const id of ['keyHelpList', 'controlList']) {
+    const dl = $(id);
+    dl.textContent = '';
+    for (const [keys, what] of rows) {
+      dl.append(Object.assign(document.createElement('dt'), { textContent: keys }), Object.assign(document.createElement('dd'), { textContent: what }));
+    }
+  }
+  for (const b of $('hintsFor').children) b.classList.toggle('active', b.dataset.mode === settings.hintsFor);
+  $('hintsForInfo').textContent = settings.hintsFor === 'auto'
+    ? `Showing ${MODE_NAMES[mode]} hints: Auto follows whichever you last used.`
+    : `Always showing ${MODE_NAMES[mode]} hints.`;
+  if (!board && mode !== 'touch') $('hintsForInfo').textContent += ' Load a game to see its controls.';
+}
+$('hintsFor').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  settings.hintsFor = b.dataset.mode; save();
+  inputMode.override = settings.hintsFor;
+  renderControls();
+});
 
 let hintTimer = 0;
 function flashHints(ms) {
@@ -697,6 +733,15 @@ const perf = {
   },
 };
 
+// A gamepad's Start button resumes a paused game (once it's been let go of since the pause).
+let padStartHeld = true;
+function resumeFromPad() {
+  const pad = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null;
+  const down = !!(pad && pad.buttons[9] && pad.buttons[9].pressed);
+  if (down && !padStartHeld) { setPaused(false); input.padStartHeld = true; }
+  padStartHeld = down;
+}
+
 let acc = 0, lastTime = performance.now();
 function tick(now) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
@@ -732,6 +777,7 @@ function tick(now) {
     }
   } else {
     acc = 0;
+    if (state.paused && !state.menuOpen) resumeFromPad();
   }
   perf.show(now, running);
 

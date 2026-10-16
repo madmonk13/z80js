@@ -385,6 +385,11 @@ The touch layout follows the game:
   for a second button (fire in one-button games), F for a third, Q/E or the mouse wheel (or the
   gamepad's shoulder buttons) to turn a dial, 5 or C for a coin, 1 or Return to start
   (2 for two players).
+- **Hints follow how you play.** On a phone or tablet the control zones show; on a computer, or as
+  soon as you press a key or a gamepad button, they're replaced by a card listing the loaded game's
+  keys (or gamepad buttons), shown as the game starts and while it's paused, and the same list is
+  in Settings › Controls. Touching the screen brings the zones back. **Hints for** in Settings fixes
+  it to Touch, Keys or Pad instead of Auto. A gamepad's Start button also resumes a paused game.
 - **Left-handed** mode in settings swaps the halves.
 - **Show control zones** (settings, on by default): a faint outline of each control's area
   with its name (Move, Fire, and the second button such as Blaster or Shield, which takes

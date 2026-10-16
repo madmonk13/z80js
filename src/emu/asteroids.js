@@ -103,6 +103,8 @@ export class Asteroids {
     this.controls = 'two-way';
     this.buttons = 2;
     this.button2 = 'Thrust';
+    this.moveName = 'Rotate';
+    this.extraControls = ['hyper'];                    // on the keyboard and gamepad only
     this.roms = roms;
     this.ram = new Uint8Array(0x400);
     this.vram = new Uint8Array(0x800);         // 4000-47FF
@@ -229,6 +231,7 @@ export class AsteroidsDeluxe extends Asteroids {
   constructor(roms) {
     super(roms);
     this.button2 = 'Thrust';
+    this.hyperName = 'Shields';
     this.analog = new AsteroidsSound();
     this.pokey = new Pokey(CPU_CLOCK, 1);
     this.pokey.readPots = () => this.dsw2;

@@ -385,6 +385,7 @@ const DefenderControls = (Base) => class extends Base {
     this.controls = 'eight-way';
     this.buttons = 2;
     this.button2 = 'Smart bomb';
+    this.extraControls = ['hyper'];                    // on the keyboard and gamepad only
     this.reverseHeld = 0;
   }
   facing() { return this.ramAt(this.facingAt) === this.facingRight ? 'right' : 'left'; }
@@ -404,7 +405,7 @@ const DefenderControls = (Base) => class extends Base {
 };
 
 export class Stargate extends DefenderControls(Williams) {
-  constructor(roms) { super(roms); this.facingAt = 0x9C92; this.facingRight = 0x03; }   // FD when facing left
+  constructor(roms) { super(roms); this.facingAt = 0x9C92; this.facingRight = 0x03; this.extraControls = ['hyper', 'inviso']; }   // FD when facing left
   ramAt(a) { return this.read(a); }
 }
 Stargate.id = 'stargate';
