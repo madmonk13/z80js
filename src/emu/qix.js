@@ -12,12 +12,13 @@
 import { M6809 } from './m6809.js';
 import { M6803 } from './m6803.js';
 import { PIA6821 } from './pia6821.js';
+import { M6805 } from './m6805.js';
 import { SoundMix, RATE } from './mixer.js';
 import { rgba, rotate270 } from './video.js';
 import { capture, apply } from './state.js';
 
 const W = 256, H = 256, LINES = 264, REFRESH = 60, SLICES = 4;
-const CPU_CLOCK = 1250000, SOUND_CLOCK = 7372800 / 8;
+const CPU_CLOCK = 1250000, SOUND_CLOCK = 7372800 / 8, MCU_CLOCK = 1000000;
 const STATE = ['shared', 'dataRam', 'cmos', 'vram', 'palRam', 'palBank', 'vaddr', 'soundRam', 'latch34', 'latch43',
   'irqs', 'scanline', 'in0', 'coins', 'frameNo', 'setup', 'cycleCarry', 'videoCarry', 'soundCarry', 'sampleCarry',
   'cpu', 'video', 'snd', 'pia', 'dac'];
@@ -211,6 +212,7 @@ export class Qix {
         this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
         this.videoCarry += step;
         this.videoCarry -= this.video.run(Math.floor(this.videoCarry));
+        if (this.mcu) { this.mcuCarry += MCU_CLOCK / REFRESH / LINES / SLICES; this.mcuCarry -= this.mcu.run(Math.floor(this.mcuCarry)); }
         const c0 = this.snd.cycles;
         this.soundCarry += sstep; this.snd.run(Math.floor(this.soundCarry)); this.soundCarry -= this.snd.cycles - c0;
       }
@@ -228,3 +230,108 @@ export class Qix {
 Qix.id = 'qix';
 Qix.title = 'Qix';
 Qix.switches = [];
+
+// Zoo Keeper (1982): the Qix board with the data CPU's RAM and PIAs moved down
+// to page 0 for 32K of program ROM, an 8K bank of the video CPU's ROM switched
+// at A000, and a 68705 that counts the coins. The MCU reads the coin door and
+// passes credits to the data CPU through PIA 0's port B; PIA 2's port B
+// interrupts it. A horizontal monitor.
+const ZOO_LINES = 240;
+const ZOO_STATE = ['zooBank', 'mcuRam', 'mcuOut', 'mcuDdr', 'coinCtrl', 'mcuCarry', 'mcu'];
+
+export class ZooKeeper extends Qix {
+  saveState() { return { ...super.saveState(), ...capture(this, ZOO_STATE) }; }
+  loadState(s) { super.loadState(s); apply(this, ZOO_STATE, s); }
+
+  // roms: { main (8000-FFFF), videoRom (the video CPU's 0x12000 region), sound (D000-FFFF), mcu (2K) }
+  constructor(roms) {
+    super(roms);
+    this.width = W; this.height = ZOO_LINES;
+    this.frame = new Uint32Array(W * ZOO_LINES);
+    this.buttons = 1;
+    this.button2 = null;
+    this.mcuRam = new Uint8Array(0x80);
+    this.mcuOut = new Uint8Array(3); this.mcuDdr = new Uint8Array(4);
+    this.pia[0].inB = () => this.mcuOut[0];
+    this.pia[0].pinsA = this.pia[2].pinsA = true;   // the game sets the joystick ports to outputs, all high
+    this.pia[2].outB = (v) => { this.coinCtrl = v; this.mcu.setIrq(!(v & 0x04)); };
+    this.mcu = new M6805({ read: (a) => this.mcuRead(a), write: (a, v) => this.mcuWrite(a, v), edge: true });
+    this.reset();
+  }
+
+  reset() {
+    this.zooBank = 0; this.coinCtrl = 0; this.mcuCarry = 0;
+    if (!this.mcu) return super.reset();
+    for (const a of [this.mcuRam, this.mcuOut, this.mcuDdr]) a.fill(0);
+    super.reset();
+    this.mcu.reset();
+  }
+
+  read(a) {
+    if (a >= 0x8000) return this.roms.main[a - 0x8000];
+    if (a < 0x400) return this.shared[a];
+    if (a < 0x800) return this.dataRam[a - 0x400];
+    if (a < 0xC00) return 0;
+    if (a < 0x1000) { if (a & 1) this.cpu.firq = false; else this.video.firq = true; return 0xFF; }
+    if (a < 0x2000) return this.pia[[3, 0, 1, 2][(a >> 10) & 3]].read(a & 3);
+    return 0xFF;
+  }
+  write(a, v) {
+    if (a >= 0x2000) return;
+    if (a < 0x400) { this.shared[a] = v; return; }
+    if (a < 0x800) { this.dataRam[a - 0x400] = v; return; }
+    if (a < 0xC00) return;
+    if (a < 0x1000) { if (a & 1) this.cpu.firq = false; else this.video.firq = true; return; }
+    this.pia[[3, 0, 1, 2][(a >> 10) & 3]].write(a & 3, v);
+  }
+
+  videoRead(a) {
+    if (a >= 0xC000) return this.roms.videoRom[a];
+    if (a >= 0xA000) return this.roms.videoRom[this.zooBank ? a + 0x6000 : a];
+    return super.videoRead(a);
+  }
+  videoWrite(a, v) {
+    if (a >= 0x8800 && a < 0x8C00) { this.palBank = v & 3; if (a & 1) this.zooBank = (v >> 2) & 1; return; }
+    super.videoWrite(a, v);
+  }
+
+  // The CRTC shows 30 rows of 8 lines from the bitmap's line 8.
+  render() {
+    const out = this.frame, v = this.vram, pal = this.palette, base = this.palBank * 256;
+    for (let i = 0, o = 8 * W; i < W * ZOO_LINES; i++) out[i] = pal[base + v[o + i]];
+  }
+
+  soundRead(a) {
+    if (a >= 0xD000) return this.roms.sound[a - 0xD000];
+    return super.soundRead(a);
+  }
+
+  // The coin MCU: ports A-C (each pin an input or an output by its DDR), RAM, ROM.
+  mcuRead(a) {
+    a &= 0x7FF;
+    if (a < 3) {
+      // Port A: PIA 0's port B, which drives its latched value once its DDR turns outward.
+      const c = this.coins, p = this.pia[0];
+      const pin = [(p.outRegB & p.ddrB) | (~p.ddrB & 0xFF), (c & 0x0F) | ((c & 0x80) >> 3), (this.coinCtrl & 0x08) | ((c & 0x70) >> 4)][a];
+      return (this.mcuOut[a] & this.mcuDdr[a]) | (pin & ~this.mcuDdr[a]);
+    }
+    if (a < 0x80) return this.mcuRam[a];
+    return this.roms.mcu[a];
+  }
+  mcuWrite(a, v) {
+    a &= 0x7FF;
+    if (a < 3) this.mcuOut[a] = v;
+    else if (a >= 4 && a < 8) this.mcuDdr[a - 4] = v;
+    else if (a >= 0x10 && a < 0x80) this.mcuRam[a] = v;
+  }
+
+  // Player 1 (PIA 0 A): up, right, down, left, start 1, start 2, jump. Coin door (to the MCU): coin 1 on bit 4.
+  setInputs(s) {
+    this.in0 = 0xFF & ~((s.up ? 1 : 0) | (s.right ? 2 : 0) | (s.down ? 4 : 0) | (s.left ? 8 : 0)
+      | (s.start1 ? 0x10 : 0) | (s.start2 ? 0x20 : 0) | (s.fire ? 0x40 : 0));
+    this.coins = 0xFF & ~(s.coin ? 0x10 : 0);
+  }
+}
+ZooKeeper.id = 'zookeep';
+ZooKeeper.title = 'Zoo Keeper';
+ZooKeeper.switches = [];

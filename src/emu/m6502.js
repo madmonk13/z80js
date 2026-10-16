@@ -104,6 +104,7 @@ export class CPU6502 {
     this.n = 0; this.v = 0; this.d = 0; this.i = 1; this.z = 0; this.c = 0;
     this.irq = false;       // IRQ line (level): taken while the I flag is clear
     this.nmiPending = false;
+    this.binaryOnly = false; // the Ricoh 2A03 has no decimal mode: ADC and SBC ignore D
   }
 
   nmi() { this.nmiPending = true; }
@@ -151,7 +152,7 @@ export class CPU6502 {
 
   adc(v) {
     const a = this.a, c = this.c;
-    if (this.d) {
+    if (this.d && !this.binaryOnly) {
       let al = (a & 0x0F) + (v & 0x0F) + c;
       if (al >= 0x0A) al = ((al + 0x06) & 0x0F) + 0x10;
       let r = (a & 0xF0) + (v & 0xF0) + al;
@@ -175,7 +176,7 @@ export class CPU6502 {
     this.v = ((a ^ v) & (a ^ r) & 0x80) ? 1 : 0;
     this.c = r >= 0 ? 1 : 0;
     this.nz(r & 0xFF);
-    if (this.d) {
+    if (this.d && !this.binaryOnly) {
       let al = (a & 0x0F) - (v & 0x0F) - b;
       if (al < 0) al = ((al - 0x06) & 0x0F) - 0x10;
       let ad = (a & 0xF0) - (v & 0xF0) + al;

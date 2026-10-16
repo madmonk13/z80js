@@ -24,13 +24,15 @@
 import { Galaga } from './galaga.js';
 import { PacMan, MsPacMan, JrPacMan, Piranha, CrushRoller, PuckMan, PacManPlus, Eyes, MrTNT, LizardWizard, Ponpoko, JumpShot, MakeTrax, MagicBrush, DreamShopper } from './pacman.js';
 import { Galaxian, MoonCresta, Eagle, UniWarS, Pisces, BlackHole, Swarm, RedUFO, MoonAlien, WarOfTheBugs } from './galaxian.js';
-import { DonkeyKong, DonkeyKongJr } from './dkong.js';
+import { DonkeyKong, DonkeyKongJr, DonkeyKong3 } from './dkong.js';
 import { Frogger } from './frogger.js';
 import { Scramble, Amidar, SuperCobra, ArmoredCar, TazzMania, Anteater } from './scramble.js';
 import { DigDug } from './digdug.js';
 import { TimePilot, Pooyan } from './timeplt.js';
 import { MrDo } from './mrdo.js';
-import { SatansHollow, Tron, Tapper, Kick, DominoMan, Timber, SolarFox, Wacko } from './mcr.js';
+import { SatansHollow, Tron, Tapper, Kick, DominoMan, Timber, SolarFox, Wacko, Journey, DiscsOfTron } from './mcr.js';
+import { Rampage, Sarge, SpyHunter, CraterRaider } from './mcr3.js';
+import { ElevatorAction, JungleKing, FrontLine } from './taitosj.js';
 import { Bosconian, Xevious, SuperXevious } from './bosco.js';
 import { Berzerk, Frenzy } from './berzerk.js';
 import { RallyX, NewRallyX } from './rallyx.js';
@@ -76,7 +78,10 @@ import { ShaolinsRoad } from './shaolins.js';
 import { TimePilot84 } from './tp84.js';
 import { BurgerTime } from './btime.js';
 import { Gyruss } from './gyruss.js';
-import { Qix } from './qix.js';
+import { Qix, ZooKeeper } from './qix.js';
+import { CrazyClimber } from './cclimber.js';
+import { PunchOut } from './punchout.js';
+import { DoubleDragon } from './ddragon.js';
 import { Salamander } from './nemesis.js';
 import { BladesOfSteel } from './bladestl.js';
 import { MarvelSuperHeroes } from './cps2.js';
@@ -91,6 +96,131 @@ import { Gorf, WizardOfWor, RobbyRoto, SpaceZap, ExtraBases, SeaWolf2 } from './
 import { Robotron, Joust, Bubbles, Splat, Stargate, Defender, Sinistar, Colony7, Mayday } from './williams.js';
 
 const BOARDS = [
+  // ---- Taito SJ
+  {
+    Board: ElevatorAction,
+    chips: [
+      ...['69', '68', '67', '66', '65', '64', '55', '54', '70', '71', '1', '2', '3', '4', '5', '6', '7', '8'].map((n) => [`ic${n}`, 0x1000, [new RegExp(`^ea-ic${n}\\.`)]]),
+      ['mcu', 0x800, [/^ba3\.11/]], ['prom', 0x100, [/^eb16\.22/]],
+    ],
+    assemble: (c) => ({
+      main: placeAt(0x12000, [[0, c.ic69], [0x1000, c.ic68], [0x2000, c.ic67], [0x3000, c.ic66], [0x4000, c.ic65], [0x5000, c.ic64], [0x6000, c.ic55], [0x7000, c.ic54]]),
+      sound: cat(c.ic70, c.ic71), gfx: cat(c.ic1, c.ic2, c.ic3, c.ic4, c.ic5, c.ic6, c.ic7, c.ic8), mcu: c.mcu, prom: c.prom,
+    }),
+  },
+  {
+    Board: JungleKing,
+    chips: [
+      ...['21-1', '22-1', '43', '24', '25', '46', '47', '28', '60', '37', '38', '59-1', '29', '30', '51', '52', '53', '34', '55', '56']
+        .map((n) => [`kn${n}`, 0x1000, [new RegExp(`^kn${n}\\.`)]]),
+      ['prom', 0x100, [/^eb16\.22/]],
+    ],
+    assemble: (c) => ({
+      main: placeAt(0x12000, [[0, c['kn21-1']], [0x1000, c['kn22-1']], [0x2000, c.kn43], [0x3000, c.kn24], [0x4000, c.kn25], [0x5000, c.kn46],
+        [0x6000, c.kn47], [0x7000, c.kn28], [0x11000, c.kn60]]),
+      sound: cat(c.kn37, c.kn38, c['kn59-1']), gfx: cat(c.kn29, c.kn30, c.kn51, c.kn52, c.kn53, c.kn34, c.kn55, c.kn56), prom: c.prom,
+    }),
+  },
+  {
+    Board: FrontLine,
+    chips: [
+      ...['69', '68', '67', '66', '65', '64', '55', '54', '53', '52', '70', '71', '1', '2', '3', '4', '5', '6', '7', '8']
+        .map((n) => [`fl${n}`, 0x1000, [new RegExp(`^fl${n}\\.u${n}$`)]]),
+      ['e000', 0x1000, [/^aa1_10\.8/]], ['mcu', 0x800, [/^aa1\.13/]], ['prom', 0x100, [/^eb16\.22/]],
+    ],
+    assemble: (c) => ({
+      main: placeAt(0x12000, [[0, c.fl69], [0x1000, c.fl68], [0x2000, c.fl67], [0x3000, c.fl66], [0x4000, c.fl65], [0x5000, c.fl64],
+        [0x6000, c.fl55], [0x7000, c.fl54], [0xE000, c.e000], [0x10000, c.fl53], [0x11000, c.fl52]]),
+      sound: cat(c.fl70, c.fl71), gfx: cat(c.fl1, c.fl2, c.fl3, c.fl4, c.fl5, c.fl6, c.fl7, c.fl8), mcu: c.mcu, prom: c.prom,
+    }),
+  },
+  // ---- Bally Midway MCR-3 and late MCR-2
+  {
+    Board: Rampage,
+    chips: [
+      ['pro0', 0x8000, [/^pro0rev3/]], ['pro1', 0x8000, [/^pro1rev3/]],
+      ['u7', 0x8000, [/^ramp_u7/]], ['u17', 0x8000, [/^ramp_u17/]], ['u8', 0x8000, [/^ramp_u8/]], ['u18', 0x8000, [/^ramp_u18/]],
+      ['bg0', 0x4000, [/^bg-0/]], ['bg1', 0x4000, [/^bg-1/]],
+      ...[0, 1, 2, 3].map((n) => [`fg${n}`, 0x10000, [new RegExp(`^fg-${n}`)]]),
+    ],
+    // The background ROMs are read inverted.
+    assemble: (c) => ({
+      main: cat(c.pro0, c.pro1), squeak: cat(interleave(c.u7, c.u17), interleave(c.u8, c.u18)),
+      bg: cat(c.bg0, c.bg1).map((v) => v ^ 0xFF), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3),
+    }),
+  },
+  {
+    Board: Sarge,
+    chips: [
+      ['p0', 0x8000, [/^cpu_3b/]], ['p1', 0x8000, [/^cpu_5b/]], ['u5', 0x2000, [/^tcs_u5/]], ['u4', 0x2000, [/^tcs_u4/]],
+      ['bg0', 0x2000, [/^til_15a/]], ['bg1', 0x2000, [/^til_14b/]],
+      ['fg0', 0x8000, [/^spr_8e/]], ['fg1', 0x8000, [/^spr_6e/]], ['fg2', 0x8000, [/^spr_5e/]], ['fg3', 0x8000, [/^spr_4e/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.p0, c.p1), squeak: cat(c.u5, c.u4),
+      bg: cat(c.bg0, c.bg1).map((v) => v ^ 0xFF), fg: cat(c.fg0, c.fg1, c.fg2, c.fg3),
+    }),
+  },
+  {
+    Board: SpyHunter,
+    chips: [
+      ...[0, 1, 2, 3, 4].map((n) => [`p${n}`, 0x2000, [new RegExp(`^cpu_pg${n}`)]]), ['p5', 0x4000, [/^cpu_pg5/]],
+      ['s0', 0x1000, [/^snd_0sd/]], ['s1', 0x1000, [/^snd_1sd/]],
+      ['u7', 0x2000, [/^csd_u7a/]], ['u17', 0x2000, [/^csd_u17b/]], ['u8', 0x2000, [/^csd_u8c/]], ['u18', 0x2000, [/^csd_u18d/]],
+      ...[0, 1, 2, 3].map((n) => [`bg${n}`, 0x2000, [new RegExp(`^cpu_bg${n}`)]]),
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => [`fg${n}`, 0x4000, [new RegExp(`^vid_${n}fg`)]]),
+      ['alpha', 0x1000, [/^cpu_alph/]], ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.p0, c.p1, c.p2, c.p3, c.p4, c.p5), sound: cat(c.s0, c.s1),
+      squeak: cat(interleave(c.u7, c.u17), interleave(c.u8, c.u18)),
+      bg: cat(c.bg0, c.bg1, c.bg2, c.bg3), fg: cat(c.fg1, c.fg0, c.fg3, c.fg2, c.fg5, c.fg4, c.fg7, c.fg6),
+      alpha: c.alpha, prom: c.prom,
+    }),
+  },
+  {
+    Board: CraterRaider,
+    chips: [
+      ...['6d', '7d', '8d', '9d', '10d'].map((n) => [`p${n}`, 0x2000, [new RegExp(`^crcpu\\.${n}$`)]]),
+      ['s4', 0x1000, [/^crsnd4/]], ['s1', 0x1000, [/^crsnd1/]], ['s2', 0x1000, [/^crsnd2/]], ['s3', 0x1000, [/^crsnd3/]],
+      ...['3a', '4a', '5a', '6a'].map((n) => [`bg${n}`, 0x2000, [new RegExp(`^crcpu\\.${n}$`)]]),
+      ...['a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10'].map((n) => [`fg${n}`, 0x4000, [new RegExp(`^crvid\\.${n}$`)]]),
+      ['alpha', 0x1000, [/^crcpu\.10g$/]], ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.p6d, c.p7d, c.p8d, c.p9d, c.p10d), sound: cat(c.s4, c.s1, c.s2, c.s3),
+      bg: cat(c.bg3a, c.bg4a, c.bg5a, c.bg6a), fg: cat(c.fga4, c.fga3, c.fga6, c.fga5, c.fga8, c.fga7, c.fga10, c.fga9),
+      alpha: c.alpha, prom: c.prom,
+    }),
+  },
+  {
+    Board: Journey,
+    chips: [
+      ...['d2', 'd3', 'd4', 'd5', 'd6'].map((n) => [n, 0x2000, [new RegExp(`^${n}$`)]]),
+      ...['a', 'b', 'c', 'd'].map((n) => [`s${n}`, 0x1000, [new RegExp(`^${n}$`)]]),
+      ['g3', 0x2000, [/^g3$/]], ['g4', 0x2000, [/^g4$/]],
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => [`a${n}`, 0x2000, [new RegExp(`^a${n}$`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.d2, c.d3, c.d4, c.d5, c.d6), sound: cat(c.sa, c.sb, c.sc, c.sd),
+      bg: cat(c.g3, c.g4), fg: cat(c.a7, c.a8, c.a5, c.a6, c.a3, c.a4, c.a1, c.a2), prom: c.prom,
+    }),
+  },
+  {
+    Board: DiscsOfTron,
+    chips: [
+      ['p0', 0x4000, [/^loc-pg0/]], ['p1', 0x4000, [/^loc-pg1\.2c/]], ['p2', 0x4000, [/^loc-pg2/]], ['p3', 0x2000, [/^loc-pg1\.4c/]],
+      ...[0, 1, 2, 3].map((n) => [`s${n}`, 0x1000, [new RegExp(`^sound${n}`)]]),
+      ['bg2', 0x2000, [/^loc-bg2/]], ['bg1', 0x2000, [/^loc-bg1/]],
+      ...['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((n) => [`fg${n}`, 0x2000, [new RegExp(`^loc-${n}\\.`)]]),
+      ['prom', 0x20, [/^82s123/]],
+    ],
+    assemble: (c) => ({
+      main: cat(c.p0, c.p1, c.p2, c.p3), sound: cat(c.s0, c.s1, c.s2, c.s3),
+      bg: cat(c.bg2, c.bg1), fg: cat(c.fgg, c.fgh, c.fge, c.fgf, c.fgc, c.fgd, c.fga, c.fgb), prom: c.prom,
+    }),
+  },
   {
     Board: Galaga,
     chips: [
@@ -795,6 +925,46 @@ const BOARDS = [
     assemble: (c) => ({
       main: cat(c.main0, c.main1, c.main2, c.main3), u5: c.u5, u6: c.u6, u7: c.u7,
       tiles: c.tiles, sprites: c.sprites, palette: c.palette, lut: c.lut, wave: c.wave,
+    }),
+  },
+  {
+    // Double Dragon (Japan): program 21j-1-5 at 8000 and three more 32K banks, the sprite MCU, the sound
+    // program, text tiles, sprites 21j-a-h, background tiles 21j-8/9/i/j and the two ADPCM ROMs.
+    Board: DoubleDragon,
+    chips: [...['0-1', '1-5', '2-3', '3', '4-1', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+      .map((n) => [`r${n.replace('-', '_')}`, null, [new RegExp(`^21j-${n}$`)]]), ['mcu', 0x4000, [/^63701\.bin$/]]],
+    assemble: (c) => ({
+      main: placeAt(0x28000, [[0x8000, c.r1_5], [0x10000, c.r2_3], [0x18000, c.r3], [0x20000, c.r4_1]]),
+      sub: c.mcu, sound: c.r0_1, chars: c.r5,
+      sprites: cat(c.ra, c.rb, c.rc, c.rd, c.re, c.rf, c.rg, c.rh), tiles: cat(c.r8, c.r9, c.ri, c.rj), adpcm: cat(c.r6, c.r7),
+    }),
+  },
+  {
+    // Punch-Out!! (US): program chp1-c.8l-8f, the 2A03's 8K, both screens' tiles, the two big sprites' tiles
+    // (gaps where the board has empty sockets read as FF), the six palette PROMs and the speech ROM.
+    Board: PunchOut,
+    chips: [...['c.8l', 'c.8k', 'c.8j', 'c.8h', 'c.8f', 'c.4k', 'c.6p', 'b.4a', 'b.4b', 'b.4c', 'b.4d', 'b.6e', 'b.7e', 'b.6f', 'b.8e', 'b.7f', 'b.8f',
+      'v.2r', 'v.2t', 'v.2u', 'v.2v', 'v.3r', 'v.3t', 'v.3u', 'v.3v', 'v.4r', 'v.4t', 'v.4u', 'v.6p', 'v.6n', 'v.8p', 'v.8n']
+      .map((n) => [n.replace('.', ''), null, [new RegExp(`^chp1-${n.replace('.', '\\.')}$`)]])],
+    assemble: (c) => ({
+      main: cat(c.c8l, c.c8k, c.c8j, c.c8h, c.c8f), sound: c.c4k, speech: c.c6p,
+      top: cat(c.b4c, c.b4d), bottom: cat(c.b4a, c.b4b),
+      bs1: placeAt(0x30000, [[0, c.v2r], [0x4000, c.v2t], [0x8000, c.v2u], [0xC000, c.v2v], [0x10000, c.v3r], [0x14000, c.v3t],
+        [0x18000, c.v3u], [0x1C000, c.v3v], [0x20000, c.v4r], [0x24000, c.v4t], [0x28000, c.v4u]]),
+      bs2: placeAt(0x10000, [[0, c.v6p], [0x2000, c.v6n], [0x8000, c.v8p], [0xA000, c.v8n]]),
+      red: cat(c.b6e, c.b7e), green: cat(c.b6f, c.b8e), blue: cat(c.b7f, c.b8f),
+    }),
+  },
+  {
+    // Donkey Kong 3 (US): program dk3c.7b-7d at 0000 and 7e at 8000, the two 2A03 programs, tiles, sprites,
+    // the palette PROMs (red/green, blue) and the tile colors.
+    Board: DonkeyKong3,
+    chips: [...['7b', '7c', '7d', '7e', '5l', '6h'].map((n) => [`c${n}`, 0x2000, [new RegExp(`^dk3c\\.${n}$`)]]),
+      ...['3n', '3p', '7c', '7d', '7e', '7f'].map((n) => [`v${n}`, 0x1000, [new RegExp(`^dk3v\\.${n}$`)]]),
+      ['palRG', 0x200, [/^dkc1-c\.1d$/]], ['palB', 0x200, [/^dkc1-c\.1c$/]], ['colors', 0x100, [/^dkc1-v\.2n$/]]],
+    assemble: (c) => ({
+      main: placeAt(0xA000, [[0, c.c7b], [0x2000, c.c7c], [0x4000, c.c7d], [0x8000, c.c7e]]), snd1: c.c5l, snd2: c.c6h,
+      tiles: cat(c.v3n, c.v3p), sprites: cat(c.v7c, c.v7d, c.v7e, c.v7f), palRG: c.palRG, palB: c.palB, colors: c.colors,
     }),
   },
   {
@@ -1780,6 +1950,31 @@ const BOARDS = [
     },
   },
   {
+    // Crazy Climber (US): program cc11-cc07, tiles/sprites cc06/cc04 (set 1) and cc05/cc03 (set 2), each a
+    // 2K chip in a 4K slot; the big sprite cc02/cc01; the three palette PROMs; voice samples cc13/cc12.
+    Board: CrazyClimber,
+    chips: [...['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map((n) => [`cc${n}`, null, [new RegExp(`^cc${n}$`)]]),
+      ...[1, 2, 3].map((n) => [`pr${n}`, 0x20, [new RegExp(`^cclimber\\.pr${n}$`)]])],
+    assemble: (c) => ({
+      main: cat(c.cc11, c.cc10, c.cc09, c.cc08, c.cc07),
+      gfx: placeAt(0x4000, [[0, c.cc06], [0x1000, c.cc04], [0x2000, c.cc05], [0x3000, c.cc03]]),
+      big: cat(c.cc02, c.cc01), palette: cat(c.pr1, c.pr2, c.pr3), samples: cat(c.cc13, c.cc12),
+    }),
+  },
+  {
+    // Zoo Keeper (set 1): the data CPU's za12-za19, the video CPU's za3-za10 (za3/za4 the A000 bank's
+    // second half), the sound CPU's za25-za27 and the coin MCU.
+    Board: ZooKeeper,
+    chips: [...[3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 25, 26, 27].map((n) => [`za${n}`, 0x1000, [new RegExp(`^za${n}$`)]]),
+      ['coin', 0x800, [/^za_coin\.bin$/]]],
+    assemble: (c) => ({
+      main: placeAt(0x8000, [12, 13, 14, 15, 16, 17, 18, 19].map((n, i) => [i * 0x1000, c[`za${n}`]])),
+      videoRom: placeAt(0x12000, [[0xA000, c.za5], [0xB000, c.za6], [0xC000, c.za7], [0xD000, c.za8], [0xE000, c.za9],
+        [0xF000, c.za10], [0x10000, c.za3], [0x11000, c.za4]]),
+      sound: cat(c.za25, c.za26, c.za27), mcu: c.coin,
+    }),
+  },
+  {
     // Qix (set 1): the data CPU's ROMs u12-u19, the video CPU's u4-u10, the sound CPU's u27.
     Board: Qix,
     chips: [4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 27].map((n) => [`u${n}`, 0x800, [new RegExp(`^u${n}$`)]]),
@@ -2264,6 +2459,13 @@ const BOARDS = [
       ['cc-c-00', 'cc-c-10', 'cc-c-20', 'cc-c-30'], ['cc-b-a0', 'cc-b-a1', 'cc-b-a2', 'cc-b-a3'], ['cc-b-b0', 'cc-b-b1', 'cc-b-b2', 'cc-b-b3'], 'cc-c-v0'],
   ].map(m72Entry),
 ];
+
+// A ROM region of `size` bytes with chips at given offsets (the rest 0xFF).
+function placeAt(size, parts) {
+  const out = new Uint8Array(size).fill(0xFF);
+  for (const [off, data] of parts) out.set(data, off);
+  return out;
+}
 
 function interleave(even, odd) {
   const out = new Uint8Array(even.length * 2);

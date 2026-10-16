@@ -8,15 +8,16 @@
 
 import { capture, apply } from './state.js';
 
-const STATE = ['a', 'x', 'pc', 'sp', 'h', 'i', 'n', 'z', 'c', 'irq', 'cycles'];
+const STATE = ['a', 'x', 'pc', 'sp', 'h', 'i', 'n', 'z', 'c', 'irq', 'pending', 'cycles'];
 const MASK = 0x7FF;
 
 export class M6805 {
   saveState() { return capture(this, STATE); }
   loadState(s) { apply(this, STATE, s); }
 
-  constructor({ read, write }) {
-    this.read = read; this.write = write;
+  // edge: the interrupt is latched when the line falls (setIrq) and taken once, instead of while `irq` is held.
+  constructor({ read, write, edge = false }) {
+    this.read = read; this.write = write; this.edge = edge;
     this.cycles = 0;
     this.reset();
   }
@@ -24,10 +25,11 @@ export class M6805 {
   reset() {
     this.a = 0; this.x = 0; this.sp = 0x7F;
     this.h = 0; this.i = 1; this.n = 0; this.z = 0; this.c = 0;
-    this.irq = false;
+    this.irq = false; this.pending = false;
     this.pc = ((this.read(0x7FE) << 8) | this.read(0x7FF)) & MASK;
   }
 
+  setIrq(on) { if (on && !this.irq) this.pending = true; this.irq = on; }
   get cc() { return 0xE0 | (this.h << 4) | (this.i << 3) | (this.n << 2) | (this.z << 1) | this.c; }
   set cc(v) { this.h = (v >> 4) & 1; this.i = (v >> 3) & 1; this.n = (v >> 2) & 1; this.z = (v >> 1) & 1; this.c = v & 1; }
 
@@ -46,7 +48,7 @@ export class M6805 {
   run(n) {
     const start = this.cycles, end = start + n;
     while (this.cycles < end) {
-      if (this.irq && !this.i) { this.interrupt(0x7FA); continue; }
+      if ((this.edge ? this.pending : this.irq) && !this.i) { this.pending = false; this.interrupt(0x7FA); continue; }
       this.step();
     }
     return this.cycles - start;

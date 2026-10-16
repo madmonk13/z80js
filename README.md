@@ -9,7 +9,7 @@ z80js started out as an emulator for Z80-based arcade boards only, and grew from
 also runs boards built around the 6502, 6809, 68000, V30, ARM and other processors, from the
 late 1970s into the 1990s. The name may change in a future rebrand.
 
-**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **195 games supported**
+**Play it:** [madmonk13.github.io/z80js](https://madmonk13.github.io/z80js/) · **209 games supported**
 
 No ROMs are included: add your own ROM sets, the zips used by MAME. A set is recognized
 by its chips' file names, so the zip's own name doesn't matter.
@@ -47,6 +47,8 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Centipede (1980) | Atari: MOS 6502, tiles and 8x16 sprites with palette RAM, POKEY sound, trackball | `centiped` (revision 3) | **Tested:** boots, attract mode, coin, start and play |
 | Colony 7 (1981) | Taito: Defender board, vertical monitor, three buttons | `colony7` | **Tested:** boots, attract mode, coin, start and play |
 | Cosmic Avenger (1981) | Universal: Lady Bug board, horizontal shooter with fire and bomb | `cavenger` | **Tested:** boots, attract mode, coin, start and play |
+| Crater Raider (1984) | Bally Midway MCR-III: 5 MHz Z80, scrolling 64x32-pixel background tiles, the Turbo Cheap Squeak sound board (6809 and a DAC) beside the SSIO's AY-3-8910s | `crater` | **Tested:** boots, attract mode with sound, coin, start and play |
+| Crazy Climber (1980) | Nichibutsu: Z80 with encrypted opcodes, column-scrolled tiles, a "big sprite" layer, an AY-3-8910 and 4-bit voice samples. The two sticks are the two arms; with one stick, up and down climb hand over hand | `cclimber` (US) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Crime Fighters (1989) | Konami: as Aliens, sprites between the layers | `crimfght` | **Tested:** boots, attract mode, coin, start and play |
 | Crush Roller (1981) | Pac-Man board with a protection device | `crush` (Kural Samno) | **Tested:** boots, coin, start and play |
 | Defend the Terra Attack on the Red UFO (1981) | Galaxian board | `redufo` | **Tested:** boots, attract mode, coin, start and play |
@@ -54,19 +56,24 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Dig Dug (1982) | Galaga board design plus a ROM-based background playfield, the 53xx switch reader and an EAROM | `digdug` (rev 2) | **Tested:** boots, attract mode, coin, start and play |
 | | | `digdugb`, `digdugat` | Recognized, not yet tested |
 | Dig Dug II (1985) | Namco: the Mappy board with a 56xx I/O chip | `digdug2` (new version) | **Tested:** boots, attract mode, coin, start and play |
+| Discs of Tron (1983) | Bally Midway MCR (91490 CPU board): Tron's hardware with a dial and an aim stick. The aim stick throws (twin-stick) | `dotron` (upright) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Do! Run Run (1984) | Universal: the Mr. Do's Castle board, horizontal, memory rearranged | `dorunrun` (set 1) | **Tested:** boots, attract mode, coin, start and play |
 | Domino Man (1982) | Bally Midway MCR2: the Satan's Hollow / Tron board | `domino` | **Tested:** boots, attract mode, coin, start and play |
 | Donkey Kong (1981) | Nintendo: Z80, an 8035 sound CPU with a DAC, analog effects | `dkong` (US set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Donkey Kong 3 (1983) | Nintendo: 4 MHz Z80, 512 tiles, 256 sprites, two Ricoh 2A03s (NES CPU and sound) for music and effects | `dkong3` (US) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Donkey Kong Jr. (1982) | Donkey Kong board with a second tile bank and different sound wiring | `dkongjr` (US) | **Tested:** boots, attract mode, coin, start and play |
+| Double Dragon (1987) | Technos: HD6309 (run as a 6809) with banked ROM, an HD63701 building the sprite list, a 6809 sound CPU with a YM2151 and two MSM5205 ADPCM players. Punch, kick and jump buttons | `ddragon` (Japan) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Dragon Breed (1989) | Irem M72 version, MCU stood in for | `dbreed` (M72 board set) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Dream Shopper (1982) | Sanritsu: Pac-Man board with an AY-3-8910, a vblank NMI, more RAM and program | `dremshpr` | **Tested:** boots, attract mode, coin, start and play |
 | Eagle (1980) | Centuri: Moon Cresta, unencrypted, new graphics | `eagle` | **Tested:** boots, attract mode, coin, start and play |
+| Elevator Action (1983) | Taito SJ: Z80, three scrolling character layers drawn from RAM, sprites with pixel collision, a 68705 protection MCU, a Z80 with four AY-3-8910s and a DAC | `elevator` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Extra Bases (1980) | Midway Astrocade, trackball (moved with the stick) | `ebases` | **Tested:** boots, attract mode, coin, start and play |
 | Eyes (1982) | Pac-Man board, program with swapped data lines and swapped graphics lines | `eyes` | **Tested:** boots, attract mode, coin, start and play |
 | Final Fight (1989) | Capcom CPS-1 | `ffight` (World) | **Tested:** boots, attract mode, coin, start and play |
 | Forgotten Worlds (1988) | Capcom CPS-1: 68000, Z80, YM2151, OKI MSM6295; three tile layers, block sprites, starfield; rotary gun | `forgottn` (US) | **Tested:** boots, attract mode, coin, start and play |
 | Frenzy (1982) | Berzerk board, bigger program | `frenzy` | **Tested:** boots, coin, start and play (no speech) |
 | Frogger (1981) | Konami: Galaxian-style video, a second Z80 and an AY-3-8910 for sound | `frogger` | **Tested:** boots, attract mode, coin, start and play |
+| Front Line (1982) | Taito SJ with the 68705 MCU; the soldier walks with the stick and aims where he walks; fire and grenade buttons; vertical monitor | `frontlin` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Galaga '88 (1987) | Namco System 1, vertical monitor | `galaga88` | **Tested:** boots, attract mode, coin, start and play |
 | Galaga (1981) | Namco Galaga: 3 Z80s, custom I/O chips, waveform sound | `galagao` | **Tested:** boots, attract mode, coin, start and play |
 | | | `galaga`, `galagamw`, `galagamk`, `galagamf`, `gallag` | Recognized, not yet tested |
@@ -87,9 +94,11 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Heavy Barrel (1987) | Data East 8-bit-era 68000 board (dec0) with rotary joystick and protection MCU (simulated) | `hbarrel` | **Tested:** boots, attract mode, coin, start and play |
 | Hopping Mappy (1986) | Namco System 86, no expansion board | `hopmappy` | **Tested:** boots, attract, coin, start and play with music |
 | Image Fight (1988) | Irem M72, MCU stood in for; vertical monitor | `imgfight` (Japan) | **Tested:** boots, attract mode with sound, coin, start and play |
+| Journey (1983) | Bally Midway MCR (91475 CPU board): Tron's hardware with a bigger palette. The cassette tape of "Separate Ways" isn't in the ROM set, so that stretch is silent | `journey` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Joust (1982) | Williams: Motorola 6809, a 16-color bitmap drawn by the "special chip" blitter, 6821 PIAs, CMOS settings RAM; sound board with a 6808 and a DAC | `joust` (White/Green label) | **Tested:** boots, self-test, attract mode, coin, start and play |
 | Jr. Pac-Man (1983) | Pac-Man board, encrypted program, scrolling 54-row playfield, banks | `jrpacman` | **Tested:** boots, attract mode, coin, start and play |
 | Jump Shot (1985) | Pac-Man board, encrypted program | `jumpshot` | **Tested:** boots, attract mode, coin, start and play |
+| Jungle King (1982) | Taito SJ (no MCU) | `junglek` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Juno First (1983) | Konami: Tutankham's board with an encrypted 6809 (Konami-1), a blitter, an 8039 DAC | `junofrst` | **Tested:** boots, attract mode, coin, start and play |
 | Kick (1981) | Bally Midway MCR (90009 CPU board), dial | `kick` (upright) | **Tested:** boots, attract mode, coin, start and play |
 | Kick Rider (1984) | Universal: Do! Run Run board, two kick buttons | `kickridr` | **Tested:** boots, attract mode, coin, start and play |
@@ -144,12 +153,14 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Pooyan (1982) | Konami: Time Pilot's sound board, 4-bit tiles and sprites | `pooyan` | **Tested:** boots, attract mode, coin, start and play |
 | Popeye (1982) | Nintendo: encrypted Z80, 512x448 raster, background bitmap, protection shifter, AY-3-8910 | `popeye` (revision D) | **Tested:** boots, attract mode, coin, start and play |
 | Puck Man (1980) | Namco's Japanese Pac-Man, program in eight 2K chips | `puckman` | **Tested:** boots, attract mode, coin, start and play |
+| Punch-Out!! (1984) | Nintendo: two monitors stacked into one tall picture; 4 MHz Z80, a zooming opponent sprite and a second big sprite, a Ricoh 2A03 and a VLM5030 for speech. Left punch, right punch and KO punch; up aims at the face, down blocks | `punchout` (US) | **Tested:** boots, attract mode with sound, coin, start and play |
 | Q*bert (1982) | Gottlieb System 80: Intel 8088 (on the V30 core), tiles and sprites, a 6502 sound board with a DAC and a Votrax SC-01 (approximated); vertical monitor | `qbert` | **Tested:** boots, attract mode with sound and speech, coin, start and play |
 | Q*bert's Qubes (1983) | Gottlieb System 80, sprite bank | `qbertqub` | **Tested:** boots, attract mode, coin, start and play |
 | Qix (1981) | Taito: two 6809s (game and a 256x256 8-bit bitmap), 6821 PIAs, a 6802 playing samples through a DAC; battery-backed CMOS | `qix` | **Tested:** boots (runs the operator setup on first power-on), attract mode, coin, start and play |
 | R-Type (1987) | Irem M72: NEC V30, Z80, YM2151; two tile layers with three priority levels, block sprites, a raster split for the status bar; the sound CPU runs from RAM the game loads | `rtype` (World) | **Tested:** boots, attract mode with sound, coin, start and play |
 | R-Type II (1989) | Irem M82: like M72, with ROM-based sound and a sample DAC | `rtype2` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Rally-X (1980) | Namco: 1 Z80, waveform sound, scrolling playfield, radar panel | `rallyx` | **Tested:** boots, attract mode, coin, start and play |
+| Rampage (1986) | Bally Midway MCR-III monoboard: 5 MHz Z80, the Sounds Good board (68000 and a 10-bit DAC). Start jumps (the game asks for Jump to start); fire punches | `rampage` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Red Baron (1980) | Atari: Battlezone board, flight stick, EAROM | `redbaron` | **Tested:** boots, attract mode, coin, start and play |
 | Rip Off (1980) | Cinematronics, 8K program; sound synthesized | `ripoff` | **Tested:** boots, attract mode, coin, start and play |
 | Robby Roto (1981) | Midway Astrocade like Wizard of Wor (no speech) | `robby` | **Tested:** boots, attract mode, coin, start and play |
@@ -159,6 +170,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Rolling Thunder (1986) | Namco System 86: two 6809s in lockstep, an HD63701 MCU running the sound (YM2151 and the CUS30 waveform chip), the 63701X voice player; four tile layers with priorities and sprites cut from 32x32 cells | `rthunder` | **Tested:** boots, attract mode with music and voices, coin, start and play |
 | Rush'n Attack / Green Beret (1985) | Konami: Z80, SN76489, a row-scrolled tile playfield with priority tiles, 48 double-buffered sprites | `rushatck` (US), `gberet` | **Tested:** boots, attract mode, coin, start and play |
 | Salamander (1986) | Konami Nemesis: 68000 with all graphics uploaded into RAM, per-line and per-column scrolling, zoomable sprites; Z80 with YM2151, K007232 and VLM5030 speech | `salamand` | **Tested:** boots, attract mode with speech, coin, start and play |
+| Sarge (1985) | Bally Midway MCR-III monoboard with the Turbo Cheap Squeak; tank treads driven from one 8-way stick | `sarge` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Satan's Hollow (1981) | Bally Midway MCR (90010 CPU board): Z80 with a Z80 CTC, Super Sound I/O (Z80, two AY-3-8910s) | `shollow` | **Tested:** boots, attract mode, coin, start and play |
 | | | `shollow2` | Recognized, not yet tested |
 | Scramble (1981) | Konami: Galaxian-style video, two AY-3-8910s, a protection check | `scramble` | **Tested:** boots, attract mode, coin, start and play |
@@ -180,6 +192,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Space Zap (1980) | Midway Astrocade with the pattern board (blitter) | `spacezap` | **Tested:** boots, attract mode, coin, start and play |
 | Splat! (1982) | Same Williams board, the second-generation blitter, twin sticks | `splat` | **Tested:** boots, attract mode, coin, start and play |
 | Splatterhouse (1988) | Namco System 1: three 6809s behind a page MMU, HD63701 MCU, CUS30 + YM2151 + DAC | `splatter` | **Tested:** boots, attract mode, coin, start and play |
+| Spy Hunter (1983) | Bally Midway MCR-III with scrolling: the SSIO plus the Chip Squeak Deluxe (68000). Left and right steer, up accelerates, down brakes, the gearshift is automatic; fire is guns, the second button missiles, the third smoke and oil | `spyhunt` | **Tested:** boots, attract mode with sound, coin, start and play |
 | Star Castle (1980) | Cinematronics CPU (like Tail Gunner), 8K program; sound synthesized | `starcas` | **Tested:** boots, attract mode, coin, start and play |
 | Star Wars (1983) | Atari: two 6809s, color Analog Vector Generator, matrix processor, four POKEYs and TMS5220 speech; analog yoke | `starwars` (rev 1) | **Tested:** boots, attract mode, coin, start and play, speech |
 | Stargate (1981) | Williams board without the blitter | `stargate` | **Tested:** boots, attract mode, coin, start and play |
@@ -218,6 +231,7 @@ by its chips' file names, so the zip's own name doesn't matter.
 | Xevious (1982) | Galaga family: two scrolling tile layers, 3-bit sprites, terrain-map ROMs | `xevious` (Namco) | **Tested:** boots, attract mode, coin, start and play |
 | Yie Ar Kung-Fu (1985) | Konami: 6809, SN76489, VLM5030 speech, a fixed tile map and 24 sprites | `yiear` | **Tested:** boots, attract mode with speech, coin, start and play |
 | Zaxxon (1982) | Sega: Z80, a ROM-map background sheared into the isometric view, 32x32 sprites, text layer; analog sound effects (synthesized here) | `zaxxon` (set 1) | **Tested:** boots, attract mode, coin, start and play |
+| Zoo Keeper (1982) | Taito: the Qix board with a 68705 coin MCU, banked video ROM and a horizontal monitor | `zookeep` (set 1) | **Tested:** boots (runs the operator setup on first power-on), attract mode, coin, start and play with sound |
 
 Galaga's older dumps that name the chips by board location (`04m_g01.bin` … `5n.bin`) are
 recognized too; that's the tested Galaga set. Gallag's extra Z80 stood in for Namco's

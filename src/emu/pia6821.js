@@ -39,6 +39,9 @@ export class PIA6821 {
       case 0:
         if (!(this.crA & 4)) return this.ddrA;
         this.crA &= 0x3F; this.updateIrq();
+        this.strobe('A');
+        // pinsA: port A reads its pins, so a switch can pull an output that's high (as boards that set it all to outputs expect).
+        if (this.pinsA) return this.inA() & (this.outRegA | ~this.ddrA) & 0xFF;
         return (this.inA() & ~this.ddrA) | (this.outRegA & this.ddrA);
       case 1: return this.crA;
       case 2:
@@ -56,16 +59,24 @@ export class PIA6821 {
         break;
       case 1: this.crA = (this.crA & 0xC0) | (v & 0x3F); this.c2Output('A'); this.updateIrq(); break;
       case 2:
-        if (this.crB & 4) { this.outRegB = v; this.outB(v & this.ddrB); } else this.ddrB = v;
+        if (this.crB & 4) { this.outRegB = v; this.outB(v & this.ddrB); this.strobe('B'); } else this.ddrB = v;
         break;
       default: this.crB = (this.crB & 0xC0) | (v & 0x3F); this.c2Output('B'); this.updateIrq(); break;
     }
   }
 
-  // C2 as a manual output: bit 5 and bit 4 set, level from bit 3.
+  // C2 as an output (bit 5): a manual level from bit 3 (bit 4 set), else high until strobed.
   c2Output(side) {
     const cr = side === 'A' ? this.crA : this.crB;
-    if ((cr & 0x30) === 0x30) (side === 'A' ? this.ca2Out : this.cb2Out)((cr >> 3) & 1);
+    if (cr & 0x20) (side === 'A' ? this.ca2Out : this.cb2Out)(cr & 0x10 ? (cr >> 3) & 1 : 1);
+  }
+  // Strobe modes: reading port A (writing port B) pulls C2 low, for one cycle (bit 3) or until C1's active edge.
+  strobe(side) {
+    const cr = side === 'A' ? this.crA : this.crB;
+    if ((cr & 0x30) !== 0x20) return;
+    const out = side === 'A' ? this.ca2Out : this.cb2Out;
+    out(0);
+    if (cr & 0x08) out(1);
   }
 
   // C1/C2 input lines: set the flag on the selected edge.
@@ -75,7 +86,10 @@ export class PIA6821 {
     const old = this[key]; this[key] = v;
     if (old === v) return;
     const rising = !!(this[crKey] & 0x02);
-    if (rising ? v : !v) { this[crKey] |= 0x80; this.updateIrq(); }
+    if (rising ? v : !v) {
+      this[crKey] |= 0x80; this.updateIrq();
+      if ((this[crKey] & 0x38) === 0x20) (side === 'A' ? this.ca2Out : this.cb2Out)(1);   // handshake: C1 ends the strobe
+    }
   }
   setC2(side, v) {
     v = v ? 1 : 0;

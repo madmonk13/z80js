@@ -9,6 +9,9 @@ import { DKongSound } from './dkong-sound.js';
 import { decodeTiles, rgba, rotate90, run } from './video.js';
 import { defaultSwitches } from './pacman.js';
 import { capture, apply } from './state.js';
+import { CPU6502 } from './m6502.js';
+import { APU2A03 } from './apu2a03.js';
+import { SoundMix } from './mixer.js';
 
 const NATIVE_W = 256, NATIVE_H = 224, TOP = 16;
 const LINES = 264, LINE_CYCLES = 192, VBLANK_LINE = 240;
@@ -50,11 +53,12 @@ export class DonkeyKong {
     this.tilePix = decodeTiles(roms.tiles, {
       count: roms.tiles.length / 16, width: 8, height: 8, planes: [tileHalf, 0], xs: run(0, 8), ys: run(0, 8, 8), size: 64,
     });
-    // Sprites: 128 of 16x16; left and right halves in separate ROMs, planes in
-    // the two halves of the set.
+    // Sprites: 128 (or 256) of 16x16; left and right halves in separate ROMs,
+    // planes in the two halves of the set.
     const quarter = roms.sprites.length * 2;     // bits in one 2K ROM
+    this.spriteCount = roms.sprites.length / 64;
     this.spritePix = decodeTiles(roms.sprites, {
-      count: 128, width: 16, height: 16, planes: [quarter * 2, 0],
+      count: this.spriteCount, width: 16, height: 16, planes: [quarter * 2, 0],
       xs: [...run(0, 8), ...run(quarter, 8)], ys: run(0, 16, 8), size: 128,
     });
 
@@ -209,7 +213,7 @@ export class DonkeyKong {
   }
 
   drawSprite(code, color, flipX, flipY, sx, sy) {
-    const out = this.native, pix = (code & 0x7F) * 256;
+    const out = this.native, pix = (code & (this.spriteCount - 1)) * 256;
     for (let y = 0; y < 16; y++) {
       const py = sy + y;
       if (py < TOP || py >= TOP + NATIVE_H) continue;
@@ -264,3 +268,142 @@ export class DonkeyKongJr extends DonkeyKong {
 DonkeyKongJr.id = 'dkongjr';
 DonkeyKongJr.title = 'Donkey Kong Jr.';
 DonkeyKongJr.switches = DonkeyKong.switches;
+
+// Donkey Kong 3 (1983): the board grown up. A 4 MHz Z80, 512 tiles in two
+// banks, 256 sprites, a 256-color palette of 4 bits a channel, and for sound
+// two Ricoh 2A03s (the NES's CPU and sound) at 1.79 MHz, each running its own
+// program from three latches the Z80 writes. All three CPUs get an NMI at
+// vertical blank; the Z80 holds the sound CPUs in reset until it's ready.
+const DK3_STATE = ['ram', 'vram', 'nmiEnable', 'paletteBank', 'tileBank', 'latches', 'soundRam', 'soundOn', 'coinFrames',
+  'coinWas', 'in0', 'in1', 'cycleCarry', 'sampleCarry', 'subCarry', 'cpu', 'sub', 'apu'];
+const DK3_LINE_CYCLES = 4000000 / 60.606 / LINES, DK3_SOUND_CYCLES = 1789773 / 60.606 / LINES, DK3_SAMPLES = 48000 / 60.606 / LINES;
+
+export class DonkeyKong3 extends DonkeyKong {
+  saveState() { return capture(this, DK3_STATE); }
+  loadState(s) { apply(this, DK3_STATE, s); }
+
+  // roms: { main 40K (0000-5FFF, 8000-9FFF), snd1, snd2 (8K each, E000-FFFF), tiles 8K, sprites 16K, palRG, palB, colors }
+  constructor(roms) {
+    super({ ...roms, sound: new Uint8Array(0x1000), palLow: roms.palB, palHigh: roms.palRG });
+    // Palette: red and green nibbles from one PROM, blue from the other, through 2.2K/1K/470/220 ohm
+    // resistors into inverting outputs.
+    const level = (n) => { const w = [1 / 2200, 1 / 1000, 1 / 470, 1 / 220]; let g = 0; for (let k = 0; k < 4; k++) if (n & (1 << k)) g += w[k]; return Math.round(255 - 255 * g / (w[0] + w[1] + w[2] + w[3])); };
+    this.palette = Uint32Array.from({ length: 256 }, (_, i) => rgba(level(roms.palRG[i] >> 4), level(roms.palRG[i] & 15), level(roms.palB[i] & 15)));
+    this.soundRam = [new Uint8Array(0x200), new Uint8Array(0x200)];
+    this.latches = new Uint8Array(3);
+    const bus = (k) => ({ read: (a) => this.soundRead(k, a), write: (a, v) => this.soundWrite(k, a, v) });
+    this.sub = [new CPU6502(bus(0)), new CPU6502(bus(1))];
+    for (const c of this.sub) c.binaryOnly = true;
+    this.apu = this.sub.map((c, k) => new APU2A03({ read: (a) => this.soundRead(k, a), stall: () => {} }));
+    this.sound = new SoundMix(this.apu, 2.4);
+    this.reset();
+  }
+
+  reset() {
+    super.reset();
+    if (!this.sub) return;
+    this.latches.fill(0); for (const r of this.soundRam) r.fill(0);
+    this.soundOn = false; this.coinFrames = 0; this.coinWas = false;
+    this.cycleCarry = 0; this.sampleCarry = 0; this.subCarry = [0, 0];
+    for (const c of this.sub) c.reset();
+  }
+
+  read(a) {
+    if (a < 0x6000 || (a >= 0x8000 && a < 0xA000)) return this.roms.main[a];
+    if (a >= 0x6000 && a < 0x7400) return this.ram[a - 0x6000];
+    if (a >= 0x7400 && a < 0x7800) return this.vram[a - 0x7400];
+    switch (a) {
+      case 0x7C00: return this.in0;
+      case 0x7C80: return this.in1;
+      case 0x7D00: return this.dsw0;
+      case 0x7D80: return this.dsw;
+    }
+    return 0;
+  }
+
+  write(a, v) {
+    if (a >= 0x6000 && a < 0x7400) { this.ram[a - 0x6000] = v; return; }
+    if (a >= 0x7400 && a < 0x7800) { this.vram[a - 0x7400] = v; return; }
+    switch (a) {
+      case 0x7C00: this.latches[0] = v; return;
+      case 0x7C80: this.latches[1] = v; return;
+      case 0x7D00: this.latches[2] = v; return;
+      case 0x7D80: {
+        const on = !!(v & 1);
+        if (on && !this.soundOn) for (const c of this.sub) c.reset();   // out of reset
+        this.soundOn = on;
+        return;
+      }
+      case 0x7E81: this.tileBank = ~v & 1; return;
+      case 0x7E84: this.nmiEnable = !!(v & 1); return;
+      case 0x7E86: case 0x7E87: {
+        const bit = a & 1;
+        this.paletteBank = (this.paletteBank & ~(1 << bit)) | ((v & 1) << bit);
+      }
+      // 7E82 flip screen, 7E85 DMA: not needed.
+    }
+  }
+
+  // Each sound CPU: 512 bytes of RAM, its APU at 4000-4017 (4016/4017 read its latches), ROM at E000.
+  soundRead(k, a) {
+    if (a < 0x200) return this.soundRam[k][a];
+    if (a >= 0xE000) return (k ? this.roms.snd2 : this.roms.snd1)[a - 0xE000];
+    if (a === 0x4016) return this.latches[k ? 2 : 0];
+    if (a === 0x4017 && !k) return this.latches[1];
+    if (a === 0x4015) return this.apu[k].readStatus();
+    return 0;
+  }
+  soundWrite(k, a, v) {
+    if (a < 0x200) this.soundRam[k][a] = v;
+    else if (a >= 0x4000 && a < 0x4018) this.apu[k].write(a, v);
+  }
+
+  // IN0: right, left, up, down, jump, start 1, start 2 (active high). IN1: coin, held for one frame.
+  setInputs(s) {
+    if (s.coin && !this.coinWas) this.coinFrames = 1;
+    this.coinWas = !!s.coin;
+    this.in0 = (s.right ? 0x01 : 0) | (s.left ? 0x02 : 0) | (s.up ? 0x04 : 0) | (s.down ? 0x08 : 0) | (s.fire ? 0x10 : 0)
+      | (s.start1 ? 0x20 : 0) | (s.start2 ? 0x40 : 0);
+    this.in1 = this.coinFrames ? 0x20 : 0;
+  }
+
+  // DSW0: 1 coin 1 credit, upright. DSW1: lives, bonus, additional bonus, difficulty.
+  applySwitches(v) {
+    this.dsw0 = 0x00;
+    this.dsw = v.lives | v.bonus | v.extra | v.difficulty;
+  }
+
+  runFrame() {
+    for (let line = 0; line < LINES; line++) {
+      if (line === VBLANK_LINE) {
+        if (this.nmiEnable) this.cpu.nmi();
+        if (this.soundOn) for (const c of this.sub) c.nmi();
+        this.render();
+      }
+      this.cycleCarry += DK3_LINE_CYCLES;
+      this.cycleCarry -= this.cpu.run(Math.floor(this.cycleCarry));
+      for (let k = 0; k < 2; k++) {
+        this.subCarry[k] += DK3_SOUND_CYCLES;
+        const apu = this.apu[k], cpu = this.sub[k];
+        while (this.subCarry[k] >= 1) {
+          let n = 1;
+          if (this.soundOn) { const c0 = cpu.cycles; cpu.step(); n = cpu.cycles - c0; }
+          for (let i = 0; i < n; i++) apu.tick();
+          this.subCarry[k] -= n;
+        }
+      }
+      this.sampleCarry += DK3_SAMPLES;
+      while (this.sampleCarry >= 1) { this.sampleCarry -= 1; this.sound.sample(); }
+    }
+    if (this.coinFrames) { this.coinFrames--; if (!this.coinFrames) this.in1 = 0; }
+  }
+}
+
+DonkeyKong3.id = 'dkong3';
+DonkeyKong3.title = 'Donkey Kong 3';
+DonkeyKong3.switches = [
+  { id: 'lives', label: 'Lives', options: [['3', 0x00], ['4', 0x01], ['5', 0x02], ['6', 0x03]], default: 0x00 },
+  { id: 'bonus', label: 'Bonus life', options: [['30K', 0x00], ['40K', 0x04], ['50K', 0x08], ['None', 0x0C]], default: 0x00 },
+  { id: 'extra', label: 'Additional', options: [['30K', 0x00], ['40K', 0x10], ['50K', 0x20], ['None', 0x30]], default: 0x00 },
+  { id: 'difficulty', label: 'Difficulty', options: [['Easy', 0x00], ['Medium', 0x40], ['Hard', 0x80], ['Hardest', 0xC0]], default: 0x00 },
+];

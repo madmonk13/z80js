@@ -52,9 +52,9 @@ export class MCR {
     this.ram = new Uint8Array(0x800);
     this.vram = new Uint8Array(0x800);
     this.spriteRam = new Uint8Array(0x200);
-    this.paletteRam = new Uint16Array(64);          // 9-bit colors
+    this.paletteRam = new Uint16Array(64);          // 9-bit colors (Journey: 64 more for its sprites)
     this.soundRam = new Uint8Array(0x400);
-    this.palette = new Uint32Array(64);
+    this.palette = new Uint32Array(128);
 
     this.ctc = new Z80CTC((ch) => { if (ch === 0) { this.ctc.trigger(1, 1); this.ctc.trigger(1, 0); } });
     this.cpu = new Z80({
@@ -68,7 +68,7 @@ export class MCR {
     this.ay = [new AY8910(SOUND_CLOCK, () => 0xFF, 2), new AY8910(SOUND_CLOCK, () => 0xFF, 2)];
     this.ay.forEach((ay, n) => { ay.portOut = (port, v) => this.ayPort(n, port, v); });
     this.sound = new SoundMix(this.ay);
-    this.dutyVolume = dutyVolumes(roms.prom);
+    this.dutyVolume = dutyVolumes(roms.prom || new Uint8Array(32).fill(0xAA));
 
     this.bgPix = decodeTiles(roms.bg, {
       count: roms.bg.length / 32, width: 8, height: 8,
@@ -84,7 +84,7 @@ export class MCR {
 
     this.native = new Uint32Array(W * H);
     this.pri = new Uint8Array(W * H);
-    this.frame = cfg.rotate || cfg.transpose ? new Uint32Array(W * H) : this.native;
+    this.frame = cfg.rotate || cfg.transpose || cfg.flipX ? new Uint32Array(W * H) : this.native;
     this.ip = new Uint8Array(5).fill(0xFF);
     this.dial = 0;
     this.applySwitches(defaultSwitches(this.constructor.switches));
@@ -116,7 +116,7 @@ export class MCR {
       if (a >= 0xFC00) return this.vram[a & 0x3FF];
       return 0xFF;
     }
-    if (this.cfg.board === 90010) {
+    if (this.cfg.board === 90010 || this.cfg.board === 91475) {
       if (a < 0xE000) return a >= 0xC000 ? this.ram[a & 0x7FF] : 0xFF;
       return a & 0x800 ? this.vram[a & 0x7FF] : this.spriteRam[a & 0x1FF];
     }
@@ -136,7 +136,7 @@ export class MCR {
       else if (a >= 0xF800 && a < 0xFC00) this.setColor(a & 0x1F, (this.paletteRam[a & 0x1F] & 0xFF) | ((v & 15) << 8));   // red
       return;
     }
-    if (this.cfg.board === 90010) {
+    if (this.cfg.board === 90010 || this.cfg.board === 91475) {
       if (a < 0xE000) { if (a >= 0xC000) this.ram[a & 0x7FF] = v; return; }
       if (!(a & 0x800)) { this.spriteRam[a & 0x1FF] = v; return; }
       const o = a & 0x7FF;
@@ -155,6 +155,16 @@ export class MCR {
     this.paletteRam[i] = v;
     if (this.cfg.board === 90009) {                // 4 bits each: red 8-11, blue 4-7, green 0-3
       this.palette[i] = rgba(((v >> 8) & 15) * 17, (v & 15) * 17, ((v >> 4) & 15) * 17);
+      return;
+    }
+    if (this.cfg.board === 91475) {
+      // Journey: 3 bits a gun scaled to 8 (r << 5 | r << 1); the sprites get a copy of the
+      // palette, where the odd entries of the upper half have a low bit wired on (for its grays).
+      const c = (x) => ((x & 7) << 5) | ((x & 7) << 1);
+      let r = c(v >> 6), g = c(v), b = c(v >> 3);
+      this.palette[i] = rgba(r, g, b);
+      if ((i & 0x31) === 0x31) { r |= 0x11; g |= 0x11; b |= 0x11; }
+      this.palette[i + 64] = rgba(r, g, b);
       return;
     }
     this.palette[i] = rgba(level3(v >> 6), level3(v), level3(v >> 3));
@@ -283,9 +293,10 @@ export class MCR {
         }
       }
     }
-    if (tapper) this.spritesFrontToBack(); else this.spritesOred();
+    if (tapper || this.cfg.board === 91475) this.spritesFrontToBack(); else this.spritesOred();
     if (this.cfg.rotate) rotate90(out, W, H, this.frame);
     else if (this.cfg.transpose) transpose(out, W, H, this.frame);
+    else if (this.cfg.flipX) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) this.frame[y * W + x] = out[y * W + (W - 1 - x)];
   }
 
   // 90010: sprites ORed into a line buffer that starts out holding each
@@ -317,7 +328,7 @@ export class MCR {
     pri.fill(0);
     for (let offs = 0x1FC; offs >= 0; offs -= 4) {
       const code = (spr[offs + 2] + 256 * ((spr[offs + 1] >> 3) & 1)) % this.spriteCount;
-      const color = (~spr[offs + 1] & 3) << 4;
+      const color = ((~spr[offs + 1] & 3) << 4) | (this.cfg.board === 91475 ? 0x40 : 0);   // Journey's sprites use the second palette
       const hflip = spr[offs + 1] & 0x10 ? 31 : 0, vflip = spr[offs + 1] & 0x20 ? 31 : 0;
       const sx = ((spr[offs + 3] - 3) * 2) & 0x1FF;
       let sy = ((241 - spr[offs]) * 2) & 0x1FF;
@@ -523,3 +534,51 @@ Wacko.config = { board: 90010, clock: 19968000 / 8, romEnd: 0x8000, rotate: fals
 Wacko.id = 'wacko';
 Wacko.title = 'Wacko';
 Wacko.switches = [];
+
+// Journey (91475 board): the 90010's memory map with the 91490's sprites, which
+// draw from a second, sprite-only copy of the palette. The concert music came
+// from a cassette player in the cabinet, which isn't in the ROM set.
+export class Journey extends MCR {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 1;
+  }
+  // IP0: coin, starts, fire. IP1: left, right, up, down.
+  setInputs(s) {
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0) | (s.fire ? 0x10 : 0));
+    this.ip[1] = 0xFF & ~((s.left ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.up ? 0x04 : 0) | (s.down ? 0x08 : 0));
+  }
+  applySwitches() { this.ip[3] = 0xFD; }             // one coin meter, upright
+}
+Journey.config = { board: 91475, clock: 19968000 / 8, romEnd: 0xA000, rotate: true };
+Journey.id = 'journey';
+Journey.title = 'Journey';
+Journey.switches = [];
+
+// Discs of Tron (upright): Tapper's board. Move with the stick; the aiming
+// stick turns the aim (the cabinet's dial), tilts it up and down, and throws.
+export class DiscsOfTron extends Tapper {
+  constructor(roms) {
+    super(roms);
+    this.controls = 'eight-way';
+    this.buttons = 0;
+    this.twinStick = true;
+  }
+  // IP0: coin, starts, throw. IP1: the dial. IP2: left, right, up, down, aim down, aim up, deflect; upright cabinet.
+  setInputs(s) {
+    const a = s.aim || {};
+    const spin = (a.right ? 3 : 0) - (a.left ? 3 : 0);
+    if (spin) this.dial = (this.dial - spin) & 0x7F;
+    const throwing = a.left || a.right || a.up || a.down;
+    this.ip[0] = 0xFF & ~((s.coin ? 0x01 : 0) | (s.start1 ? 0x04 : 0) | (s.start2 ? 0x08 : 0) | (throwing || s.fire ? 0x10 : 0));
+    this.ip[1] = 0x80 | (this.dial & 0x7F);
+    this.ip[2] = 0xFF & ~((s.left ? 0x01 : 0) | (s.right ? 0x02 : 0) | (s.up ? 0x04 : 0) | (s.down ? 0x08 : 0)
+      | (a.down ? 0x10 : 0) | (a.up ? 0x20 : 0) | (s.fire2 ? 0x40 : 0));
+  }
+  applySwitches() { this.ip[3] = 0xFF; }
+}
+DiscsOfTron.config = { board: 91490, clock: 5000000, romEnd: 0xE000, flipX: true };
+DiscsOfTron.id = 'dotron';
+DiscsOfTron.title = 'Discs of Tron';
+DiscsOfTron.switches = [];

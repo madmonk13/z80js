@@ -4,7 +4,7 @@
 // the current app) and falls back to the cache when offline. ROM sets under
 // roms/ aren't cached here: games kept on the device live in IndexedDB.
 
-const CACHE = 'z80js-f5f02d2bd8c2';
+const CACHE = 'z80js-d74cfbc1bb24';
 const FILES = [
   "./",
   "favicon-32.png",
@@ -16,6 +16,7 @@ const FILES = [
   "manifest.webmanifest",
   "src/audio-out.js",
   "src/audio-worklet.js",
+  "src/emu/apu2a03.js",
   "src/emu/arm.js",
   "src/emu/asteroids.js",
   "src/emu/astrocade-sound.js",
@@ -32,6 +33,7 @@ const FILES = [
   "src/emu/bzone.js",
   "src/emu/c1942.js",
   "src/emu/captaven.js",
+  "src/emu/cclimber.js",
   "src/emu/ccpu.js",
   "src/emu/centiped.js",
   "src/emu/cinemat.js",
@@ -39,6 +41,7 @@ const FILES = [
   "src/emu/cps2.js",
   "src/emu/cps2crypt.js",
   "src/emu/cus30.js",
+  "src/emu/ddragon.js",
   "src/emu/dec0.js",
   "src/emu/decocrypt.js",
   "src/emu/digdug.js",
@@ -78,6 +81,7 @@ const FILES = [
   "src/emu/mario.js",
   "src/emu/mathbox.js",
   "src/emu/mcr.js",
+  "src/emu/mcr3.js",
   "src/emu/midyunit.js",
   "src/emu/mixer.js",
   "src/emu/mpatrol.js",
@@ -95,6 +99,7 @@ const FILES = [
   "src/emu/pia6821.js",
   "src/emu/pokey.js",
   "src/emu/popeye.js",
+  "src/emu/punchout.js",
   "src/emu/qix.js",
   "src/emu/qsound.js",
   "src/emu/rallyx.js",
@@ -108,6 +113,7 @@ const FILES = [
   "src/emu/starwars.js",
   "src/emu/state.js",
   "src/emu/tailg.js",
+  "src/emu/taitosj.js",
   "src/emu/tecmo.js",
   "src/emu/tempest.js",
   "src/emu/timeplt.js",
