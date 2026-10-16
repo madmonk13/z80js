@@ -255,7 +255,7 @@ async function keepServer(file) {
     const res = await library.add(file, bytes, Board.title);
     if (!res.stored) { toast('Storage is full, so this ROM set won\'t be saved. Remove some to make room.'); return; }
     if (state.serverFile === file) { state.serverFile = null; library.setLast(res.id); store.remove(LAST_SERVER); }
-    toast(`${Board.title} saved to this device`);
+    toast(`${Board.title} saved to this device`, { success: true });
   } catch (err) {
     toast(`Couldn't save ${file}: ${err.message}`);
   }
