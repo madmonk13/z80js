@@ -128,6 +128,23 @@ export class K052109 {
     const sc = layer ? this.scrolls(layer) : null;
     for (let y = 0; y < win.h; y++) {
       const by = win.y + y;
+      if (!sc || !sc.colMode) {
+        // One Y for the whole line: go a tile run at a time.
+        const ty = sc ? (by + sc.ys[0]) & 255 : by & 255, dx = sc ? sc.xs[by] : 0, row = (ty >> 3) * 64;
+        for (let x = 0; x < win.w;) {
+          const tx = (win.x + x + dx) & 511, n = Math.min(8 - (tx & 7), win.w - x), ti = (row + (tx >> 3)) * 4;
+          if (cat !== undefined && t[ti + 3] !== cat) { x += n; continue; }
+          const f = t[ti + 2], py = f & 2 ? 7 - (ty & 7) : ty & 7, src = t[ti] + py * 8, col = t[ti + 1], o = y * win.w + x;
+          for (let i = 0; i < n; i++) {
+            const c = (tx + i) & 7, pen = pix[src + (f & 1 ? 7 - c : c)];
+            if (!pen && !opaque) continue;
+            frame[o + i] = palette[col + pen];
+            pri[o + i] |= orPri;
+          }
+          x += n;
+        }
+        continue;
+      }
       for (let x = 0; x < win.w; x++) {
         const bx = win.x + x;
         let tx, ty;

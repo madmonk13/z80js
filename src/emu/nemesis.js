@@ -209,7 +209,8 @@ export class Salamander {
 
   // Sprites: 8 words each; higher priority bytes in front, then later entries; the first drawn at a pixel wins.
   drawSprites(out) {
-    const s = this.spriteRam, pal = this.palette, taken = new Uint8Array(W * H);
+    const s = this.spriteRam, pal = this.palette, taken = this.taken || (this.taken = new Uint8Array(W * H));
+    taken.fill(0);
     const order = [];
     for (let a = s.length - 8; a >= 0; a -= 8) order.push(a);
     order.sort((p, q) => (s[q] & 0xFF) - (s[p] & 0xFF));     // stable: equal priorities keep high-to-low addresses

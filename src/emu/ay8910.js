@@ -117,23 +117,44 @@ export class AY8910 {
 
   envLevel() { return (this.envStep ^ this.envAttack) & 0x0F; }
 
+  // The registers can't change during one sample, so read them once and run the
+  // clock/8 counts (tick()'s work, inlined) with them in locals.
   sample() {
     this.acc += this.clock / 8 / RATE;
     let a = 0, b = 0, c = 0, n = 0;
-    while (this.acc >= 1) {
-      this.acc -= 1;
-      this.tick();
-      // Mix this tick: a channel sounds when its enabled sources (tone and/or
-      // noise) are high; with both disabled it's held high.
-      const mix = this.regs[7], noise = this.noise & 1;
-      for (let ch = 0; ch < 3; ch++) {
-        const toneOn = !((mix >> ch) & 1), noiseOn = !((mix >> (ch + 3)) & 1);
-        if (!((toneOn ? this.toneOut[ch] : 1) & (noiseOn ? noise : 1))) continue;
-        const amp = this.regs[8 + ch];
-        const level = LEVEL[(amp & 0x10) ? this.envLevel() : amp & 0x0F];
-        if (ch === 0) a += level * this.volume[0]; else if (ch === 1) b += level * this.volume[1]; else c += level * this.volume[2];
+    if (this.acc >= 1) {
+      const regs = this.regs, tc = this.toneCount, to = this.toneOut, vol = this.volume;
+      const p0 = (regs[0] | (regs[1] << 8)) || 1, p1 = (regs[2] | (regs[3] << 8)) || 1, p2 = (regs[4] | (regs[5] << 8)) || 1;
+      const noisePer = (regs[6] || 1) * 2, envPer = ((regs[11] | (regs[12] << 8)) || 1) * 2;
+      // A channel sounds when its enabled sources (tone and/or noise) are high; with both disabled it's held high.
+      const mix = regs[7], t0 = !(mix & 1), t1 = !(mix & 2), t2 = !(mix & 4), n0 = !(mix & 8), n1 = !(mix & 16), n2 = !(mix & 32);
+      const amp0 = regs[8], amp1 = regs[9], amp2 = regs[10], v0 = vol[0], v1 = vol[1], v2 = vol[2];
+      while (this.acc >= 1) {
+        this.acc -= 1;
+        if (++tc[0] >= p0) { tc[0] = 0; to[0] ^= 1; }
+        if (++tc[1] >= p1) { tc[1] = 0; to[1] ^= 1; }
+        if (++tc[2] >= p2) { tc[2] = 0; to[2] ^= 1; }
+        // Noise steps at half the tone rate.
+        if (++this.noiseCount >= noisePer) {
+          this.noiseCount = 0;
+          const bit = (this.noise ^ (this.noise >> 3)) & 1;
+          this.noise = (this.noise >> 1) | (bit << 16);
+        }
+        if (++this.envCount >= envPer) {
+          this.envCount = 0;
+          if (!this.envHold) {
+            if (this.envStep > 0) this.envStep--;
+            else if (!this.envCont) { this.envHold = true; this.envAttack = 0; this.envStep = 0; }
+            else if (this.envHoldBit) { this.envHold = true; if (this.envAlt) this.envAttack ^= 0x0F; }
+            else { if (this.envAlt) this.envAttack ^= 0x0F; this.envStep = 0x0F; }
+          }
+        }
+        const noise = this.noise & 1, env = (this.envStep ^ this.envAttack) & 0x0F;
+        if ((t0 ? to[0] : 1) & (n0 ? noise : 1)) a += LEVEL[amp0 & 0x10 ? env : amp0 & 0x0F] * v0;
+        if ((t1 ? to[1] : 1) & (n1 ? noise : 1)) b += LEVEL[amp1 & 0x10 ? env : amp1 & 0x0F] * v1;
+        if ((t2 ? to[2] : 1) & (n2 ? noise : 1)) c += LEVEL[amp2 & 0x10 ? env : amp2 & 0x0F] * v2;
+        n++;
       }
-      n++;
     }
     // Each channel through its filter (if any), then the three mixed.
     const lp = this.lp, k = this.filterK;

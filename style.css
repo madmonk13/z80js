@@ -44,6 +44,14 @@ html, body {
   box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0, 0, 0, 0.55);
   background: #000;
 }
+/* The performance readout (Settings > Show performance). */
+#perfStats {
+  position: fixed; left: calc(8px + var(--safe-l, 0px)); top: calc(var(--bar-h) + var(--safe-t) + 6px); z-index: 5;
+  padding: 3px 7px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #cfe;
+  font: 600 11px/1.35 ui-monospace, Menlo, monospace; white-space: pre; pointer-events: none;
+}
+#perfStats.slow { color: #ffb4a0; }
+
 /* Vector games draw at the screen's own resolution: smooth scaling. */
 body.vector #screen2d { image-rendering: auto; }
 

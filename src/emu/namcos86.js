@@ -278,16 +278,21 @@ export class NamcoSystem86 {
         const sx = this.xscroll[layer] - XDISP[layer], sy = this.yscroll[layer] + 9;
         for (let y = 0; y < H; y++) {
           const ty = (y + Y0 + sy) & 255, row = (ty >> 3) * 64, fy = (ty & 7) * 8, o = y * W;
-          for (let x = 0; x < W; x++) {
-            const tx = (x + X0 + sx) & 511;
+          // A tile run at a time: the tile code and colors are looked up once per run.
+          for (let x = 0; x < W;) {
+            const tx = (x + X0 + sx) & 511, n = Math.min(8 - (tx & 7), W - x);
             const idx = vo + 2 * (row + (tx >> 3)), attr = vram[idx + 1];
             let code = vram[idx];
             if (layer & 2) code += ((dec[((layer & 1) << 4) + (attr & 3)] & 0xE0) >> 5) * 0x100;
             else code += ((dec[((layer & 1) << 4) + ((attr & 3) << 2)] & 0x0E) >> 1) * 0x100 + this.tileBank * 0x800;
-            const pen = set[(code % count) * 64 + fy + (tx & 7)];
-            if (pen === 7) continue;
-            out[o + x] = tc[attr * 8 + pen];
-            pri[o + x] = p;
+            const src = (code % count) * 64 + fy + (tx & 7), cb = attr * 8;
+            for (let i = 0; i < n; i++) {
+              const pen = set[src + i];
+              if (pen === 7) continue;
+              out[o + x + i] = tc[cb + pen];
+              pri[o + x + i] = p;
+            }
+            x += n;
           }
         }
       }

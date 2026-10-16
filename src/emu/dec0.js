@@ -141,37 +141,38 @@ export class Dec0 {
 
   // ---------------------------------------------------------------- main CPU
 
-  // Word-wide areas: [start, end, array]; reads and writes go through these.
+  // Word-wide areas: reads and writes go through these. A hit leaves the array, the byte
+  // offset into it and whether it's palette RAM in arArr / arOff / arPal (no allocation per access).
   area(a) {
-    if (a >= 0x244000 && a < 0x246000) return [this.pf[0], a - 0x244000];
-    if (a >= 0x24A000 && a < 0x24A800) return [this.pf[1], a - 0x24A000];
-    if (a >= 0x24D000 && a < 0x24D800) return [this.pf[2], a - 0x24D000];
-    if (a >= 0x242000 && a < 0x242080) return [this.colScroll[0], a - 0x242000];
-    if (a >= 0x242400 && a < 0x242800) return [this.rowScroll[0], a - 0x242400];
-    if (a >= 0x242800 && a < 0x244000) return [this.extraRam, a - 0x242800];
-    if (a >= 0x248000 && a < 0x248080) return [this.colScroll[1], a - 0x248000];
-    if (a >= 0x248400 && a < 0x248800) return [this.rowScroll[1], a - 0x248400];
-    if (a >= 0x24C800 && a < 0x24C880) return [this.colScroll[2], a - 0x24C800];
-    if (a >= 0x24CC00 && a < 0x24D000) return [this.rowScroll[2], a - 0x24CC00];
-    if (a >= 0x240000 && a < 0x240008) return [this.ctl0[0], a - 0x240000];
-    if (a >= 0x240010 && a < 0x240018) return [this.ctl1[0], a - 0x240010];
-    if (a >= 0x246000 && a < 0x246008) return [this.ctl0[1], a - 0x246000];
-    if (a >= 0x246010 && a < 0x246018) return [this.ctl1[1], a - 0x246010];
-    if (a >= 0x24C000 && a < 0x24C008) return [this.ctl0[2], a - 0x24C000];
-    if (a >= 0x24C010 && a < 0x24C018) return [this.ctl1[2], a - 0x24C010];
-    if (a >= 0x310000 && a < 0x310800) return [this.pal, a - 0x310000, true];
-    if (a >= 0x314000 && a < 0x314800) return [this.palB, a - 0x314000, true];
-    if (a >= 0xFFC000 && a < 0xFFC800) return [this.spriteRam, a - 0xFFC000];
-    return null;
+    if (a >= 0x244000 && a < 0x246000) return this.hit(this.pf[0], a - 0x244000);
+    if (a >= 0x24A000 && a < 0x24A800) return this.hit(this.pf[1], a - 0x24A000);
+    if (a >= 0x24D000 && a < 0x24D800) return this.hit(this.pf[2], a - 0x24D000);
+    if (a >= 0x242000 && a < 0x242080) return this.hit(this.colScroll[0], a - 0x242000);
+    if (a >= 0x242400 && a < 0x242800) return this.hit(this.rowScroll[0], a - 0x242400);
+    if (a >= 0x242800 && a < 0x244000) return this.hit(this.extraRam, a - 0x242800);
+    if (a >= 0x248000 && a < 0x248080) return this.hit(this.colScroll[1], a - 0x248000);
+    if (a >= 0x248400 && a < 0x248800) return this.hit(this.rowScroll[1], a - 0x248400);
+    if (a >= 0x24C800 && a < 0x24C880) return this.hit(this.colScroll[2], a - 0x24C800);
+    if (a >= 0x24CC00 && a < 0x24D000) return this.hit(this.rowScroll[2], a - 0x24CC00);
+    if (a >= 0x240000 && a < 0x240008) return this.hit(this.ctl0[0], a - 0x240000);
+    if (a >= 0x240010 && a < 0x240018) return this.hit(this.ctl1[0], a - 0x240010);
+    if (a >= 0x246000 && a < 0x246008) return this.hit(this.ctl0[1], a - 0x246000);
+    if (a >= 0x246010 && a < 0x246018) return this.hit(this.ctl1[1], a - 0x246010);
+    if (a >= 0x24C000 && a < 0x24C008) return this.hit(this.ctl0[2], a - 0x24C000);
+    if (a >= 0x24C010 && a < 0x24C018) return this.hit(this.ctl1[2], a - 0x24C010);
+    if (a >= 0x310000 && a < 0x310800) return this.hit(this.pal, a - 0x310000, true);
+    if (a >= 0x314000 && a < 0x314800) return this.hit(this.palB, a - 0x314000, true);
+    if (a >= 0xFFC000 && a < 0xFFC800) return this.hit(this.spriteRam, a - 0xFFC000);
+    return false;
   }
+  hit(arr, off, pal = false) { this.arArr = arr; this.arOff = off; this.arPal = pal; return true; }
 
   read16(a) {
     a &= 0xFFFFFF;
     if (a < 0x60000) { const r = this.roms.main; return a < r.length ? (r[a] << 8) | r[a + 1] : 0xFFFF; }
     if (a >= 0xFF8000 && a < 0xFFC000) { const o = a - 0xFF8000; return (this.ram[o] << 8) | this.ram[o + 1]; }
     if (a >= 0x180000 && a < 0x181000 && this.sub) return this.shared[(a - 0x180000) >> 1];
-    const ar = this.area(a);
-    if (ar) return ar[0][ar[1] >> 1];
+    if (this.area(a)) return this.arArr[this.arOff >> 1];
     if (a >= 0x30C000 && a < 0x30C00C) {
       switch (a & 0xE) {
         case 0: return this.in0;
@@ -194,8 +195,7 @@ export class Dec0 {
       if (o === 0x7FF) this.sub.setIrq(0, true);
       return;
     }
-    const ar = this.area(a);
-    if (ar) { ar[0][ar[1] >> 1] = v; if (ar[2]) this.setColor(ar[1] >> 1); return; }
+    if (this.area(a)) { const i = this.arOff >> 1; this.arArr[i] = v; if (this.arPal) this.setColor(i); return; }
     if (a >= 0x30C010 && a < 0x30C020) {
       switch (a & 0xE) {
         case 0x0: this.pri = v; break;
@@ -210,11 +210,10 @@ export class Dec0 {
     a &= 0xFFFFFF;
     if (a >= 0xFF8000 && a < 0xFFC000) { this.ram[a - 0xFF8000] = v; return; }
     if (a >= 0x180000 && a < 0x181000 && this.sub) { if (a & 1) this.write16(a & ~1, v); return; }
-    const ar = this.area(a);
-    if (ar) {
-      const i = ar[1] >> 1, w = ar[0][i];
-      ar[0][i] = a & 1 ? (w & 0xFF00) | v : (w & 0xFF) | (v << 8);
-      if (ar[2]) this.setColor(i);
+    if (this.area(a)) {
+      const arr = this.arArr, i = this.arOff >> 1, w = arr[i];
+      arr[i] = a & 1 ? (w & 0xFF00) | v : (w & 0xFF) | (v << 8);
+      if (this.arPal) this.setColor(i);
       return;
     }
     if (a >= 0x30C010 && a < 0x30C020) this.write16(a & ~1, (v << 8) | v);
@@ -301,15 +300,23 @@ export class Dec0 {
     const scan = (n === 0 ? SCAN8 : SCAN16)[shape];
     const rowOn = c0[0] & 4, colOn = c0[0] & 8, rs = c1[3] & 15, cs = c1[2] & 15;
     const area = size * size;
+    // Each row goes a run at a time: to the end of a tile, or of an 8-pixel column-scroll group.
+    const m = mode === 'opaque' ? 0 : mode === 'trans' ? 1 : 2, tmask = size - 1;
+    const rows = this.rowScroll[n], colsS = this.colScroll[n];
     let srcY = c1[1] + TOP;
     for (let y = 0; y < H; y++, srcY++) {
-      let srcX = c1[0] + (rowOn ? this.rowScroll[n][(srcY >> rs) & (0x1FF >> rs)] : 0);
-      for (let x = 0; x < W; x++, srcX++) {
-        const colOff = colOn ? this.colScroll[n][((srcX >> 3) >> cs) & (0x3F >> cs)] : 0;
+      let srcX = c1[0] + (rowOn ? rows[(srcY >> rs) & (0x1FF >> rs)] : 0);
+      for (let x = 0; x < W;) {
+        const colOff = colOn ? colsS[((srcX >> 3) >> cs) & (0x3F >> cs)] : 0;
         const py = (srcY + colOff) & (mapH - 1), px = srcX & (mapW - 1);
-        const tile = data[scan(px >> shift, py >> shift)], color = tile >> 12;
-        const pen = pix[((tile & 0xFFF) % count) * area + (py & (size - 1)) * size + (px & (size - 1))];
-        if (mode === 'opaque' || (pen && (mode === 'trans' || (color & 8 && pen & 8)))) out[y * W + x] = pal[base + color * 16 + pen];
+        let run = Math.min(size - (px & tmask), W - x);
+        if (colOn) run = Math.min(run, 8 - (srcX & 7));
+        const tile = data[scan(px >> shift, py >> shift)], color = tile >> 12, cb = base + color * 16;
+        const src = ((tile & 0xFFF) % count) * area + (py & tmask) * size + (px & tmask), o = y * W + x;
+        if (m === 0) for (let i = 0; i < run; i++) out[o + i] = pal[cb + pix[src + i]];
+        else if (m === 1) for (let i = 0; i < run; i++) { const pen = pix[src + i]; if (pen) out[o + i] = pal[cb + pen]; }
+        else if (color & 8) for (let i = 0; i < run; i++) { const pen = pix[src + i]; if (pen & 8) out[o + i] = pal[cb + pen]; }
+        x += run; srcX += run;
       }
     }
   }

@@ -189,7 +189,8 @@ export class BladesOfSteel {
 
   // ---------------------------------------------------------------- video
 
-  // One K007342 layer's pixel: [pen, color index, priority group], scrolled.
+  // One K007342 layer's pixel, scrolled: its pen, color base and priority group are left in
+  // tPen / tCb / tGrp (no allocation per pixel).
   tile(layer, x, y) {
     const r = this.regs, v = this.vram, base = layer * 0x1000;
     let sx, sy;
@@ -204,24 +205,24 @@ export class BladesOfSteel {
     const i = (col & 0x1F) + (row << 5) + ((col & 0x20) << 5);
     const c = v[base + i], code = v[base + 0x800 + i] | ((c & 0x0F) << 8) | ((c & 0x40) << 6);
     const px = c & 0x10 ? 7 - (tx & 7) : tx & 7, py = c & 0x20 ? 7 - (ty & 7) : ty & 7;
-    return [this.tilePix[(code % 8192) * 64 + py * 8 + px], layer * 16, c >> 7];
+    this.tPen = this.tilePix[(code % 8192) * 64 + py * 8 + px]; this.tCb = layer * 16; this.tGrp = c >> 7;
   }
 
   render() {
     const out = this.native, pal = this.palette;
-    const front = new Uint8Array(W * H);               // layer 1's priority tiles (in front of sprites)
+    const front = this.front || (this.front = new Uint8Array(W * H));   // layer 1's priority tiles (in front of sprites)
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const [pen, cb, grp] = this.tile(1, x, y + TOP);
-        out[y * W + x] = pal[cb + pen];
-        front[y * W + x] = grp;
+        this.tile(1, x, y + TOP);
+        out[y * W + x] = pal[this.tCb + this.tPen];
+        front[y * W + x] = this.tGrp;
       }
     }
     this.drawSprites(out, front);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const [pen, cb] = this.tile(0, x, y + TOP);
-        if (pen) out[y * W + x] = pal[cb + pen];
+        this.tile(0, x, y + TOP);
+        if (this.tPen) out[y * W + x] = pal[this.tCb + this.tPen];
       }
     }
     rotate90(out, W, H, this.frame);

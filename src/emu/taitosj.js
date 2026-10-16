@@ -75,7 +75,7 @@ export class TaitoSJ {
     this.spritePix = [new Uint8Array(64 * 256), new Uint8Array(64 * 256)];
     this.dirty = new Uint8Array(2);
     this.drawOrder = drawOrders(roms.prom);
-    this.layerPix = [new Uint8Array(256 * 256), new Uint8Array(256 * 256), new Uint8Array(256 * 256)];  // each layer's pens, scrolled into screen space
+    this.layers = [0, 1, 2].map(() => ({ chars: null, scrollX: 0, colY: new Int32Array(32) }));   // each layer's scroll set-up for the frame
 
     this.cpu = new Z80({ read: (a) => this.read(a), write: (a, v) => this.write(a, v), input: () => 0xFF, output: () => {} });
     this.cpu.onIrqAck = () => { this.cpu.irq = false; };
@@ -305,22 +305,20 @@ export class TaitoSJ {
     }
   }
 
-  // A layer's pens scrolled into screen space: one X scroll for the layer, a Y scroll per column.
-  buildLayer(n) {
-    const out = this.layerPix[n], vram = this.vram, base = n * 0x400;
+  // A layer's scroll set-up for this frame: one X scroll for the layer, a Y scroll per column.
+  setupLayer(n) {
+    const L = this.layers[n];
     const bankBit = [this.colorBank[0] & 0x08, this.colorBank[0] & 0x80, this.colorBank[1] & 0x08][n];
-    const chars = this.charPix[bankBit ? 1 : 0];
+    L.chars = this.charPix[bankBit ? 1 : 0];
     const sx = this.scroll[2 * n], fudge1 = [3, 1, -1][n], fudge2 = [8, 10, 12][n];
-    const scrollX = -(sx & 0xF8) + ((sx + fudge1) & 7) + fudge2;
-    for (let x = 0; x < 256; x++) {
-      const srcX = (x - scrollX) & 255, col = srcX >> 3;
-      const scrollY = -this.colScroll[32 * n + col] - this.scroll[2 * n + 1];
-      for (let y = 0; y < 256; y++) {
-        const srcY = (y - scrollY) & 255;
-        const code = vram[base + (srcY >> 3) * 32 + col];
-        out[y * 256 + x] = chars[code * 64 + (srcY & 7) * 8 + (srcX & 7)];
-      }
-    }
+    L.scrollX = -(sx & 0xF8) + ((sx + fudge1) & 7) + fudge2;
+    for (let col = 0; col < 32; col++) L.colY[col] = -this.colScroll[32 * n + col] - this.scroll[2 * n + 1];
+  }
+
+  // Layer n's pen at screen position (x, y), both 0-255.
+  layerPixel(n, x, y) {
+    const L = this.layers[n], srcX = (x - L.scrollX) & 255, col = srcX >> 3, srcY = (y - L.colY[col]) & 255;
+    return L.chars[this.vram[n * 0x400 + (srcY >> 3) * 32 + col] * 64 + (srcY & 7) * 8 + (srcX & 7)];
   }
 
   spriteXY(i) {
@@ -336,7 +334,7 @@ export class TaitoSJ {
   render() {
     for (let set = 0; set < 2; set++) if (this.dirty[set]) { this.decodeGraphics(set); this.dirty[set] = 0; }
     const ve = this.videoEnable;
-    for (let n = 0; n < 3; n++) if (ve & (0x10 << n)) this.buildLayer(n);
+    for (let n = 0; n < 3; n++) if (ve & (0x10 << n)) this.setupLayer(n);
     const out = this.native, pal = this.palette;
     out.fill(pal[8 * (this.colorBank[1] & 7)]);
     const colorOf = [this.colorBank[0] & 7, (this.colorBank[0] >> 4) & 7, this.colorBank[1] & 7];
@@ -344,10 +342,14 @@ export class TaitoSJ {
       if (plane === 0) { if (ve & 0x80) this.drawSprites(); continue; }
       const n = plane - 1;
       if (!(ve & (0x10 << n))) continue;
-      const lp = this.layerPix[n], base = colorOf[n] * 8;
+      const L = this.layers[n], chars = L.chars, colY = L.colY, scrollX = L.scrollX, vram = this.vram, vbase = n * 0x400, base = colorOf[n] * 8;
       for (let y = 0; y < H; y++) {
-        const src = (y + TOP) * 256, dst = y * W;
-        for (let x = 0; x < W; x++) { const p = lp[src + x]; if (p) out[dst + x] = pal[base + p]; }
+        const sy = y + TOP, dst = y * W;
+        for (let x = 0; x < W; x++) {
+          const srcX = (x - scrollX) & 255, col = srcX >> 3, srcY = (sy - colY[col]) & 255;
+          const p = chars[vram[vbase + (srcY >> 3) * 32 + col] * 64 + (srcY & 7) * 8 + (srcX & 7)];
+          if (p) out[dst + x] = pal[base + p];
+        }
       }
     }
     if (ve & 0x80) this.collide();
@@ -417,7 +419,7 @@ export class TaitoSJ {
           const tx = s.sx + x;
           if (tx > 255) break;
           if (!pen(s, x, y)) continue;
-          for (let n = 0; n < 3; n++) if ((ve & (0x10 << n)) && this.layerPix[n][ty * 256 + tx]) result |= 1 << n;
+          for (let n = 0; n < 3; n++) if ((ve & (0x10 << n)) && this.layerPixel(n, tx, ty)) result |= 1 << n;
         }
       }
       this.collision[3] |= result;

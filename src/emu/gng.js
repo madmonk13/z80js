@@ -154,22 +154,23 @@ export class GhostsNGoblins {
     const out = this.frame, ram = this.ram, pal = this.palette;
     // Background (32x32 tiles of 16x16, stored a column at a time): attribute
     // bits 7-6 code high, 5/4 flips, 3 priority split, 2-0 color.
-    const bgPix = (x, y) => {
-      const bx = (x + this.scrollX) & 0x1FF, by = (y + TOP + this.scrollY) & 0x1FF;
-      const i = (bx >> 4) * 32 + (by >> 4), attr = ram[0x2C00 + i];
-      let px = bx & 15, py = by & 15;
-      if (attr & 0x10) px = 15 - px;
-      if (attr & 0x20) py = 15 - py;
-      const pen = this.tilePix[(ram[0x2800 + i] + ((attr & 0xC0) << 2)) * 256 + py * 16 + px];
-      return [pen, attr];
-    };
-    const front = new Uint8Array(W * H);
+    // A 16-pixel tile run at a time; each pixel's color is kept for the pass over the sprites.
+    const front = this.front || (this.front = new Uint8Array(W * H)), bgCol = this.bgCol || (this.bgCol = new Uint32Array(W * H));
+    front.fill(0);
     for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const [pen, attr] = bgPix(x, y);
-        out[y * W + x] = pal[(attr & 7) * 8 + pen];
-        // Split type 1: all but colors 0 and 6 draw in front of the sprites.
-        if ((attr & 0x08) && pen !== 0 && pen !== 6) front[y * W + x] = 1;
+      const by = (y + TOP + this.scrollY) & 0x1FF;
+      for (let x = 0; x < W;) {
+        const bx = (x + this.scrollX) & 0x1FF, n = Math.min(16 - (bx & 15), W - x);
+        const i = (bx >> 4) * 32 + (by >> 4), attr = ram[0x2C00 + i];
+        const py = attr & 0x20 ? 15 - (by & 15) : by & 15, src = (ram[0x2800 + i] + ((attr & 0xC0) << 2)) * 256 + py * 16;
+        const cb = (attr & 7) * 8, split = attr & 0x08, o = y * W + x;
+        for (let k = 0; k < n; k++) {
+          const c = (bx + k) & 15, pen = this.tilePix[src + (attr & 0x10 ? 15 - c : c)], col = pal[cb + pen];
+          out[o + k] = col; bgCol[o + k] = col;
+          // Split type 1: all but colors 0 and 6 draw in front of the sprites.
+          if (split && pen !== 0 && pen !== 6) front[o + k] = 1;
+        }
+        x += n;
       }
     }
     // Sprites, last to first, from last frame's copy: code, attributes
@@ -193,13 +194,7 @@ export class GhostsNGoblins {
       }
     }
     // The front half of the background over the sprites.
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        if (!front[y * W + x]) continue;
-        const [pen, attr] = bgPix(x, y);
-        out[y * W + x] = pal[(attr & 7) * 8 + pen];
-      }
-    }
+    for (let i = 0; i < W * H; i++) if (front[i]) out[i] = bgCol[i];
     // Text: code bits 9-8, flips and color in the attribute byte; pen 3 see-through.
     for (let row = 2; row < 30; row++) {
       for (let col = 0; col < 32; col++) {

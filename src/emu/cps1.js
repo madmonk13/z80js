@@ -324,13 +324,20 @@ export class CPS1 {
           let src;
           if (l === 1) src = code * 128 + ((idx & 0x20) ? 8 : 0) + row * 16;
           else src = code * size * size + row * size;
-          let px = mx & (size - 1);
-          for (let i = 0; i < run; i++, px++) {
-            const pen = pix[src + (flipX ? size - 1 - px : px)];
-            if (pen === 15) continue;
-            out[y * W + x + i] = pal[colBase + pen];
-            if ((hiMask >> pen) & 1) mask[y * W + x + i] = 1;
-            if (priBit) this.pri[y * W + x + i] |= priBit;
+          // Walk the tile's row forwards or backwards; the mask and priority bookkeeping only when needed.
+          const o0 = y * W + x, step = flipX ? -1 : 1;
+          let s = src + (flipX ? size - 1 - (mx & (size - 1)) : mx & (size - 1));
+          if (!hiMask && !priBit) {
+            for (let i = 0; i < run; i++, s += step) { const pen = pix[s]; if (pen !== 15) out[o0 + i] = pal[colBase + pen]; }
+          } else {
+            const pri = this.pri;
+            for (let i = 0; i < run; i++, s += step) {
+              const pen = pix[s];
+              if (pen === 15) continue;
+              out[o0 + i] = pal[colBase + pen];
+              if ((hiMask >> pen) & 1) mask[o0 + i] = 1;
+              if (priBit) pri[o0 + i] |= priBit;
+            }
           }
         }
         x += run;

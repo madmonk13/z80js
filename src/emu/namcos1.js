@@ -345,19 +345,27 @@ export class NamcoSystem1 {
         const [dx, dxf, dy, dyf] = fixed ? [73, 512 - 73, 16, 0x110] : [0, 0, 0, 0];
         // Where the map's origin lands on the screen (MAME's tilemap rule).
         const ox = flip ? 512 - mw - (dxf - sx) : dx - sx, oy = flip ? 512 - mh - (dyf - sy) : dy - sy;
+        // Each row walks the map a tile run at a time (maps are whole tiles wide, so runs never wrap mid-tile).
+        const tx0 = mod(WIN.x - ox, mw);
         for (let y = 0; y < WIN.h; y++) {
           let ty = mod(y + WIN.y - oy, mh);
           if (flip) ty = mh - 1 - ty;
-          const row = (ty >> 3) * cols, ry = ty & 7;
-          for (let x = 0; x < WIN.w; x++) {
-            let tx = mod(x + WIN.x - ox, mw);
-            if (flip) tx = mw - 1 - tx;
-            const t = base + (row + (tx >> 3)) * 2;
+          const row = (ty >> 3) * cols, ry = ty & 7, outRow = y * WIN.w;
+          let tx = tx0;
+          for (let x = 0; x < WIN.w;) {
+            const etx = flip ? mw - 1 - tx : tx, t = base + (row + (etx >> 3)) * 2;
             const code = (vram[t + 1] | ((vram[t] & 0x3F) << 8)) % cc;
-            if (!((mask[code * 8 + ry] << (tx & 7)) & 0x80)) continue;
-            const o = y * WIN.w + x;
-            idx[o] = colorBase + pix[code * 64 + ry * 8 + (tx & 7)];
-            pri[o] = p;
+            const m = mask[code * 8 + ry], src = code * 64 + ry * 8;
+            const n = Math.min(WIN.w - x, 8 - (tx & 7));
+            let col = etx & 7;
+            if (m) {
+              for (let k = 0; k < n; k++, col += flip ? -1 : 1) {
+                if (!((m << col) & 0x80)) continue;
+                idx[outRow + x + k] = colorBase + pix[src + col];
+                pri[outRow + x + k] = p;
+              }
+            }
+            x += n; tx += n; if (tx >= mw) tx -= mw;
           }
         }
       }

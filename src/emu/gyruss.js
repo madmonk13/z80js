@@ -181,7 +181,8 @@ export class Gyruss {
 
   render() {
     const out = this.native, v = this.vram, pal = this.palette, clut = this.roms.charLut, slut = this.roms.spriteLut;
-    const front = new Uint8Array(W * H);
+    const front = this.front || (this.front = new Uint8Array(W * H));
+    front.fill(0);
     for (let offs = 0; offs < 0x400; offs++) {
       const attr = v[offs], code = v[0x400 + offs] + 8 * (attr & 0x20), color = (attr & 0x0F) * 4;
       const x0 = (offs & 31) * 8, y0 = (offs >> 5) * 8 - TOP, fx = attr & 0x40, fy = attr & 0x80;

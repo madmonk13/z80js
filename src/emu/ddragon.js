@@ -242,12 +242,14 @@ export class DoubleDragon {
     // stored as four 16x16-tile quarters.
     for (let y = 0; y < H; y++) {
       const ty = (y + TOP + this.scrollY) & 0x1FF, row = ty >> 4;
-      for (let x = 0; x < W; x++) {
-        const tx = (x + LEFT + this.scrollX) & 0x1FF, col = tx >> 4;
+      // A 16-pixel tile run at a time.
+      for (let x = 0; x < W;) {
+        const tx = (x + LEFT + this.scrollX) & 0x1FF, col = tx >> 4, n = Math.min(16 - (tx & 15), W - x);
         const i = ((col & 15) + ((row & 15) << 4) + ((col & 16) << 4) + ((row & 16) << 5)) * 2, attr = bg[i];
-        const code = (bg[i + 1] | ((attr & 7) << 8)) % this.tileCount;
-        const px = attr & 0x40 ? 15 - (tx & 15) : tx & 15, py = attr & 0x80 ? 15 - (ty & 15) : ty & 15;
-        out[y * W + x] = pal[256 + ((attr >> 3) & 7) * 16 + this.tilePix[code * 256 + py * 16 + px]];
+        const code = (bg[i + 1] | ((attr & 7) << 8)) % this.tileCount, fx = attr & 0x40;
+        const py = attr & 0x80 ? 15 - (ty & 15) : ty & 15, src = code * 256 + py * 16, cb = 256 + ((attr >> 3) & 7) * 16, o = y * W + x;
+        for (let k = 0; k < n; k++) { const c = (tx + k) & 15; out[o + k] = pal[cb + this.tilePix[src + (fx ? 15 - c : c)]]; }
+        x += n;
       }
     }
 

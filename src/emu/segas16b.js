@@ -63,6 +63,9 @@ const STATE = ['mapRegs', 'palRam', 'tileRam', 'textRam', 'spriteRam', 'workRam'
 // Extra state for the later ROM boards.
 const STATE_X = ['tileBanks', 'mult', 'cmp', 'cmpBit', 'p2'];
 
+// Store a word's selected bytes (mask: 1 low byte, 2 high byte) into big-endian byte RAM.
+function put(arr, i, v, mask) { if (mask & 2) arr[i] = v >> 8; if (mask & 1) arr[i + 1] = v & 0xFF; }
+
 export class System16B {
   saveState() { return capture(this, this.board === 5358 ? STATE : [...STATE, ...STATE_X]); }
   loadState(s) { apply(this, this.board === 5358 ? STATE : [...STATE, ...STATE_X], s); this.remap(); for (let i = 0; i < 2048; i++) this.setColor(i); }
@@ -188,26 +191,28 @@ export class System16B {
 
   // ---------------------------------------------------------------- 68000 bus
 
+  // Find what's mapped at a: false if nothing, else true with the region's kind, the offset
+  // into it and the mirrored address left in lkKind / lkOff / lkAbs (no allocation per access).
   locate(a) {
     const i = this.blockMap[(a >> 11) & 0x1FFF];
-    if (i < 0) return null;
-    const r = this.ranges[i];
-    return [r.kind, ((a & ~r.mirror) - r.start), (a & ~r.mirror)];
+    if (i < 0) return false;
+    const r = this.ranges[i], abs = a & ~r.mirror;
+    this.lkKind = r.kind; this.lkOff = abs - r.start; this.lkAbs = abs;
+    return true;
   }
 
   read16(a) {
-    const hit = this.locate(a);
-    if (!hit) return 0xFF00 | this.mapperRead(a >> 1);
-    const [kind, o, abs] = hit;
-    const word = (arr, i) => (arr[i] << 8) | arr[i + 1];
+    if (!this.locate(a)) return 0xFF00 | this.mapperRead(a >> 1);
+    const kind = this.lkKind, o = this.lkOff;
+    let arr, i;
     switch (kind) {
       case 0: return this.io(o >> 1);
-      case 1: return word(this.palRam, o & 0xFFE);
-      case 2: return word(this.tileRam, o & 0xFFFE);
-      case 3: return word(this.textRam, o & 0xFFE);
-      case 4: return word(this.spriteRam, o & 0x7FE);
-      case 5: return word(this.workRam, o & 0x3FFE);
-      case 6: return word(this.roms.main, abs);
+      case 1: arr = this.palRam; i = o & 0xFFE; break;
+      case 2: arr = this.tileRam; i = o & 0xFFFE; break;
+      case 3: arr = this.textRam; i = o & 0xFFE; break;
+      case 4: arr = this.spriteRam; i = o & 0x7FE; break;
+      case 5: arr = this.workRam; i = o & 0x3FFE; break;
+      case 6: arr = this.roms.main; i = this.lkAbs; break;
       case 8: {                                   // 5797: multiplier, compare chip 0
         const w = (o >> 1) & 0x1FFF;
         if ((w & 0x1800) === 0) return this.multRead(w & 3);
@@ -215,8 +220,9 @@ export class System16B {
         return 0xFFFF;
       }
       case 9: return this.cmpRead(1, (o >> 1) & 7);
+      default: return 0xFFFF;
     }
-    return 0xFFFF;
+    return (arr[i] << 8) | arr[i + 1];
   }
   read8(a) { const w = this.read16(a & ~1); return a & 1 ? w & 0xFF : w >> 8; }
 
@@ -225,17 +231,16 @@ export class System16B {
 
   // mask: 1 low byte, 2 high byte, 3 both.
   write(a, v, mask) {
-    const hit = this.locate(a);
-    if (!hit) { if (mask & 1) this.mapperWrite(a >> 1, v & 0xFF); return; }
-    const [kind, o] = hit;
-    const put = (arr, i) => { if (mask & 2) arr[i] = v >> 8; if (mask & 1) arr[i + 1] = v & 0xFF; };
+    if (!this.locate(a)) { if (mask & 1) this.mapperWrite(a >> 1, v & 0xFF); return; }
+    const kind = this.lkKind, o = this.lkOff;
+    let arr, i;
     switch (kind) {
       case 0: if ((o >> 1 & 0x1800) === 0 && (mask & 1)) this.videoCtl = v & 0xFF; return;   // display enable, flip
-      case 1: put(this.palRam, o & 0xFFE); this.setColor((o & 0xFFE) >> 1); return;
-      case 2: put(this.tileRam, o & 0xFFFE); return;
-      case 3: put(this.textRam, o & 0xFFE); return;
-      case 4: put(this.spriteRam, o & 0x7FE); return;
-      case 5: put(this.workRam, o & 0x3FFE); return;
+      case 1: i = o & 0xFFE; put(this.palRam, i, v, mask); this.setColor(i >> 1); return;
+      case 2: arr = this.tileRam; i = o & 0xFFFE; break;
+      case 3: arr = this.textRam; i = o & 0xFFE; break;
+      case 4: arr = this.spriteRam; i = o & 0x7FE; break;
+      case 5: arr = this.workRam; i = o & 0x3FFE; break;
       case 7: if (mask & 1) this.setTileBank((o >> 1) & 1, v & 7); return;
       case 8: {
         const w = (o >> 1) & 0x1FFF;
@@ -245,7 +250,9 @@ export class System16B {
         return;
       }
       case 9: this.cmpWrite(1, (o >> 1) & 7, v, mask); return;
+      default: return;
     }
+    put(arr, i, v, mask);
   }
 
   // ---------------------------------------------------------------- ROM board chips
@@ -410,19 +417,27 @@ export class System16B {
       const rs = this.tw(0xF80 + 0x40 * which + (y >> 3) * 2);
       let effx = xs & 0x8000 ? rs : xs, effy = ys, pages = this.latched[which];
       if (rs & 0x8000) { effx = this.latched[8 + which + 2]; effy = this.latched[4 + which + 2]; pages = this.latched[which + 2]; }
-      const sx = (0xC0 - effx) & 0x3FF;
-      for (let x = 0; x < W; x++) {
+      const sx = (0xC0 - effx) & 0x3FF, colScroll = ys & 0x8000 && !(rs & 0x8000);
+      // A run at a time: to the end of a tile, or of a 16-pixel column-scroll group.
+      for (let x = 0; x < W;) {
         let sy = effy;
-        if (ys & 0x8000 && !(rs & 0x8000)) sy = this.tw(0xF16 + 0x40 * which + ((x + 8) >> 4) * 2);
+        if (colScroll) sy = this.tw(0xF16 + 0x40 * which + ((x + 8) >> 4) * 2);
         const vx = (x + sx) & 0x3FF, vy = (y + (sy & 0x1FF)) & 0x1FF;
+        let n = Math.min(8 - (vx & 7), W - x);
+        if (colScroll) n = Math.min(n, 16 - ((x + 8) & 15));
         const page = (pages >> (4 * ((vx >> 9) | ((vy >> 8) << 1)))) & 15;
         const o = (page * 2048 + ((vy & 255) >> 3) * 64 + ((vx & 511) >> 3)) * 2;
         const data = (ram[o] << 8) | ram[o + 1];
-        const raw = data & 0x1FFF, code = (this.tileBanks[raw >> 12] * 0x1000 + (raw & 0xFFF)) % count, color = (data >> 6) & 0x7F, cat = data >> 15;
-        const p = pix[code * 64 + (vy & 7) * 8 + (vx & 7)];
-        const i = y * W + x;
-        if (opaque) { idx[i] = color * 8 + p; if (p) pri[i] = cat ? 2 : 1; }
-        else if (p) { idx[i] = color * 8 + p; pri[i] = cat ? 4 : 2; }
+        const raw = data & 0x1FFF, code = (this.tileBanks[raw >> 12] * 0x1000 + (raw & 0xFFF)) % count, cb = ((data >> 6) & 0x7F) * 8, cat = data >> 15;
+        const src = code * 64 + (vy & 7) * 8 + (vx & 7), i0 = y * W + x;
+        if (opaque) {
+          const pp = cat ? 2 : 1;
+          for (let k = 0; k < n; k++) { const p = pix[src + k]; idx[i0 + k] = cb + p; if (p) pri[i0 + k] = pp; }
+        } else {
+          const pp = cat ? 4 : 2;
+          for (let k = 0; k < n; k++) { const p = pix[src + k]; if (p) { idx[i0 + k] = cb + p; pri[i0 + k] = pp; } }
+        }
+        x += n;
       }
     }
   }
@@ -430,15 +445,14 @@ export class System16B {
   drawText() {
     const idx = this.index, pri = this.pri, pix = this.tilePix, t = this.textRam, count = pix.length / 64;
     for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const tx = (x + 192) & 511;
+      for (let x = 0; x < W;) {
+        const tx = (x + 192) & 511, n = Math.min(8 - (tx & 7), W - x);
         const o = ((y >> 3) * 64 + (tx >> 3)) * 2;
         const data = (t[o] << 8) | t[o + 1];
-        const p = pix[((this.tileBanks[0] * 0x1000 + (data & 0x1FF)) % count) * 64 + (y & 7) * 8 + (tx & 7)];
-        if (!p) continue;
-        const i = y * W + x;
-        idx[i] = ((data >> 9) & 7) * 8 + p;
-        pri[i] = data & 0x8000 ? 8 : 4;
+        const src = ((this.tileBanks[0] * 0x1000 + (data & 0x1FF)) % count) * 64 + (y & 7) * 8 + (tx & 7);
+        const cb = ((data >> 9) & 7) * 8, pp = data & 0x8000 ? 8 : 4, i0 = y * W + x;
+        for (let k = 0; k < n; k++) { const p = pix[src + k]; if (p) { idx[i0 + k] = cb + p; pri[i0 + k] = pp; } }
+        x += n;
       }
     }
   }

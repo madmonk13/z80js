@@ -26,6 +26,7 @@ const DEFAULTS = {
   switches: {},      // board id -> { switch id -> value }
   resume: true,      // pick games up where they were left
   showAll: true,     // list every supported game, not just the ones with a ROM set added
+  perf: false,       // the performance readout
 };
 
 const input = new Input();
@@ -423,6 +424,7 @@ function syncMenu() {
   $('volume').value = settings.volume;
   $('resume').checked = settings.resume;
   $('showAll').checked = settings.showAll;
+  $('perf').checked = settings.perf;
   applySound();
   $('hapticsRow').hidden = !navigator.vibrate;
   applyControls();
@@ -446,6 +448,7 @@ $('haptics').addEventListener('change', (e) => {
 });
 $('zones').addEventListener('change', (e) => { settings.zones = e.target.checked; applyControls(); save(); });
 $('showAll').addEventListener('change', (e) => { settings.showAll = e.target.checked; save(); refreshLibrary(); });
+$('perf').addEventListener('change', (e) => { settings.perf = e.target.checked; save(); perf.reset(); });
 $('zoneOpacity').addEventListener('input', (e) => { settings.zoneOpacity = +e.target.value; applyControls(); save(); });
 $('zoneOverlap').addEventListener('input', (e) => { settings.zoneOverlap = +e.target.value; applyControls(); layout2D(); save(); });
 $('hints').addEventListener('change', (e) => {
@@ -672,6 +675,27 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', onRo
 
 // ---------------------------------------------------------------- loop
 
+// The performance readout: emulated frames a second against the game's own rate, the
+// time each emulated frame takes, screen updates a second and the time to draw one, and
+// frames dropped because the device fell more than 4 frames behind.
+const perf = {
+  frames: 0, emuMs: 0, worstMs: 0, draws: 0, drawMs: 0, dropped: 0, since: performance.now(),
+  reset() { this.frames = this.emuMs = this.worstMs = this.draws = this.drawMs = this.dropped = 0; this.since = performance.now(); $('perfStats').hidden = !settings.perf; },
+  show(now, running) {
+    const el = $('perfStats');
+    if (!settings.perf || !running) { el.hidden = true; this.frames = this.emuMs = this.worstMs = this.draws = this.drawMs = this.dropped = 0; this.since = now; return; }
+    if (now - this.since < 1000) return;
+    const secs = (now - this.since) / 1000, rate = this.frames / secs, target = board.refresh;
+    const avg = this.frames ? this.emuMs / this.frames : 0;
+    el.hidden = false;
+    el.className = rate < target * 0.97 ? 'slow' : '';
+    el.textContent = `speed ${Math.round((100 * rate) / target)}%  ${rate.toFixed(1)}/${target.toFixed(1)} fps\n`
+      + `emu ${avg.toFixed(1)} ms/frame (worst ${this.worstMs.toFixed(1)}, budget ${(1000 / target).toFixed(1)})\n`
+      + `screen ${(this.draws / secs).toFixed(0)} fps, draw ${(this.draws ? this.drawMs / this.draws : 0).toFixed(1)} ms${this.dropped ? `  dropped ${this.dropped}` : ''}`;
+    this.frames = this.emuMs = this.worstMs = this.draws = this.drawMs = this.dropped = 0; this.since = now;
+  },
+};
+
 let acc = 0, lastTime = performance.now();
 function tick(now) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
@@ -690,16 +714,25 @@ function tick(now) {
       if (board.buttons < 3) s.fire2 ||= s.fire3;   // a third button is the second's job here
       if (board.buttons < 2) s.fire ||= s.fire2;    // a second button is just fire here
       board.setInputs(s);
-      board.runFrame();
+      if (settings.perf) {
+        const t0 = performance.now();
+        board.runFrame();
+        const ms = performance.now() - t0;
+        perf.frames++; perf.emuMs += ms; if (ms > perf.worstMs) perf.worstMs = ms;
+      } else board.runFrame();
       acc -= frameTime;
       ran++;
     }
-    if (ran === 4) acc = 0;
+    if (ran === 4) { if (settings.perf) perf.dropped += Math.floor(acc / frameTime); acc = 0; }
     audio.flush();
-    if (ran) screen2d.draw(board.frame, board);
+    if (ran) {
+      if (settings.perf) { const t0 = performance.now(); screen2d.draw(board.frame, board); perf.drawMs += performance.now() - t0; perf.draws++; }
+      else screen2d.draw(board.frame, board);
+    }
   } else {
     acc = 0;
   }
+  perf.show(now, running);
 
   requestAnimationFrame(tick);
 }

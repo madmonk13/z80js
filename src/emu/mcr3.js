@@ -314,18 +314,25 @@ export class MCR3 extends MCR {
   // Monoboard: 32x30 tiles of 16x16; a tile's color bank is inverted; tile codes reach 11 bits.
   renderMono() {
     const out = this.native, vram = this.vram, pal = this.palette, bg = this.bgPix, count = this.bgPix.length / 64;
+    // Tiles are drawn into a cache and redrawn only when their tile RAM or the palette changes.
+    if (!this.tileKey) { this.tileKey = new Int32Array(30 * 32); this.bgOut = new Uint32Array(W * H); this.lastPalGen = NaN; }
+    const keys = this.tileKey, cache = this.bgOut;
+    if (this.palGen !== this.lastPalGen) { keys.fill(-1); this.lastPalGen = this.palGen; }
     for (let row = 0; row < 30; row++) {
       for (let col = 0; col < 32; col++) {
         const i = row * 32 + col, data = vram[i * 2] | (vram[i * 2 + 1] << 8);
+        if (keys[i] === data) continue;
+        keys[i] = data;
         const code = ((data & 0x3FF) | ((data >> 4) & 0x400)) % count;
         const base = (((data >> 12) & 3) ^ 3) * 16, flip = (data >> 10) & 3;
         for (let y = 0; y < 16; y++) {
           const src = code * 64 + ((flip & 2 ? 15 - y : y) >> 1) * 8;
           let o = (row * 16 + y) * W + col * 16;
-          for (let x = 0; x < 16; x++, o++) out[o] = pal[base + bg[src + ((flip & 1 ? 15 - x : x) >> 1)]];
+          for (let x = 0; x < 16; x++, o++) cache[o] = pal[base + bg[src + ((flip & 1 ? 15 - x : x) >> 1)]];
         }
       }
     }
+    out.set(cache);
     this.sprites3(W, H, 3, 0, 0);
   }
 
@@ -337,13 +344,14 @@ export class MCR3 extends MCR {
     for (let y = 0; y < 480; y++) {
       const fy = (y + sy0) & 1023, row = fy >> 5, ty = fy & 31;
       const memRow = (row & 0x0F) | ((row & 0x10) << 6);
-      let o = y * w;
-      for (let x = 0; x < w; x++, o++) {
-        const fx = (x + sx0) & 4095, col = fx >> 6;
+      // A tile (64 pixels wide) at a time.
+      for (let x = 0; x < w;) {
+        const fx = (x + sx0) & 4095, col = fx >> 6, n = Math.min(64 - (fx & 63), w - x);
         const data = vram[memRow | (col << 4)];
         const code = (data & 0x3F) | ((data >> 1) & 0x40);
-        const py = data & 0x40 ? 31 - ty : ty;
-        out[o] = pal[16 + bg[code * 512 + (py >> 1) * 32 + ((fx & 63) >> 1)]];
+        const py = data & 0x40 ? 31 - ty : ty, src = code * 512 + (py >> 1) * 32, o = y * w + x;
+        for (let i = 0; i < n; i++) out[o + i] = pal[16 + bg[src + (((fx + i) & 63) >> 1)]];
+        x += n;
       }
     }
     this.sprites3(w, 480, this.cfg.spriteColors, -12, 0);

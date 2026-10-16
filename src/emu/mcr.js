@@ -153,6 +153,7 @@ export class MCR {
   // 9-bit color: red in bits 6-8, blue 3-5, green 0-2.
   setColor(i, v) {
     this.paletteRam[i] = v;
+    this.palGen = (this.palGen + 1) | 0;          // the tile cache redraws after a palette change
     if (this.cfg.board === 90009) {                // 4 bits each: red 8-11, blue 4-7, green 0-3
       this.palette[i] = rgba(((v >> 8) & 15) * 17, (v & 15) * 17, ((v >> 4) & 15) * 17);
       return;
@@ -272,27 +273,35 @@ export class MCR {
 
   // ---------------------------------------------------------------- video
 
+  // Tiles are drawn into a cache and only redrawn when their tile RAM or the palette changes;
+  // each frame copies the cache in and adds the sprites.
   render() {
     const out = this.native, pri = this.pri, vram = this.vram, pal = this.palette, bg = this.bgPix;
-    const tapper = this.cfg.board === 91490;
+    const tapper = this.cfg.board === 91490, b90009 = this.cfg.board === 90009;
+    if (!this.tileKey) { this.tileKey = new Int32Array(30 * 32); this.bgOut = new Uint32Array(W * H); this.bgPri = new Uint8Array(W * H); this.lastPalGen = NaN; }
+    const keys = this.tileKey, cache = this.bgOut, cpri = this.bgPri;
+    if (this.palGen !== this.lastPalGen) { keys.fill(-1); this.lastPalGen = this.palGen; }
     for (let row = 0; row < 30; row++) {
       for (let col = 0; col < 32; col++) {
-        const i = row * 32 + col, data = vram[i * 2] | (vram[i * 2 + 1] << 8);
+        const i = row * 32 + col, data = b90009 ? vram[i] : vram[i * 2] | (vram[i * 2 + 1] << 8);
+        if (keys[i] === data) continue;
+        keys[i] = data;
         let code, color, flip;
-        if (this.cfg.board === 90009) { code = vram[i]; color = 0; flip = 0; }     // one byte per tile; sprites always use colors 16-31
+        if (b90009) { code = data; color = 0; flip = 0; }                          // one byte per tile; sprites always use colors 16-31
         else if (tapper) { code = data & 0x3FF; color = (data >> 12) & 3; flip = (data >> 10) & 3; }
         else { code = data & 0x1FF; color = (data >> 11) & 3; flip = (data >> 9) & 3; }
-        const bank = this.cfg.board === 90009 ? 0x10 : ((data >> 14) & 3) << 4, base = color * 16;
+        const bank = b90009 ? 0x10 : ((data >> 14) & 3) << 4, base = color * 16;
         for (let y = 0; y < 16; y++) {
           const src = code * 64 + ((flip & 2 ? 15 - y : y) >> 1) * 8;
           let o = (row * 16 + y) * W + col * 16;
           for (let x = 0; x < 16; x++, o++) {
-            out[o] = pal[base + bg[src + ((flip & 1 ? 15 - x : x) >> 1)]];
-            pri[o] = bank;
+            cache[o] = pal[base + bg[src + ((flip & 1 ? 15 - x : x) >> 1)]];
+            cpri[o] = bank;
           }
         }
       }
     }
+    out.set(cache); pri.set(cpri);
     if (tapper || this.cfg.board === 91475) this.spritesFrontToBack(); else this.spritesOred();
     if (this.cfg.rotate) rotate90(out, W, H, this.frame);
     else if (this.cfg.transpose) transpose(out, W, H, this.frame);

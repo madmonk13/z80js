@@ -421,6 +421,11 @@ The touch layout follows the game:
   switch apps or lock the phone), so a refresh or relaunch picks up exactly where you were. It
   isn't saved during play, so a crash loses what happened since the last stop. Restart / Power
   cycle starts over.
+- **Show performance** (off by default): a small readout over the game with the emulation speed
+  against the game's own frame rate, the time each emulated frame takes (average and worst, beside
+  the frame budget), how often and how fast the screen is drawn, and any frames dropped because the
+  device fell behind. Turns red when the game runs slower than full speed; useful for checking how a
+  game runs on a phone.
 - **Battery RAM:** boards with battery-backed settings and high scores (the Midway Y-unit
   games' CMOS) keep it per ROM set, so the first launch's "factory settings restored"
   message (press any button) appears only once.

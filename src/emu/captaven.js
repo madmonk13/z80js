@@ -258,37 +258,44 @@ export class CaptainAmerica {
     }
     const pf2At = (ly) => { for (const s of segs) if (ly >= s[0] && ly <= s[1]) return [s[2], s[3]]; return null; };
 
-    // [pen, color] of a pixel in each layer, or null when see-through.
-    const pf2px = (x, y) => {
-      let [sx, sy] = this.scroll(p12, 1, this.row2, 512, y);
-      const r = pf2At(y); if (r) { sx = r[0] & 0xFFFF; sy = r[1] & 0xFFFF; }
-      const tx = (x + sx) & 1023, ty = (y + sy) & 511, col = tx >> 4, row = ty >> 4;
-      const t = this.pf2[(col & 0x1F) + ((row & 0x1F) << 5) + ((col & 0x20) << 5)];
-      let color = (t >> 12) & 15, fx = 0, fy = 0;
-      if (t & 0x8000) { if (pf2Flip & 1) { fx = 1; color &= 7; } if (pf2Flip & 2) { fy = 1; color &= 7; } }
-      const code = (t & 0xFFF) % (this.tilePix.length / 256);
-      const pen = this.tilePix[code * 256 + (fy ? 15 - (ty & 15) : ty & 15) * 16 + (fx ? 15 - (tx & 15) : tx & 15)];
-      return [pen, 512 + (color + 16) * 16 + pen];
-    };
-    const pf3px = (x, y) => {
-      const [sx, sy] = this.scroll(p34, 0, this.row3, 512, y);
-      const tx = (x + sx) & 511, ty = (y + sy) & 511;
-      const t = this.pf3[(ty >> 4) * 32 + (tx >> 4)];
-      const code = ((t & 0x3FFF) + pf3Bank) % (this.tile8Pix.length / 256);
-      const pen = this.tile8Pix[code * 256 + (ty & 15) * 16 + (tx & 15)];
-      return [pen, 1024 + ((t >> 14) & 3) * 256 + pen];
-    };
     const lower = (this.pri & 1) === 0;
+    // Both layers' scroll is fixed for a line, so it's worked out once a line; each pixel is
+    // then looked up directly (pen 0 is see-through in the upper layer).
+    const tilePix = this.tilePix, tile8Pix = this.tile8Pix, pf2 = this.pf2, pf3 = this.pf3;
+    const count2 = tilePix.length / 256, count3 = tile8Pix.length / 256;
     for (let y = 0; y < H; y++) {
       const ly = y + TOP, row = y * W;
+      let sx2 = 0, sy2 = 0, sx3 = 0, sy3 = 0;
+      if (pf2On) {
+        [sx2, sy2] = this.scroll(p12, 1, this.row2, 512, ly);
+        const r = pf2At(ly); if (r) { sx2 = r[0] & 0xFFFF; sy2 = r[1] & 0xFFFF; }
+      }
+      if (pf3On) [sx3, sy3] = this.scroll(p34, 0, this.row3, 512, ly);
+      const ty2 = (ly + sy2) & 511, ty3 = (ly + sy3) & 511, row3 = (ty3 >> 4) * 32, py3 = (ty3 & 15) * 16;
       for (let x = 0; x < W; x++) {
+        let pen2 = 0, ci2 = 0, pen3 = 0, ci3 = 0;
+        if (pf2On) {
+          const tx = (x + sx2) & 1023, col = tx >> 4, rw = ty2 >> 4;
+          const t = pf2[(col & 0x1F) + ((rw & 0x1F) << 5) + ((col & 0x20) << 5)];
+          let color = (t >> 12) & 15, fx = 0, fy = 0;
+          if (t & 0x8000) { if (pf2Flip & 1) { fx = 1; color &= 7; } if (pf2Flip & 2) { fy = 1; color &= 7; } }
+          const code = (t & 0xFFF) % count2;
+          pen2 = tilePix[code * 256 + (fy ? 15 - (ty2 & 15) : ty2 & 15) * 16 + (fx ? 15 - (tx & 15) : tx & 15)];
+          ci2 = 512 + (color + 16) * 16 + pen2;
+        }
+        if (pf3On) {
+          const tx = (x + sx3) & 511, t = pf3[row3 + (tx >> 4)];
+          const code = ((t & 0x3FFF) + pf3Bank) % count3;
+          pen3 = tile8Pix[code * 256 + py3 + (tx & 15)];
+          ci3 = 1024 + ((t >> 14) & 3) * 256 + pen3;
+        }
         let c = black, p = 0;
         if (lower) {
-          if (pf3On) c = pal[pf3px(x, ly)[1]];
-          if (pf2On) { const [pen, ci] = pf2px(x, ly); if (pen) { c = pal[ci]; p = 1; } }
+          if (pf3On) c = pal[ci3];
+          if (pf2On && pen2) { c = pal[ci2]; p = 1; }
         } else {
-          if (pf2On) c = pal[pf2px(x, ly)[1]];
-          if (pf3On) { const [pen, ci] = pf3px(x, ly); if (pen) { c = pal[ci]; p = 1; } }
+          if (pf2On) c = pal[ci2];
+          if (pf3On && pen3) { c = pal[ci3]; p = 1; }
         }
         out[row + x] = c; pri[row + x] = p;
       }

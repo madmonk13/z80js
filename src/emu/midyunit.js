@@ -492,10 +492,11 @@ export class MidwayYUnit {
       const x0 = Math.max(0, p.heblnk), x1 = Math.min(p.hsblnk, p.heblnk + W);
       if (!p.enabled) out.fill(0xFF000000, o, o + W);
       else {
-        for (let x = x0; x < x1; x++) {
-          const v = vr[row + (col++ & 0x1FF)];
-          out[o + x - p.heblnk] = pal[eight ? v & 0x1FFF : four ? ((v & 0xF000) >> 8) | (v & 0x000F) : ((v & 0xC000) >> 8) | (v & 0x0F3F)];
-        }
+        // One loop per pixel format (8-bit Z-unit, 4-bit, 6-bit), so the format isn't tested per pixel.
+        const d = o - p.heblnk;
+        if (eight) for (let x = x0; x < x1; x++) out[d + x] = pal[vr[row + (col++ & 0x1FF)] & 0x1FFF];
+        else if (four) for (let x = x0; x < x1; x++) { const v = vr[row + (col++ & 0x1FF)]; out[d + x] = pal[((v & 0xF000) >> 8) | (v & 0x000F)]; }
+        else for (let x = x0; x < x1; x++) { const v = vr[row + (col++ & 0x1FF)]; out[d + x] = pal[((v & 0xC000) >> 8) | (v & 0x0F3F)]; }
         for (let x = x1 - p.heblnk; x < W; x++) out[o + x] = 0xFF000000;
       }
     }

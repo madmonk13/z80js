@@ -55,6 +55,13 @@ function makeOp() {
 const STATE = ['addr', 'regs', 'ch', 'waveEnable', 'nts', 'depthAm', 'depthVib', 'rhythm', 'drums', 't1', 't2', 'count1',
   'count2', 'timerCtl', 'flags', 'lfoAm', 'lfoVib', 'noise'];
 
+// An operator's output level from its attenuation, total level, key scaling and tremolo.
+function opLevel(op, kslPos, tremDb) {
+  if (op.stage === OFF) return 0;
+  const db = op.att + op.tl * 0.75 + kslPos * KSL_SCALE[op.ksl] + (op.am ? tremDb : 0);
+  return db >= 96 ? 0 : Math.exp(-db * LN10_20);
+}
+
 export class YM3812 {
   constructor(clock, gain = 1) {
     this.clock = clock;
@@ -168,29 +175,28 @@ export class YM3812 {
     }
     const white = this.noise & 1 ? 1 : -1;
     let sum = 0;
-    const last = this.rhythm ? 6 : 9;
+    const last = this.rhythm ? 6 : 9, waves = this.waveEnable;
     for (let n = 0; n < 9; n++) {
       const c = this.ch[n], o = c.ops;
-      const base = (c.fnum * Math.pow(2, c.block) * fs) / 1048576;
+      // The channel's phase step only changes with its frequency registers.
+      if (c.stepF !== c.fnum || c.stepB !== c.block) { c.stepF = c.fnum; c.stepB = c.block; c.step = (c.fnum * Math.pow(2, c.block) * fs) / 1048576; }
+      const base = c.step;
       const keycode = (c.block << 1) | ((c.fnum >> (this.nts ? 8 : 9)) & 1);
-      const kslDb = KSL_DB[c.fnum >> 6] - 6 * (7 - c.block);
-      for (const op of o) {
+      const kslDb = KSL_DB[c.fnum >> 6] - 6 * (7 - c.block), kslPos = Math.max(0, kslDb);
+      for (let k = 0; k < o.length; k++) {
+        const op = o[k];
         this.envelope(op, keycode, dt);
         op.phase = (op.phase + base * op.mul * (op.vib ? vibMul : 1) * dt) % 1;
       }
       if (n >= last) continue;
-      const level = (op) => {
-        if (op.stage === OFF) return 0;
-        const db = op.att + op.tl * 0.75 + Math.max(0, kslDb) * KSL_SCALE[op.ksl] + (op.am ? tremDb : 0);
-        return db >= 96 ? 0 : Math.exp(-db * LN10_20);
-      };
-      const wave = (op, mod) => WAVES[this.waveEnable ? op.wave : 0][(op.phase * N + (mod / TWO_PI) * N) & (N - 1)];
-      const a1 = level(o[0]);
+      const o0 = o[0], o1 = o[1];
+      const a1 = opLevel(o0, kslPos, tremDb);
       const fbIn = c.fb ? (c.fb1 + c.fb2) * Math.PI * Math.pow(2, c.fb - 7) : 0;
-      const out1 = a1 ? wave(o[0], fbIn) * a1 : 0;
+      const out1 = a1 ? WAVES[waves ? o0.wave : 0][(o0.phase * N + (fbIn / TWO_PI) * N) & (N - 1)] * a1 : 0;
       c.fb2 = c.fb1; c.fb1 = out1;
-      const a2 = level(o[1]);
-      const out2 = a2 ? wave(o[1], c.con ? 0 : out1 * 4 * Math.PI) * a2 : 0;
+      const a2 = opLevel(o1, kslPos, tremDb);
+      const mod = c.con ? 0 : out1 * 4 * Math.PI;
+      const out2 = a2 ? WAVES[waves ? o1.wave : 0][(o1.phase * N + (mod / TWO_PI) * N) & (N - 1)] * a2 : 0;
       sum += c.con ? out1 + out2 : out2;
     }
     if (this.rhythm) sum += this.drumMix(white);
@@ -224,9 +230,8 @@ export class YM3812 {
   envelope(op, keycode, dt) {
     if (op.stage === OFF) return;
     const rof = op.ksr ? keycode : keycode >> 2;
-    const rate = (r) => (r ? Math.min(63, 4 * r + rof) : 0);
     if (op.stage === ATTACK) {
-      const r = rate(op.ar);
+      const r = op.ar ? Math.min(63, 4 * op.ar + rof) : 0;
       if (r >= 60) { op.att = 0; op.stage = DECAY; return; }
       const t = RISE(r);
       if (t === Infinity) return;
@@ -235,10 +240,8 @@ export class YM3812 {
       return;
     }
     const sl = op.sl === 15 ? 93 : op.sl * 3;
-    let r;
-    if (op.stage === DECAY) r = rate(op.dr);
-    else if (op.stage === SUSTAIN) r = op.egt ? 0 : rate(op.rr);   // percussive sounds keep falling at the release rate
-    else r = rate(op.rr);
+    const rate = op.stage === DECAY ? op.dr : op.stage === SUSTAIN && op.egt ? 0 : op.rr;   // percussive sounds keep falling at the release rate
+    const r = rate ? Math.min(63, 4 * rate + rof) : 0;
     const t = FALL(r);
     if (t !== Infinity) op.att += (96 * dt) / t;
     if (op.stage === DECAY && op.att >= sl) { op.att = sl; op.stage = SUSTAIN; }
