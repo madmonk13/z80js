@@ -8,6 +8,7 @@ import { AudioOut } from './audio-out.js';
 import { store, readRomFile, withLoading, toast } from './shared.js';
 import { library, renderLibrary, server, romId } from './library.js';
 import { TouchControls } from './touch.js';
+import { registerServiceWorker } from './sw-update.js';
 
 const $ = (id) => document.getElementById(id);
 const SOUND_RATE = 48000;        // every board's sound source runs at this rate
@@ -779,9 +780,7 @@ window.audio = audio;
 Object.defineProperty(window, 'board', { get: () => board });
 
 // Offline support: the service worker (sw.js, written by tools/build-sw.mjs)
-// caches the app so it runs without a network once installed. Browsers only
-// allow it on https or localhost.
-if ('serviceWorker' in navigator && window.isSecureContext) {
-  const register = () => navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (document.readyState === 'complete') register(); else window.addEventListener('load', register);
-}
+// caches the app so it runs without a network once installed, and a new
+// version shows an update screen while it installs. Browsers only allow it on
+// https or localhost.
+registerServiceWorker('z80js');
